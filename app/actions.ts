@@ -8,6 +8,7 @@ import { Member } from "./types/member";
 import { AttendanceStat } from "./types/attendance";
 import { TrainerMember } from "./types/trainer";
 import { MemberRoutine } from "@/app/types/routine";
+import { decodeSession, encodeSession, getSessionCookieName } from "@/lib/session";
 
 // ==================== AUTH ACTIONS ====================
 
@@ -101,7 +102,9 @@ export async function loginUser(formData: FormData) {
     };
 
     const cookieStore = await cookies();
-    cookieStore.set("session", JSON.stringify(sessionData), {
+    const encodedSession = await encodeSession(sessionData);
+
+    cookieStore.set(getSessionCookieName(), encodedSession, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -121,22 +124,18 @@ export async function loginUser(formData: FormData) {
 
 
 export async function logoutUser() {
-  const cookieStore = await cookies(); 
-  cookieStore.delete("session");
+  const cookieStore = await cookies();
+  cookieStore.delete(getSessionCookieName());
   return { success: true };
 }
 
 export async function getSession() {
-  const cookieStore = await cookies(); 
-  const session = cookieStore.get("session");
+  const cookieStore = await cookies();
+  const session = cookieStore.get(getSessionCookieName());
 
   if (!session) return null;
 
-  try {
-    return JSON.parse(session.value);
-  } catch {
-    return null;
-  }
+  return decodeSession(session.value);
 }
 
 // ==================== MEMBER ACTIONS ====================
@@ -680,5 +679,4 @@ interface RoutineExercise {
   sets: number;
   reps: number;
 }
-
 

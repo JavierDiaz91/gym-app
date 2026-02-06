@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { decodeSession, getSessionCookieName } from "@/lib/session";
 
-export function middleware(request: NextRequest) {
-  const sessionCookie = request.cookies.get("session");
+export async function middleware(request: NextRequest) {
+  const sessionCookie = request.cookies.get(getSessionCookieName());
   const { pathname } = request.nextUrl;
 
   const isAdminRoute = pathname.startsWith("/admin");
@@ -15,33 +16,31 @@ export function middleware(request: NextRequest) {
   }
 
   if (sessionCookie) {
-    try {
-      const session = JSON.parse(sessionCookie.value);
+    const session = await decodeSession(sessionCookie.value);
+    if (!session) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
 
-      // 🔒 Admin ONLY
-      if (isAdminRoute && session.role !== "admin") {
-        return NextResponse.redirect(new URL("/miembro", request.url));
-      }
+    // 🔒 Admin ONLY
+    if (isAdminRoute && session.role !== "admin") {
+      return NextResponse.redirect(new URL("/miembro", request.url));
+    }
 
-      // 🔒 Trainer ONLY (admin también puede entrar)
-      if (
-        isTrainerRoute &&
-        session.role !== "trainer" &&
-        session.role !== "admin"
-      ) {
-        return NextResponse.redirect(new URL("/login", request.url));
-      }
+    // 🔒 Trainer ONLY (admin también puede entrar)
+    if (
+      isTrainerRoute &&
+      session.role !== "trainer" &&
+      session.role !== "admin"
+    ) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
 
-      // 🔒 Member ONLY (admin también puede entrar)
-      if (
-        isMemberRoute &&
-        session.role !== "member" &&
-        session.role !== "admin"
-      ) {
-        return NextResponse.redirect(new URL("/login", request.url));
-      }
-    } catch {
-      // Cookie corrupta
+    // 🔒 Member ONLY (admin también puede entrar)
+    if (
+      isMemberRoute &&
+      session.role !== "member" &&
+      session.role !== "admin"
+    ) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }
