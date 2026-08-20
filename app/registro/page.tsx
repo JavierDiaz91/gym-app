@@ -1,8 +1,6 @@
 "use client";
 
-import React from "react"
-
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -10,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Dumbbell, Loader2, CheckCircle2 } from "lucide-react";
+import { Activity, Loader2, CheckCircle2 } from "lucide-react";
 import { registerUser } from "@/app/actions";
 
 export default function RegistroPage() {
@@ -29,13 +27,13 @@ export default function RegistroPage() {
     const confirmPassword = formData.get("confirmPassword") as string;
 
     if (password !== confirmPassword) {
-      setError("Las contrasenas no coinciden");
+      setError("Las contraseñas no coinciden");
       setLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setError("La contrasena debe tener al menos 6 caracteres");
+      setError("La contraseña debe tener al menos 6 caracteres");
       setLoading(false);
       return;
     }
@@ -51,136 +49,185 @@ export default function RegistroPage() {
   }
 
   const benefits = [
-    "Acceso a clases grupales",
-    "Seguimiento de progreso",
-    "Reserva de clases online",
-    "Planes personalizados",
+    "Acceso a instalaciones completas",
+    "Planes adaptados a tu ritmo",
+    "Seguimiento personalizado",
+    "Reserva y consulta de clases",
   ];
 
   return (
-    <div className="min-h-screen flex bg-muted/30">
-      {/* Left Side - Benefits */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary p-12 flex-col justify-center relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
+    <div className="min-h-screen flex bg-[#0d0f12] text-gray-100">
+      {/* Left Side - Hero Panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#12151a] p-12 flex-col justify-between relative overflow-hidden border-r border-gray-800/60">
+        {/* Background Subtle Gradient */}
+        <div className="absolute inset-0 z-0 opacity-20">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#00aeef] rounded-full blur-[120px]" />
         </div>
-        <div className="relative z-10 max-w-lg">
-          <Link href="/" className="flex items-center gap-3 mb-12">
-            <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-              <Dumbbell className="w-8 h-8 text-primary-foreground" />
+
+        {/* Top Brand Logo */}
+        <div className="relative z-10">
+          <Link href="/" className="inline-flex items-center gap-3">
+            <div className="w-12 h-12 bg-[#00aeef]/10 border border-[#00aeef]/30 rounded-xl flex items-center justify-center shadow-lg shadow-[#00aeef]/10">
+              <Activity className="w-6 h-6 text-[#00aeef]" />
             </div>
             <span 
-              className="text-3xl font-bold text-primary-foreground"
+              className="text-2xl font-extrabold text-white tracking-tight"
               style={{ fontFamily: "var(--font-heading)" }}
             >
-              FitZone
+              Pulse<span className="text-[#00aeef]">Fit</span>
             </span>
           </Link>
+        </div>
+
+        {/* Center Content */}
+        <div className="relative z-10 max-w-lg my-auto py-12">
+          <span className="text-[#00aeef] font-bold uppercase tracking-wider text-xs bg-[#00aeef]/10 border border-[#00aeef]/20 px-3.5 py-1.5 rounded-full inline-block mb-6">
+            Comenzá Hoy
+          </span>
+
           <h1 
-            className="text-4xl font-bold text-primary-foreground mb-6"
+            className="text-4xl sm:text-5xl font-black text-white mb-6 leading-tight tracking-tight"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Comienza Tu Viaje Fitness Hoy
+            Tu Cambio Empieza <br />
+            <span className="text-[#00aeef]">Con Un Clic.</span>
           </h1>
-          <p className="text-xl text-primary-foreground/80 mb-8">
-            Unete a miles de personas que ya estan transformando sus vidas con nosotros.
+
+          <p className="text-lg text-gray-400 mb-8 leading-relaxed">
+            Sumate a la comunidad y empezá a entrenar con las mejores herramientas y acompañamiento.
           </p>
+
           <ul className="space-y-4">
             {benefits.map((benefit) => (
-              <li key={benefit} className="flex items-center gap-3 text-primary-foreground">
-                <CheckCircle2 className="w-6 h-6 text-primary-foreground/80" />
-                <span className="text-lg">{benefit}</span>
+              <li key={benefit} className="flex items-center gap-3 text-gray-300">
+                <div className="w-6 h-6 rounded-full bg-[#00aeef]/10 border border-[#00aeef]/30 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-[#00aeef]" />
+                </div>
+                <span className="text-base font-medium">{benefit}</span>
               </li>
             ))}
           </ul>
         </div>
+
+        {/* Footer Note */}
+        <div className="relative z-10 text-xs text-gray-600">
+          &copy; {new Date().getFullYear()} PulseFit. Todos los derechos reservados.
+        </div>
       </div>
 
       {/* Right Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <Card className="w-full max-w-md border-0 shadow-xl">
-          <CardHeader className="text-center">
-            <div className="lg:hidden flex items-center justify-center gap-2 mb-4">
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                <Dumbbell className="w-7 h-7 text-primary-foreground" />
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-[#0a0c0e]">
+        <Card className="w-full max-w-md border border-gray-800/80 shadow-2xl rounded-2xl bg-[#14171d] text-gray-100 p-2">
+          <CardHeader className="text-center pb-6">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <div className="w-12 h-12 bg-[#00aeef]/10 border border-[#00aeef]/30 rounded-xl flex items-center justify-center">
+                <Activity className="w-6 h-6 text-[#00aeef]" />
               </div>
             </div>
-            <CardTitle className="text-2xl" style={{ fontFamily: "var(--font-heading)" }}>
+            <CardTitle 
+              className="text-2xl font-extrabold text-white" 
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
               Crear Cuenta
             </CardTitle>
-            <CardDescription>
-              Completa tus datos para registrarte
+            <CardDescription className="text-gray-400 text-sm">
+              Ingresá tus datos para acceder a <span className="text-[#00aeef] font-medium">PulseFit</span>
             </CardDescription>
           </CardHeader>
+
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               {error && (
-                <Alert variant="destructive">
+                <Alert variant="destructive" className="rounded-xl bg-red-500/10 border-red-500/30 text-red-400">
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre Completo</Label>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="name" className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                  Nombre Completo
+                </Label>
                 <Input
                   id="name"
                   name="name"
                   type="text"
-                  placeholder="Juan Perez"
+                  placeholder="Juan Pérez"
+                  className="rounded-xl bg-[#0d0f12] border-gray-800 text-white placeholder:text-gray-600 focus-visible:ring-[#00aeef] focus-visible:border-[#00aeef] h-11"
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                  Correo electrónico
+                </Label>
                 <Input
                   id="email"
                   name="email"
                   type="email"
                   placeholder="tu@email.com"
+                  className="rounded-xl bg-[#0d0f12] border-gray-800 text-white placeholder:text-gray-600 focus-visible:ring-[#00aeef] focus-visible:border-[#00aeef] h-11"
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Telefono (opcional)</Label>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="phone" className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                  Teléfono (opcional)
+                </Label>
                 <Input
                   id="phone"
                   name="phone"
                   type="tel"
-                  placeholder="(555) 123-4567"
+                  placeholder="(3492) 12-3456"
+                  className="rounded-xl bg-[#0d0f12] border-gray-800 text-white placeholder:text-gray-600 focus-visible:ring-[#00aeef] focus-visible:border-[#00aeef] h-11"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password">Contrasena</Label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="password" className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                    Contraseña
+                  </Label>
                   <Input
                     id="password"
                     name="password"
                     type="password"
                     placeholder="******"
+                    className="rounded-xl bg-[#0d0f12] border-gray-800 text-white placeholder:text-gray-600 focus-visible:ring-[#00aeef] focus-visible:border-[#00aeef] h-11"
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirmar</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirmPassword" className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                    Confirmar
+                  </Label>
                   <Input
                     id="confirmPassword"
                     name="confirmPassword"
                     type="password"
                     placeholder="******"
+                    className="rounded-xl bg-[#0d0f12] border-gray-800 text-white placeholder:text-gray-600 focus-visible:ring-[#00aeef] focus-visible:border-[#00aeef] h-11"
                     required
                   />
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col gap-4">
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+
+            <CardFooter className="flex flex-col gap-4 pt-4">
+              <Button 
+                type="submit" 
+                className="w-full bg-[#00aeef] hover:bg-[#0098d4] text-black font-bold h-12 rounded-xl shadow-lg shadow-[#00aeef]/20 text-base transition-all" 
+                disabled={loading}
+              >
+                {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin text-black" />}
                 Crear Cuenta
               </Button>
-              <p className="text-sm text-muted-foreground text-center">
-                Ya tienes cuenta?{" "}
-                <Link href="/login" className="text-primary hover:underline">
-                  Inicia sesion
+
+              <p className="text-sm text-gray-400 text-center">
+                ¿Ya tenés cuenta?{" "}
+                <Link href="/login" className="text-[#00aeef] hover:underline font-semibold">
+                  Iniciá sesión
                 </Link>
               </p>
             </CardFooter>

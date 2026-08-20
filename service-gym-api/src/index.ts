@@ -5,6 +5,7 @@ import membersRoutes from "./routes/members.routes";
 import routinesRoutes from "./routes/routines.routes";
 import memberRoutinesRoutes from "./routes/memberRoutines.routes";
 import routineExercisesRoutes from "./routes/routineExercises.routes";
+import trainersRoutes from "./routes/trainers.routes";
 
 const app = express();
 
@@ -15,7 +16,7 @@ app.use("/api/members", membersRoutes);
 app.use("/api/routines", routinesRoutes);
 app.use("/api/member-routines", memberRoutinesRoutes);
 app.use("/api/routine-exercises", routineExercisesRoutes);
-
+app.use("/api/trainers", trainersRoutes);
 app.listen(3001, () => {
   console.log("API running on http://localhost:3001");
 });

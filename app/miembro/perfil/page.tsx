@@ -1,90 +1,139 @@
-"use client";
+import { getSession, updateProfile } from "@/app/actions";
+import { redirect } from "next/navigation";
+import { sql } from "@/lib/db";
+import { User, Lock, Save } from "lucide-react";
+import { AvatarUpload } from "@/components/member/avatar-upload";
+import { ChangePasswordForm } from "@/components/member/change-password-form";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { User } from "lucide-react";
+export default async function ProfilePage() {
+  const session = await getSession();
+  if (!session) redirect("/login");
 
-export default function PerfilPage() {
+  const userId = session.user?.id || session.id || session.userId;
+
+  // Traer los datos reales del alumno
+  let member: any = null;
+  try {
+    const result = await sql`
+      SELECT 
+        m.first_name, 
+        m.last_name, 
+        m.phone, 
+        m.emergency_contact,
+        m.avatar_url,
+        u.email
+      FROM members m
+      JOIN users u ON u.id = m.user_id
+      WHERE m.user_id = ${userId} OR m.id = ${userId}
+      LIMIT 1
+    `;
+    const rows = Array.isArray(result) ? result : (result as any).rows || [];
+    member = rows[0] || {};
+  } catch (error) {
+    console.error("Error al obtener datos del perfil:", error);
+  }
+
   return (
-    <div className="space-y-8 max-w-2xl">
-      <div>
-        <h1 
-          className="text-3xl font-bold"
-          style={{ fontFamily: "var(--font-heading)" }}
+    <div className="max-w-3xl mx-auto space-y-8">
+      {/* Sección Información Personal */}
+      <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm space-y-6">
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <User className="w-5 h-5 text-primary" />
+            Información Personal
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Actualizá tus datos de contacto
+          </p>
+        </div>
+
+        {/* Carga e interacción del Avatar */}
+        <AvatarUpload
+          initialImage={member.avatar_url}
+          initials={member.first_name?.[0]?.toUpperCase() || "A"}
+        />
+
+        <form
+          action={async (formData: FormData) => {
+            "use server";
+            await updateProfile(formData);
+          }}
+          className="space-y-4"
         >
-          Mi Perfil
-        </h1>
-        <p className="text-muted-foreground">
-          Administra tu informacion personal
-        </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium block mb-1">Nombre</label>
+              <input
+                name="firstName"
+                defaultValue={member.first_name || ""}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Apellido</label>
+              <input
+                name="lastName"
+                defaultValue={member.last_name || ""}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium block mb-1">Email</label>
+            <input
+              value={member.email || session.email || ""}
+              disabled
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-muted text-muted-foreground cursor-not-allowed"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium block mb-1">Teléfono</label>
+            <input
+              name="phone"
+              defaultValue={member.phone || ""}
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium block mb-1">
+              Contacto de Emergencia
+            </label>
+            <input
+              name="emergencyContact"
+              defaultValue={member.emergency_contact || ""}
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
+          >
+            <Save className="w-4 h-4" /> Guardar Cambios
+          </button>
+        </form>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Informacion Personal</CardTitle>
-          <CardDescription>Actualiza tus datos de contacto</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center">
-              <User className="w-10 h-10 text-primary" />
-            </div>
-            <Button variant="outline">Cambiar Foto</Button>
-          </div>
+      {/* Sección Cambiar Contraseña */}
+      <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm space-y-6">
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Lock className="w-5 h-5 text-primary" />
+            Cambiar Contraseña
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Actualizá tu contraseña de acceso
+          </p>
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">Nombre</Label>
-              <Input id="firstName" placeholder="Juan" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Apellido</Label>
-              <Input id="lastName" placeholder="Perez" />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="juan@email.com" />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="phone">Telefono</Label>
-            <Input id="phone" type="tel" placeholder="(555) 123-4567" />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="emergency">Contacto de Emergencia</Label>
-            <Input id="emergency" placeholder="Nombre y telefono" />
-          </div>
-
-          <Button>Guardar Cambios</Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Cambiar Contrasena</CardTitle>
-          <CardDescription>Actualiza tu contrasena de acceso</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="currentPassword">Contrasena Actual</Label>
-            <Input id="currentPassword" type="password" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="newPassword">Nueva Contrasena</Label>
-            <Input id="newPassword" type="password" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirmar Nueva Contrasena</Label>
-            <Input id="confirmPassword" type="password" />
-          </div>
-          <Button variant="outline">Cambiar Contrasena</Button>
-        </CardContent>
-      </Card>
+        {/* Componente Client Form con estados y feedback de error/éxito */}
+        <ChangePasswordForm />
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import Link from "next/link";
+import TrainerSidebar from "@/components/trainer/sidebar";
+import ThemeToggleBar from "@/components/ui/ThemeToggleBar";
 
 export default function TrainerLayout({
   children,
@@ -6,25 +7,17 @@ export default function TrainerLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-64 bg-sidebar text-sidebar-foreground p-4">
-        <nav className="space-y-2">
-          <Link href="/trainer" className="block hover:underline">
-            Dashboard
-          </Link>
+    <div className="flex flex-col md:flex-row min-h-screen bg-background text-foreground relative">
+      {/* Sidebar preparado para ocultarse en celular y ser fijo en PC */}
+      <TrainerSidebar />
 
-          <Link href="/trainer/alumnos" className="block hover:underline">
-            Mis Alumnos
-          </Link>
+      {/* Contenido principal con límites de ancho responsivos */}
+      <main className="flex-1 w-full min-w-0 p-4 md:p-8 overflow-y-auto">
+        {children}
+      </main>
 
-          <Link href="/trainer/rutinas" className="block hover:underline">
-            Rutinas
-          </Link>
-        </nav>
-      </aside>
-
-      <main className="flex-1 p-6">{children}</main>
+      {/* Barra flotante de cambio de tema */}
+      <ThemeToggleBar />
     </div>
   );
 }
-

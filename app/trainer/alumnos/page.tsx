@@ -1,62 +1,50 @@
-import { getSession, getTrainerMembers } from "@/app/actions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Phone } from "lucide-react";
+import { redirect } from "next/navigation";
+import { getSession, getTrainerMembers, getTrainerRoutines } from "@/app/actions";
+import AlumnosClient from "./AlumnosClient";
+import { Routine } from "../rutinas/TarjetaRutina";
+
+export const dynamic = "force-dynamic";
 
 export default async function TrainerAlumnosPage() {
   const session = await getSession();
-
-  // 🔒 Seguridad extra (además del middleware)
   if (!session || session.role !== "trainer") {
-    return (
-      <div className="p-6 text-center text-muted-foreground">
-        No autorizado
-      </div>
-    );
+    redirect("/login");
   }
 
-  const members = await getTrainerMembers(session.id);
+  // Cargar alumnos y catálogo de rutinas en paralelo
+  const [rawMembers, serverRoutines] = await Promise.all([
+    getTrainerMembers(session.id),
+    getTrainerRoutines(session.id),
+  ]);
+
+  const members = (rawMembers || []).map((row: any) => ({
+    id: Number(row.id),
+    first_name: row.first_name || row.name || "Alumno",
+    last_name: row.last_name || "",
+    phone: row.phone || "",
+    status: row.status || "active",
+    routines: Array.isArray(row.routines) 
+      ? row.routines 
+      : row.routine_name 
+        ? [{ id: Number(row.routine_id), title: row.routine_name }] 
+        : [],
+    last_workout_at: row.last_workout_at ? String(row.last_workout_at) : undefined,
+  }));
+
+  // Mapear el catálogo de rutinas al tipo estricto
+  const routines: Routine[] = (serverRoutines || []).map((row: any) => ({
+    id: Number(row.id),
+    title: row.title || "Sin título",
+    notes: typeof row.notes === "string" ? row.notes : JSON.stringify(row.notes || []),
+  }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Mis Alumnos</h1>
-        <p className="text-muted-foreground">
-          Alumnos asignados a tu cuenta
-        </p>
-      </div>
-
-      {members.length === 0 ? (
-        <p className="text-muted-foreground">
-          No tenés alumnos asignados todavía
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {members.map((member) => (
-            <Card key={member.id}>
-              <CardHeader>
-                <CardTitle>
-                  {member.first_name} {member.last_name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="text-sm">
-                  Estado:{" "}
-                  <span className="font-medium capitalize">
-                    {member.status}
-                  </span>
-                </p>
-
-                {member.phone && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Phone className="w-4 h-4" />
-                    {member.phone}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+    <div className="w-full min-h-screen bg-background text-foreground transition-colors p-4 md:p-6">
+      <AlumnosClient 
+        initialMembers={members} 
+        routines={routines} 
+        sessionUserId={session.id}
+      />
     </div>
   );
 }

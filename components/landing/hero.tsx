@@ -1,73 +1,70 @@
-import { Button } from "@/components/ui/button";
-import { ArrowRight, Play } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
 
 export function Hero() {
   return (
-    <section id="inicio" className="relative min-h-screen flex items-center pt-16">
-      {/* Background */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#0a0a0a_0%,transparent_50%)] z-10" />
-      <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: "url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1920&q=80')",
-        }}
-      />
-      <div className="absolute inset-0 bg-foreground/70" />
-      
-      <div className="container mx-auto px-4 relative z-20">
-        <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 bg-primary/20 border border-primary/30 rounded-full px-4 py-1.5 mb-6">
-            <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-            <span className="text-sm text-primary-foreground/90">Nuevas instalaciones 2026</span>
-          </div>
+    <section className="relative min-h-[85vh] flex items-center bg-[#0d0f12] overflow-hidden pt-16">
+      {/* Background Image with Dark Overlay */}
+      <div className="absolute inset-0 z-0">
+        <img
+          src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1920&auto=format&fit=crop"
+          alt="PulseFit Gym Background"
+          className="w-full h-full object-cover opacity-25"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0d0f12] via-[#0d0f12]/85 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0d0f12] via-transparent to-transparent" />
+      </div>
+
+      <div className="container mx-auto px-4 z-10 relative py-16 md:py-24">
+        <div className="max-w-3xl space-y-8">
           
+          {/* Badge llamativo */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#00aeef]/10 border border-[#00aeef]/30 text-[#00aeef] text-xs font-bold tracking-wider uppercase backdrop-blur-md">
+            <span className="w-2 h-2 rounded-full bg-[#00aeef] animate-pulse" />
+            Superá tus límites
+          </div>
+
+          {/* Título de alto impacto */}
           <h1 
-            className="text-5xl md:text-7xl font-bold text-white leading-tight mb-6"
+            className="text-4xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight leading-[1.08]"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Tu Mejor <br />
-            <span className="text-primary">Version</span> <br />
-            Comienza Aqui
+            ENTRENÁ <br />
+            SIN EXCUSAS. <br />
+            <span className="text-[#00aeef]">TRANSFORMÁ</span> TU VIDA.
           </h1>
-          
-          <p className="text-lg text-white/80 mb-8 max-w-lg leading-relaxed">
-            Transforma tu cuerpo y mente con nuestros programas personalizados, 
-            equipos de ultima generacion y entrenadores certificados.
+
+          {/* Bajada directa */}
+          <p className="text-lg md:text-xl text-gray-300 max-w-xl font-normal leading-relaxed">
+            El espacio, la disciplina y el ambiente que necesitás para alcanzar tu mejor versión física.
           </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button size="lg" className="text-base h-12 px-8" asChild>
-              <Link href="/registro">
-                Empieza Gratis
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
+
+          {/* Botones de acción directos */}
+          <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <Button 
               size="lg" 
-              variant="outline" 
-              className="text-base h-12 px-8 border-white/30 text-white hover:bg-white/10 bg-transparent"
+              className="bg-[#00aeef] hover:bg-[#0098d4] text-black font-extrabold text-base h-13 px-8 rounded-xl shadow-lg shadow-[#00aeef]/25 transition-all uppercase tracking-wide"
+              asChild
             >
-              <Play className="mr-2 h-5 w-5" />
-              Ver Tour Virtual
+              <Link href="/registro">
+                Inscribirme Ahora
+                <ArrowRight className="ml-2 h-5 w-5 stroke-[2.5]" />
+              </Link>
+            </Button>
+
+            <Button 
+              size="lg" 
+              variant="outline"
+              className="text-base h-13 px-8 border-gray-800 text-white hover:bg-white/10 bg-black/40 backdrop-blur-sm rounded-xl font-semibold hover:border-gray-700"
+              asChild
+            >
+              <Link href="#planes" className="flex items-center gap-2">
+                Conocer Planes
+              </Link>
             </Button>
           </div>
-          
-          {/* Stats */}
-          <div className="flex flex-wrap gap-8 mt-12 pt-8 border-t border-white/20">
-            <div>
-              <p className="text-3xl font-bold text-white" style={{ fontFamily: "var(--font-heading)" }}>2,500+</p>
-              <p className="text-sm text-white/60">Miembros Activos</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-white" style={{ fontFamily: "var(--font-heading)" }}>50+</p>
-              <p className="text-sm text-white/60">Clases Semanales</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-white" style={{ fontFamily: "var(--font-heading)" }}>15</p>
-              <p className="text-sm text-white/60">Entrenadores Pro</p>
-            </div>
-          </div>
+
         </div>
       </div>
     </section>

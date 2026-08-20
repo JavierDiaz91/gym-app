@@ -1,57 +1,27 @@
-// app/trainer/rutinas/page.tsx
+import { redirect } from "next/navigation";
+import { getSession, getTrainerRoutines } from "@/app/actions";
+import PlanificadorClient from "./PlanificadorClient";
+import { Routine } from "./TarjetaRutina";
 
-import { getSession } from "@/app/actions";
-import { sql } from "@/lib/db";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+export const dynamic = "force-dynamic";
 
 export default async function RutinasPage() {
-  // 1️⃣ Obtener sesión (SERVER COMPONENT)
   const session = await getSession();
-
   if (!session || session.role !== "trainer") {
-    return <p>No autorizado</p>;
+    redirect("/login");
   }
 
-  // QUERY PARA OBTENER LAS RUTINAS DEL TRAINER 
-  const routines = await sql`
-  SELECT 
-    r.id,
-    r.title,
-    r.description
-  FROM routines r
-  JOIN trainers t ON r.trainer_id = t.id
-  WHERE t.user_id = ${session.id}
-  ORDER BY r.created_at DESC
-`;
+  const serverRoutines = await getTrainerRoutines(session.id);
 
+  const routines: Routine[] = (serverRoutines || []).map((row: any) => ({
+    id: Number(row.id),
+    title: row.title || "Sin título",
+    notes: typeof row.notes === "string" ? row.notes : JSON.stringify(row.notes || []),
+  }));
 
-  // Render
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Mis Rutinas</h1>
-        <Button asChild>
-          <Link href="/trainer/rutinas/nueva">Nueva Rutina</Link>
-        </Button>
-      </div>
-
-      {routines.length === 0 ? (
-        <p className="text-muted-foreground">
-          Todavía no creaste rutinas
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {routines.map((r) => (
-            <li key={r.id} className="border p-4 rounded">
-              <p className="font-medium">{r.title}</p>
-              <p className="text-sm text-muted-foreground">
-                {r.description || "Sin descripción"}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="w-full min-h-screen bg-background text-foreground p-4 md:p-6 transition-colors duration-200">
+      <PlanificadorClient initialRoutines={routines} />
     </div>
   );
 }

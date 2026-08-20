@@ -4,32 +4,39 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
+  LayoutDashboard, 
+  Users, 
   Dumbbell, 
-  History, 
-  User, 
+  UserCheck, 
   LogOut, 
   Activity, 
   Menu,
   X 
 } from "lucide-react";
-import { logoutUser } from "@/app/actions";
+import { logoutUser } from "@/app/actions"; 
 
 const navigation = [
-  { name: "Mi Rutina", href: "/miembro", icon: Dumbbell },
-  { name: "Historial", href: "/miembro/historial", icon: History },
-  { name: "Mi Perfil", href: "/miembro/perfil", icon: User },
+  { name: "Dashboard", href: "/trainer", icon: LayoutDashboard },
+  { name: "Mis Alumnos", href: "/trainer/alumnos", icon: Users },
+  { name: "Rutinas", href: "/trainer/rutinas", icon: Dumbbell },
+  { name: "Asignación Masiva", href: "/trainer/asignar-masivo", icon: UserCheck },
 ];
 
-export default function MemberSidebar() {
+export default function TrainerSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
-  async function handleLogout() {
-    await logoutUser();
-    router.push("/login");
-    router.refresh();
-  }
+  // Función para procesar el logout
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      router.push("/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
+  };
 
   return (
     <>
@@ -44,7 +51,7 @@ export default function MemberSidebar() {
               PulseFit
             </h1>
             <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">
-              Member App
+              Trainer Hub
             </span>
           </div>
         </div>
@@ -65,7 +72,7 @@ export default function MemberSidebar() {
         />
       )}
 
-      {/* Menú Lateral Alumno */}
+      {/* Menú Lateral */}
       <aside
         className={`bg-zinc-950 text-zinc-300 flex flex-col justify-between border-r border-zinc-800/80 select-none shrink-0 z-50 transition-transform duration-300 ease-in-out ${
           "fixed top-0 left-0 bottom-0 w-64 shadow-xl md:shadow-none"
@@ -87,26 +94,26 @@ export default function MemberSidebar() {
                   PulseFit
                 </h1>
                 <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
-                  Member App
+                  Trainer Hub
                 </span>
               </div>
             </div>
             <span className="text-[10px] bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-500/20 font-medium">
-              MEMBER
+              PRO
             </span>
           </div>
 
           {/* Navigation */}
           <nav className="p-4 space-y-1.5">
             <p className="px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-              Menú Alumno
+              Menú Principal
             </p>
 
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive =
-                item.href === "/miembro"
-                  ? pathname === "/miembro"
+                item.href === "/trainer"
+                  ? pathname === "/trainer"
                   : pathname.startsWith(item.href);
 
               return (
@@ -132,22 +139,24 @@ export default function MemberSidebar() {
           </nav>
         </div>
 
-        {/* Profile / Logout */}
+        {/* Profile */}
         <div className="p-4 border-t border-zinc-800/60">
           <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/50 border border-zinc-800/40">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 text-white font-bold text-xs flex items-center justify-center shadow-inner">
-                AU
+                JD
               </div>
               <div className="flex flex-col">
                 <span className="text-xs font-semibold text-white leading-tight">
-                  Alumno Uno
+                  Javier Díaz
                 </span>
-                <span className="text-[10px] text-zinc-400">Atleta</span>
+                <span className="text-[10px] text-zinc-400">Entrenador</span>
               </div>
             </div>
 
+            {/* BOTÓN CON onClick Y cursor-pointer AÑADIDOS */}
             <button
+              type="button"
               title="Cerrar sesión"
               onClick={handleLogout}
               className="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"

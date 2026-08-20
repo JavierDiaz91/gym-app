@@ -1,0 +1,24 @@
+{
+  "name": "FitZone - Trainer Hub",
+  "short_name": "FitZone",
+  "description": "Plataforma de entrenamiento y gestión de rutinas",
+  "start_url": "/miembro/rutina",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#059669",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
