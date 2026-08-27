@@ -11,7 +11,7 @@ export interface User {
   id: number
   email: string
   password_hash: string
-  role: 'admin' | 'trainer' | 'member'
+  role: 'admin' | 'trainer' | 'member' | 'superadmin'
   created_at: Date
   updated_at: Date
 }

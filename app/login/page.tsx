@@ -28,11 +28,13 @@ export default function LoginPage() {
       setError(result.error);
       setLoading(false);
     } else if (result.success) {
-      setLoading(false); // ✅ IMPORTANTE
+      setLoading(false); 
 
-      if (result.user?.role === "admin") {
+      if (result.user?.role === "superadmin") {
+        router.push("/admin/gimnasios");
+      } else if (result.user?.role === "admin") {
         router.push("/admin");
-      } else if (result.user.role === "trainer") {
+      } else if (result.user?.role === "trainer") {
         router.push("/trainer");
       } else {
         router.push("/miembro");
@@ -99,7 +101,7 @@ export default function LoginPage() {
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin text-zinc-950" />}
               Iniciar Sesión
             </Button>
-
+console.log("Resultado del login:", result);
             <p className="text-sm text-zinc-400 text-center">
               ¿No tenés cuenta?{" "}
               <Link href="/registro" className="text-cyan-400 hover:text-cyan-300 hover:underline font-medium transition-colors">

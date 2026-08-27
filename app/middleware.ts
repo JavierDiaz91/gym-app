@@ -9,38 +9,57 @@ export function middleware(request: NextRequest) {
   const isAdminRoute = pathname.startsWith("/admin");
   const isTrainerRoute = pathname.startsWith("/trainer");
   const isMemberRoute = pathname.startsWith("/miembro");
+  const isLoginRoute = pathname === "/login";
 
-  // ❌ 1️⃣ SIN SESIÓN → Mandar derecho al login
+  // 🔄 Si YA TIENE SESIÓN e intenta ir a /login, lo redirigimos a su panel
+  if (sessionCookie && isLoginRoute) {
+    try {
+      const session = JSON.parse(sessionCookie.value);
+      if (session.role === "superadmin") return NextResponse.redirect(new URL("/admin/gimnasios", request.url));
+      if (session.role === "admin") return NextResponse.redirect(new URL("/admin", request.url));
+      if (session.role === "trainer") return NextResponse.redirect(new URL("/trainer", request.url));
+      return NextResponse.redirect(new URL("/miembro", request.url));
+    } catch {
+      // Si la cookie es inválida, dejamos que pase al login
+    }
+  }
+
+  // ❌ 1️⃣ SIN SESIÓN → Mandar al login
   if (!sessionCookie && (isAdminRoute || isTrainerRoute || isMemberRoute)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 🔒 2️⃣ CON SESIÓN → Validar roles de forma estricta
+  // 🔒 2️⃣ CON SESIÓN → Validar roles
   if (sessionCookie) {
     try {
       const session = JSON.parse(sessionCookie.value);
 
-      // 👑 Regla Admin ONLY
-      if (isAdminRoute && session.role !== "admin") {
-        // Si no es admin, lo pateamos a su respectiva zona según su rol
+      // 👑 Regla Admin / SuperAdmin
+      if (isAdminRoute && session.role !== "admin" && session.role !== "superadmin") {
         const fallbackUrl = session.role === "trainer" ? "/trainer" : "/miembro";
         return NextResponse.redirect(new URL(fallbackUrl, request.url));
       }
 
-      // 🏋️ Regla Trainer ONLY (Admin también puede pasar)
-      if (isTrainerRoute && session.role !== "trainer" && session.role !== "admin") {
-        // Si un miembro común intenta entrar acá, lo mandamos a su panel de alumno
+      // 🏋️ Regla Trainer
+      if (
+        isTrainerRoute &&
+        session.role !== "trainer" &&
+        session.role !== "admin" &&
+        session.role !== "superadmin"
+      ) {
         return NextResponse.redirect(new URL("/miembro", request.url));
       }
 
-      // 👤 Regla Member ONLY (Admin también puede pasar)
-      if (isMemberRoute && session.role !== "member" && session.role !== "admin") {
-        // Si el entrenador intenta entrar a /miembro, lo mandamos a su panel de trainer
+      // 👤 Regla Member
+      if (
+        isMemberRoute &&
+        session.role !== "member" &&
+        session.role !== "admin" &&
+        session.role !== "superadmin"
+      ) {
         return NextResponse.redirect(new URL("/trainer", request.url));
       }
-
     } catch {
-      // Si la cookie está corrupta o rota, limpiamos y mandamos a loguear
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }
@@ -48,7 +67,6 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Esto le dice a Next.js exactamente qué rutas monitorear desde el segundo cero
 export const config = {
-  matcher: ["/admin/:path*", "/trainer/:path*", "/miembro/:path*"],
+  matcher: ["/login", "/admin/:path*", "/trainer/:path*", "/miembro/:path*"],
 };

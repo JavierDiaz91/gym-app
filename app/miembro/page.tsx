@@ -14,7 +14,8 @@ import {
   Dumbbell,
   Play,
   Flame,
-  Zap
+  Zap,
+  Check
 } from "lucide-react";
 
 interface MemberDashboardData {
@@ -32,6 +33,7 @@ interface RoutineData {
   id: number;
   name: string;
   description: string | null;
+  completedToday?: boolean;
 }
 
 export default async function MiembroDashboardPage() {
@@ -66,22 +68,41 @@ export default async function MiembroDashboardPage() {
     const rows = Array.isArray(result) ? result : (result as any).rows || [];
     memberData = (rows[0] as MemberDashboardData) || null;
 
-    // 2. Si se encontró el miembro, obtenemos todas las rutinas asignadas
+    // 2. Si se encontró el miembro, obtenemos las rutinas y los entrenamientos completados HOY
     if (memberData) {
-      const routineResult = await sql`
-        SELECT r.id, COALESCE(r.title, 'Rutina Asignada') as name, r.notes as description
-        FROM routines r
-        INNER JOIN member_routines mr ON mr.routine_id = r.id
-        WHERE mr.member_id = ${memberData.id}
-        
-        UNION
+      // Fecha de hoy en formato YYYY-MM-DD
+      const todayStr = new Date().toISOString().split("T")[0];
 
-        SELECT r.id, COALESCE(r.title, 'Rutina Asignada') as name, r.notes as description
-        FROM routines r
-        WHERE r.id = ${memberData.routine_id || -1}
-      `;
+     // Consulta simultánea: rutinas asignadas y logs de hoy
+      const [routineResult, completedTodayLogs] = await Promise.all([
+        sql`
+          SELECT r.id, COALESCE(r.title, 'Rutina Asignada') as name, r.notes as description
+          FROM routines r
+          INNER JOIN member_routines mr ON mr.routine_id = r.id
+          WHERE mr.member_id = ${memberData.id}
+          
+          UNION
+
+          SELECT r.id, COALESCE(r.title, 'Rutina Asignada') as name, r.notes as description
+          FROM routines r
+          WHERE r.id = ${memberData.routine_id || -1}
+        `,
+        sql`
+          SELECT DISTINCT routine_id 
+          FROM workout_logs 
+          WHERE member_id = ${memberData.id} 
+            AND completed_at::date = CURRENT_DATE
+        `.catch((err) => {
+          console.error("Error al consultar logs:", err);
+          return [];
+        })
+      ]);
 
       const routineRows = Array.isArray(routineResult) ? routineResult : (routineResult as any).rows || [];
+      const completedRows = Array.isArray(completedTodayLogs) ? completedTodayLogs : (completedTodayLogs as any).rows || [];
+      
+      // Set con los IDs de las rutinas ya realizadas hoy
+      const completedRoutineIds = new Set(completedRows.map((c: any) => c.routine_id));
 
       assignedRoutines = routineRows.map((raw: any) => {
         let cleanDescription = "Ingresá para ver las series, repeticiones y descansos asignados.";
@@ -105,6 +126,7 @@ export default async function MiembroDashboardPage() {
           id: raw.id,
           name: raw.name,
           description: cleanDescription,
+          completedToday: completedRoutineIds.has(raw.id),
         };
       });
     }
@@ -283,12 +305,22 @@ export default async function MiembroDashboardPage() {
                     </p>
                   </div>
 
-                  <Link
-                    href={`/miembro/rutina?id=${routine.id}`}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap shadow-sm"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" /> Iniciar Rutina
-                  </Link>
+                  {/* Renderizado dinámico según el estado de la rutina */}
+                  {routine.completedToday ? (
+                    <Link
+                      href={`/miembro/rutina?id=${routine.id}`}
+                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-semibold text-emerald-600 bg-emerald-500/10 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 transition-colors whitespace-nowrap shadow-sm"
+                    >
+                      <Check className="w-3.5 h-3.5 text-emerald-600" /> Realizada
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/miembro/rutina?id=${routine.id}`}
+                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap shadow-sm"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" /> Iniciar Rutina
+                    </Link>
+                  )}
                 </div>
               );
             })}

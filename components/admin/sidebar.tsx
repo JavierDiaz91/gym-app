@@ -11,23 +11,29 @@ import {
   BarChart3, 
   Settings,
   LogOut,
-  Dumbbell
+  Dumbbell,
+  Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { logoutUser } from "@/app/actions";
 
+interface AdminSidebarProps {
+  userRole?: string; // Recibe 'superadmin', 'admin', etc.
+}
+
 const navItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/miembros", label: "Miembros", icon: Users },
-  { href: "/admin/membresias", label: "Membresias", icon: CreditCard },
-  { href: "/admin/clases", label: "Clases", icon: Calendar },
-  { href: "/admin/entrenadores", label: "Entrenadores", icon: UserCheck },
-  { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },
-  { href: "/admin/configuracion", label: "Configuracion", icon: Settings },
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, roles: ["superadmin", "admin"] },
+  { href: "/admin/gimnasios", label: "Gimnasios", icon: Building2, roles: ["superadmin"] }, // Solo Superadmin
+  { href: "/admin/miembros", label: "Miembros", icon: Users, roles: ["superadmin", "admin"] },
+  { href: "/admin/membresias", label: "Membresias", icon: CreditCard, roles: ["superadmin", "admin"] },
+  { href: "/admin/clases", label: "Clases", icon: Calendar, roles: ["superadmin", "admin"] },
+  { href: "/admin/entrenadores", label: "Entrenadores", icon: UserCheck, roles: ["superadmin", "admin"] },
+  { href: "/admin/reportes", label: "Reportes", icon: BarChart3, roles: ["superadmin", "admin"] },
+  { href: "/admin/configuracion", label: "Configuracion", icon: Settings, roles: ["superadmin", "admin"] },
 ];
 
-export function AdminSidebar() {
+export function AdminSidebar({ userRole = "admin" }: AdminSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -35,6 +41,11 @@ export function AdminSidebar() {
     await logoutUser();
     router.push("/");
   }
+
+  // Filtramos las opciones según el rol del usuario
+  const filteredNavItems = navItems.filter((item) => 
+    item.roles.includes(userRole)
+  );
 
   return (
     <aside className="w-64 bg-sidebar text-sidebar-foreground min-h-screen flex flex-col">
@@ -50,14 +61,16 @@ export function AdminSidebar() {
             >
               FitZone
             </span>
-            <span className="text-xs text-sidebar-foreground/60">Panel Admin</span>
+            <span className="text-xs text-sidebar-foreground/60">
+              {userRole === "superadmin" ? "SuperAdmin SaaS" : "Panel Admin"}
+            </span>
           </div>
         </Link>
       </div>
 
       <nav className="flex-1 p-4">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const isActive = pathname === item.href || 
               (item.href !== "/admin" && pathname.startsWith(item.href));
             

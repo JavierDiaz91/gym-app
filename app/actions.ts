@@ -1322,3 +1322,74 @@ export async function assignRoutineToMultipleMembersBulk(
     };
   }
 }
+
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+export async function getGymsAction() {
+  try {
+    const response = await fetch(`${API_URL}/gyms`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    if (!response.ok) return { success: false, data: [] };
+
+    const result = await response.json();
+    
+    // Express responde { success: true, data: [...] }
+    return { success: true, data: result.data || [] };
+  } catch (error) {
+    console.error("Error fetching gyms:", error);
+    return { success: false, data: [] };
+  }
+}
+
+export async function createGymAction(formData: {
+  name: string;
+  slug: string;
+  adminEmail: string;
+  adminPasswordHash: string; // Recibe el valor plano del formulario
+}) {
+  try {
+    const payload = {
+      name: formData.name,
+      slug: formData.slug,
+      adminEmail: formData.adminEmail,
+      adminPasswordHash: formData.adminPasswordHash, // ❌ NO apliques bcrypt.hash acá
+      adminFirstName: "Admin",
+      adminLastName: formData.name,
+    };
+
+    const res = await fetch(`${API_URL}/gyms`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (data.success) revalidatePath("/admin/gimnasios");
+    return data;
+  } catch (error) {
+    console.error("Error creating gym:", error);
+    return { success: false, error: "No se pudo crear el gimnasio" };
+  }
+}
+
+export async function toggleGymStatusAction(gymId: number, status: string) {
+  try {
+    const res = await fetch(`${API_URL}/gyms/${gymId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+
+    const data = await res.json();
+    if (data.success) revalidatePath("/admin/gimnasios");
+    return data;
+  } catch (error) {
+    console.error("Error updating status:", error);
+    return { success: false, error: "No se pudo actualizar el estado" };
+  }
+}

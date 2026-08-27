@@ -84,11 +84,7 @@ export default function TarjetaRutina({ routine, onEdit, onDeleteSuccess }: Tarj
                 <h3 className="font-bold text-foreground text-base tracking-tight leading-snug">
                   {routine.title}
                 </h3>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    ID #{routine.id}
-                  </span>
-                  <span className="w-1 h-1 rounded-full bg-border" />
+                <div className="flex items-center gap-2 mt-1">
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#00aeef] bg-[#00aeef]/10 px-2 py-0.5 rounded-md border border-[#00aeef]/20">
                     <Layers className="w-3 h-3" />
                     {ejercicios.length} {ejercicios.length === 1 ? "ejercicio" : "ejercicios"}
