@@ -100,3 +100,83 @@ export async function updateMember(
 export async function deleteMember(id: number): Promise<void> {
   await sql`DELETE FROM members WHERE id = ${id}`;
 }
+
+
+export async function createGymMember(data: {
+  gymId: number;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  emergencyContact?: string;
+  planId?: number;
+}) {
+  // 1. Crear el miembro
+  const [member] = await sql`
+    INSERT INTO members (gym_id, first_name, last_name, email, phone, emergency_contact)
+    VALUES (${data.gymId}, ${data.firstName}, ${data.lastName}, ${data.email || null}, ${data.phone || null}, ${data.emergencyContact || null})
+    RETURNING *
+  `;
+
+  // 2. Si se seleccionó un plan, crear su suscripción inicial (30 días)
+  if (data.planId) {
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + 1);
+
+    await sql`
+      INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
+      VALUES (${member.id}, ${data.planId}, ${startDate.toISOString()}, ${endDate.toISOString()}, 'active')
+    `;
+  }
+
+  return member;
+}
+
+
+export async function getMemberProfile(memberId: number) {
+  const result = await sql`
+    SELECT 
+      m.id,
+      m.first_name,
+      m.last_name,
+      m.email,
+      m.status,
+      s.start_date,
+      s.end_date,
+      mp.name AS plan_name,
+      mp.price AS plan_price
+    FROM members m
+    LEFT JOIN subscriptions s ON s.member_id = m.id
+    LEFT JOIN memberships mp ON s.membership_id = mp.id
+    WHERE m.id = ${memberId}
+    ORDER BY s.created_at DESC
+    LIMIT 1;
+  `;
+
+  return result[0];
+}
+
+export async function getMemberDashboard(memberId: number) {
+  const result = await sql`
+    SELECT 
+      m.id,
+      m.first_name,
+      m.last_name,
+      m.email,
+      m.status AS member_status,
+      s.start_date,
+      s.end_date,
+      s.status AS subscription_status,
+      mp.name AS plan_name,
+      mp.price AS plan_price
+    FROM members m
+    LEFT JOIN subscriptions s ON s.member_id = m.id AND s.status = 'active'
+    LEFT JOIN memberships mp ON s.membership_id = mp.id
+    WHERE m.id = ${memberId}
+    ORDER BY s.created_at DESC
+    LIMIT 1;
+  `;
+
+  return result[0];
+}

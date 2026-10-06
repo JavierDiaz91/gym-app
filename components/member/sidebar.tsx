@@ -14,13 +14,20 @@ import {
 } from "lucide-react";
 import { logoutUser } from "@/app/actions";
 
+interface MemberSidebarProps {
+  user?: {
+    name?: string;
+    email?: string;
+  };
+}
+
 const navigation = [
   { name: "Mi Rutina", href: "/miembro", icon: Dumbbell },
   { name: "Historial", href: "/miembro/historial", icon: History },
   { name: "Mi Perfil", href: "/miembro/perfil", icon: User },
 ];
 
-export default function MemberSidebar() {
+export default function MemberSidebar({ user }: MemberSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -30,6 +37,19 @@ export default function MemberSidebar() {
     router.push("/login");
     router.refresh();
   }
+
+  // Nombre de usuario dinámico con fallback a "Javier Diaz" si la propiedad viene vacía
+  const userName =
+    user?.name && user.name !== "Alumno" ? user.name : "Javier Diaz";
+
+  // Genera "JD" a partir de las iniciales del nombre
+  const initials = userName
+    .trim()
+    .split(/\s+/)
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
 
   return (
     <>
@@ -135,13 +155,13 @@ export default function MemberSidebar() {
         {/* Profile / Logout */}
         <div className="p-4 border-t border-zinc-800/60">
           <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/50 border border-zinc-800/40">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 text-white font-bold text-xs flex items-center justify-center shadow-inner">
-                AU
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 text-white font-bold text-xs flex items-center justify-center shadow-inner">
+                {initials}
               </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-semibold text-white leading-tight">
-                  Alumno Uno
+              <div className="flex flex-col truncate">
+                <span className="text-xs font-semibold text-white leading-tight truncate">
+                  {userName}
                 </span>
                 <span className="text-[10px] text-zinc-400">Atleta</span>
               </div>
@@ -150,7 +170,7 @@ export default function MemberSidebar() {
             <button
               title="Cerrar sesión"
               onClick={handleLogout}
-              className="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer shrink-0"
             >
               <LogOut className="w-4 h-4" />
             </button>

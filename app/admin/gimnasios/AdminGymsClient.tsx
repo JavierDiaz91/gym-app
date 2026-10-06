@@ -1,16 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Building2, Plus, Search, ShieldCheck, Ban, Users, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
 import { createGymAction, toggleGymStatusAction } from "@/app/actions";
 
 export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] }) {
-  // Aseguramos que el estado inicial siempre sea un Array
+  const router = useRouter();
+
+  // Estado local derivado de props
   const [gyms, setGyms] = useState<any[]>(Array.isArray(initialGyms) ? initialGyms : []);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sincronizar el estado cliente cuando initialGyms cambia en el servidor
+  useEffect(() => {
+    setGyms(Array.isArray(initialGyms) ? initialGyms : []);
+  }, [initialGyms]);
 
   const [form, setForm] = useState({
     name: "",
@@ -36,27 +44,34 @@ export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] })
       toast.success("¡Gimnasio creado con éxito!", { id: toastId });
       setIsModalOpen(false);
       setForm({ name: "", slug: "", adminEmail: "", adminPasswordHash: "" });
-      setGyms((prev) => [res.data.gym, ...prev]);
+      
+      // Actualización optimista + Refresh del servidor
+      if (res.data?.gym) {
+        setGyms((prev) => [res.data.gym, ...prev]);
+      }
+      router.refresh();
     } else {
       toast.error(res?.error || "Error al registrar gimnasio", { id: toastId });
     }
   };
 
   const handleStatusToggle = async (id: number, currentStatus: string) => {
-    const newStatus = currentStatus === "active" ? "suspended" : "active";
-    const res = await toggleGymStatusAction(id, newStatus);
+  const newStatus = currentStatus === "active" ? "suspended" : "active";
 
-    if (res?.success) {
-      toast.success(`Gimnasio ${newStatus === "active" ? "activado" : "suspendido"}`);
-      setGyms((prev) =>
-        prev.map((g) => (g.id === id ? { ...g, status: newStatus } : g))
-      );
-    } else {
-      toast.error("Error al cambiar estado");
-    }
+  const res = (await toggleGymStatusAction(id, newStatus)) as {
+    success: boolean;
+    error?: string;
   };
 
-  // Filtrado seguro validando que gyms sea un Array y que g no sea undefined
+  if (res?.success) {
+    toast.success(`Gimnasio ${newStatus === "active" ? "activado" : "suspendido"}`);
+    // Le pedimos a Next.js que re-ejecute el GET en el servidor
+    router.refresh(); 
+  } else {
+    toast.error(res?.error || "Error al cambiar estado");
+  }
+  };
+
   const filteredGyms = (Array.isArray(gyms) ? gyms : []).filter(
     (g) =>
       g?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||

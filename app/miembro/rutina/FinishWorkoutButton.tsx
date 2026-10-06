@@ -1,71 +1,33 @@
-// app/miembro/rutina/FinishWorkoutButton.tsx
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, Loader2 } from "lucide-react";
-import { logWorkout } from "@/app/actions";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { logWorkout } from "@/app/actions";
+import { CheckCircle } from "lucide-react";
 
 export function FinishWorkoutButton({ routineId }: { routineId: number }) {
-  const [loading, setLoading] = useState(false);
-  const [completed, setCompleted] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  const handleFinish = async () => {
-    setLoading(true);
-    try {
-      const res = await logWorkout(routineId, { status: "completed", date: new Date().toISOString() });
+  const handleFinish = () => {
+    startTransition(async () => {
+      const res = await logWorkout(routineId, { completedAt: new Date().toISOString() });
       if (res.success) {
-        setCompleted(true);
-        
-        // 1. Limpiamos las claves del localStorage (tanto la nueva convención como la anterior)
-        Object.keys(localStorage).forEach((key) => {
-          if (key.startsWith("routine_progress_") || key.startsWith("exercise_completed_")) {
-            localStorage.removeItem(key);
-          }
-        });
-
-        // 2. Disparamos el evento personalizado para notificar a ExerciseCard que limpie el estado local
-        window.dispatchEvent(new Event("workout_reset"));
-
-        setTimeout(() => {
-          router.push("/miembro");
-        }, 1500);
+        router.refresh(); // <--- Fuerza el re-render de la Server Page
+      } else {
+        alert(res.error || "No se pudo finalizar el entrenamiento");
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
-  if (completed) {
-    return (
-      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center text-emerald-800 font-medium flex items-center justify-center gap-2">
-        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-        ¡Entrenamiento guardado con éxito! Redirigiendo...
-      </div>
-    );
-  }
-
   return (
-    <Button
+    <button
       onClick={handleFinish}
-      disabled={loading}
-      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-6 rounded-2xl shadow-sm text-base flex items-center justify-center gap-2 cursor-pointer"
+      disabled={isPending}
+      className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
     >
-      {loading ? (
-        <>
-          <Loader2 className="w-5 h-5 animate-spin" />
-          Guardando en la base de datos...
-        </>
-      ) : (
-        <>
-          <CheckCircle2 className="w-5 h-5" />
-          Finalizar y Guardar Entrenamiento
-        </>
-      )}
-    </Button>
+      <CheckCircle className="w-5 h-5" />
+      {isPending ? "Guardando..." : "Finalizar y Guardar Entrenamiento"}
+    </button>
   );
 }

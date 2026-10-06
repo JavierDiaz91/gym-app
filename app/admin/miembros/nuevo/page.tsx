@@ -1,8 +1,6 @@
 "use client";
 
-import React from "react"
-
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,12 +9,37 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { createMember } from "@/app/actions";
+import { createMember, getPlansAction } from "@/app/actions";
+
+interface Plan {
+  id: number;
+  name: string;
+  price: number;
+  is_active?: boolean;
+}
 
 export default function NuevoMiembroPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        const data = await getPlansAction();
+        if (Array.isArray(data)) {
+          setPlans(data.filter((p: any) => p.is_active !== false));
+        }
+      } catch (err) {
+        console.error("Error al obtener planes:", err);
+      } finally {
+        setLoadingPlans(false);
+      }
+    }
+    fetchPlans();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -26,10 +49,10 @@ export default function NuevoMiembroPage() {
     const formData = new FormData(e.currentTarget);
     const result = await createMember(formData);
 
-    if (result.error) {
+    if (result?.error) {
       setError(result.error);
       setLoading(false);
-    } else if (result.success) {
+    } else if (result?.success || !result?.error) {
       router.push("/admin/miembros");
     }
   }
@@ -110,6 +133,24 @@ export default function NuevoMiembroPage() {
                 type="tel"
                 placeholder="(555) 123-4567"
               />
+            </div>
+
+            {/* SELECCIÓN DE PLAN / MEMBRESÍA */}
+            <div className="space-y-2">
+              <Label htmlFor="planId">Membresía Inicial (Opcional)</Label>
+              <select
+                id="planId"
+                name="planId"
+                disabled={loadingPlans}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Sin membresía inicial</option>
+                {plans.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.name} - ${Number(plan.price).toLocaleString("es-AR")}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">

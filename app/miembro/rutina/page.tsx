@@ -1,293 +1,227 @@
 import { getSession } from "@/app/actions";
-import { sql } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Dumbbell, ArrowLeft, CalendarCheck, Calendar } from "lucide-react";
+import { sql } from "@/lib/db";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, Dumbbell, CheckCircle2 } from "lucide-react";
 import ExerciseCard from "./ExerciseCard";
 import { FinishWorkoutButton } from "./FinishWorkoutButton";
 
 export const dynamic = "force-dynamic";
-
-interface BloqueEjercicio {
-  nombre?: string;
-  name?: string;
-  series?: number | string;
-  reps?: number | string;
-  rir?: number | string;
-  pausa?: string;
-  notas?: string;
-  image_url?: string;
-  muscle_group?: string;
-  equipment?: string;
-}
+export const revalidate = 0;
 
 interface PageProps {
-  searchParams: Promise<{ routineId?: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-async function getMemberRoutinesData(userId: number) {
-  try {
-    // 1. Obtener TODAS las rutinas activas desde la tabla pivote member_routines
-    const routinesRes = await sql`
-      SELECT 
-        r.id,
-        r.title,
-        r.notes,
-        t.first_name AS trainer_first_name,
-        t.last_name AS trainer_last_name,
-        m.id AS member_id
-      FROM member_routines mr
-      JOIN members m ON mr.member_id = m.id
-      JOIN routines r ON mr.routine_id = r.id
-      LEFT JOIN trainers t ON m.trainer_id = t.id
-      WHERE m.user_id = ${userId}
-        AND mr.is_active = true
-        AND (r.is_archived IS FALSE OR r.is_archived IS NULL)
-      ORDER BY mr.id DESC
-    `;
-
-    if (!routinesRes.length) return null;
-
-    // 2. Traer catálogo de ejercicios
-    const dbExercises = await sql`
-      SELECT name, image_url, muscle_group, equipment 
-      FROM exercises
-    `;
-
-    const exerciseMap = new Map(
-      dbExercises.map((e) => [e.name.toLowerCase().trim(), e])
-    );
-
-    return {
-      routines: routinesRes,
-      exerciseMap,
-      memberId: routinesRes[0].member_id
-    };
-  } catch (error) {
-    console.error("Error al obtener las rutinas:", error);
-    return null;
-  }
-}
-
-export default async function MiembroRutinaPage(props: PageProps) {
+export default async function MiembroRutinaPage({ searchParams }: PageProps) {
   const session = await getSession();
+  if (!session) redirect("/login");
 
-  if (!session || session.role !== "member") {
-    redirect("/login");
+  const userId = session.user?.id || session.id || session.userId;
+  const userEmail = session.user?.email || "";
+
+  const resolvedParams = await searchParams;
+  const targetRoutineId = resolvedParams?.id ? Number(resolvedParams.id) : null;
+
+  let routineData: {
+    id: number;
+    title: string;
+    notes?: string;
+    exercises: Array<{
+      displayName: string;
+      imageUrl?: string;
+      bloque: {
+        series?: number;
+        reps?: string;
+        rir?: number;
+        pausa?: string;
+        notas?: string;
+      };
+    }>;
+  } | null = null;
+
+  let isCompletedToday = false;
+
+  try {
+    // 1. Obtener ID del miembro con fallback flexible
+    const memberRes = await sql`
+  SELECT id FROM members WHERE user_id = ${userId} LIMIT 1
+`;
+
+    const memberRows = Array.isArray(memberRes) ? memberRes : (memberRes as any).rows || [];
+    const memberId = memberRows[0]?.id;
+
+    if (memberId) {
+      // 2. Buscar la rutina asignada o la solicitada por parámetro
+      const routineRes = await sql`
+        SELECT 
+          r.id, 
+          COALESCE(r.title, 'Rutina de Entrenamiento') as title, 
+          r.notes
+        FROM routines r
+        LEFT JOIN member_routines mr ON mr.routine_id = r.id
+        LEFT JOIN members m ON m.routine_id = r.id
+        WHERE (mr.member_id = ${memberId} OR m.id = ${memberId} OR r.id = ${targetRoutineId || -1})
+          ${targetRoutineId ? sql`AND r.id = ${targetRoutineId}` : sql``}
+        LIMIT 1
+      `;
+
+      const routineRows = Array.isArray(routineRes) ? routineRes : (routineRes as any).rows || [];
+      const rawRoutine = routineRows[0];
+
+      if (rawRoutine) {
+        // 3. Verificación de rutina realizada hoy (Robusta y compatible con Neon/Postgres)
+        const logRes = await sql`
+  SELECT id 
+  FROM workout_logs 
+  WHERE member_id = ${memberId} 
+    AND routine_id = ${rawRoutine.id}
+    AND completed_at >= NOW() - INTERVAL '20 hours'
+  LIMIT 1
+`;
+
+        const logRows = Array.isArray(logRes) ? logRes : (logRes as any).rows || [];
+        isCompletedToday = logRows.length > 0;
+
+        // 4. Parsear ejercicios
+        let parsedExercises: any[] = [];
+
+        if (typeof rawRoutine.notes === "string" && rawRoutine.notes.trim().startsWith("[")) {
+          try {
+            parsedExercises = JSON.parse(rawRoutine.notes);
+          } catch (e) {
+            console.error("Error al parsear JSON de ejercicios:", e);
+          }
+        }
+
+        if (parsedExercises.length === 0) {
+          const exercisesRes = await sql`
+            SELECT 
+              e.name AS display_name,
+              e.image_url,
+              re.sets,
+              re.reps,
+              re.rir,
+              re.rest_seconds AS pausa,
+              re.notes
+            FROM routine_exercises re
+            INNER JOIN exercises e ON e.id = re.exercise_id
+            WHERE re.routine_id = ${rawRoutine.id}
+            ORDER BY re.order_index ASC, re.id ASC
+          `;
+
+          const dbExerciseRows = Array.isArray(exercisesRes) ? exercisesRes : (exercisesRes as any).rows || [];
+
+          parsedExercises = dbExerciseRows.map((ex: any) => ({
+            displayName: ex.display_name,
+            imageUrl: ex.image_url,
+            bloque: {
+              series: ex.sets || 3,
+              reps: ex.reps || "10-12",
+              rir: ex.rir ?? 2,
+              pausa: ex.pausa ? `${ex.pausa}s` : "60s",
+              notas: ex.notes || "",
+            },
+          }));
+        } else {
+          parsedExercises = parsedExercises.map((ex: any) => ({
+            displayName: ex.nombre || ex.displayName || "Ejercicio",
+            imageUrl: ex.imageUrl || ex.image_url || "",
+            bloque: {
+              series: ex.series || ex.bloque?.series || 3,
+              reps: ex.reps || ex.bloque?.reps || "10-12",
+              rir: ex.rir ?? ex.bloque?.rir ?? 2,
+              pausa: ex.pausa || ex.bloque?.pausa || "60s",
+              notas: ex.notas || ex.bloque?.notas || "",
+            },
+          }));
+        }
+
+        routineData = {
+          id: rawRoutine.id,
+          title: rawRoutine.title,
+          notes: !rawRoutine.notes?.startsWith("[") ? rawRoutine.notes : null,
+          exercises: parsedExercises,
+        };
+      }
+    }
+  } catch (error) {
+    console.error("Error al consultar rutina del miembro:", error);
   }
 
-  const searchParams = await props.searchParams;
-  const selectedRoutineId = searchParams.routineId ? Number(searchParams.routineId) : null;
-
-  const data = await getMemberRoutinesData(session.id);
-
-  if (!data || !data.routines.length) {
+  if (!routineData) {
     return (
-      <div className="max-w-4xl mx-auto p-6 space-y-4">
-        <Button variant="ghost" asChild className="mb-2">
-          <Link href="/miembro">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Volver al Panel
-          </Link>
-        </Button>
-        <Card className="p-8 text-center">
-          <CardContent className="space-y-3">
-            <Dumbbell className="w-10 h-10 text-gray-300 mx-auto" />
-            <h2 className="text-xl font-bold text-gray-800">No tenés rutinas asignadas</h2>
-          </CardContent>
-        </Card>
+      <div className="max-w-4xl mx-auto p-6 space-y-6">
+        <Link
+          href="/miembro"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Volver al Panel
+        </Link>
+        <div className="bg-card border rounded-xl p-12 text-center space-y-3">
+          <Dumbbell className="w-10 h-10 text-muted-foreground mx-auto" />
+          <h3 className="text-lg font-bold text-foreground">No tenés rutinas asignadas</h3>
+        </div>
       </div>
     );
   }
-
-  // Determinar cuál rutina mostrar (la seleccionada por URL o la primera de la lista)
-  const activeRoutine = data.routines.find((r) => r.id === selectedRoutineId) || data.routines[0];
-
-  // 3. Verificar si el miembro ya registró esta rutina HOY
-  const todayLogRes = await sql`
-    SELECT id, completed_at 
-    FROM workout_logs 
-    WHERE member_id = ${data.memberId} 
-      AND routine_id = ${activeRoutine.id}
-      AND DATE(completed_at) = CURRENT_DATE
-    ORDER BY completed_at DESC
-    LIMIT 1
-  `;
-
-  const isCompletedToday = todayLogRes.length > 0;
-  const completedAt = isCompletedToday ? todayLogRes[0].completed_at : null;
-
-  // 4. Parsear ejercicios de la rutina activa
-  let bloques: BloqueEjercicio[] = [];
-  if (typeof activeRoutine.notes === "string" && activeRoutine.notes.trim() !== "") {
-    try {
-      const parsed = JSON.parse(activeRoutine.notes);
-      if (Array.isArray(parsed)) {
-        bloques = parsed;
-      }
-    } catch {
-      // Fallback
-    }
-  }
-
-  const enrichedBloques = bloques.map((bloque) => {
-    const nombreReal = bloque.nombre || bloque.name || "Ejercicio";
-    const exerciseName = nombreReal.toLowerCase().trim();
-
-    // Coincidencia con catálogo global
-    let match = data.exerciseMap.get(exerciseName);
-    if (!match) {
-      for (const [dbName, dbEx] of data.exerciseMap.entries()) {
-        if (dbName.includes(exerciseName) || exerciseName.includes(dbName)) {
-          match = dbEx;
-          break;
-        }
-      }
-    }
-
-    // Prioridad: 1. Imagen en la rutina -> 2. Imagen del catálogo -> 3. String vacío (para placeholder)
-    const rawUrl = bloque.image_url || match?.image_url || "";
-    const finalImageUrl = typeof rawUrl === "string" ? rawUrl.trim() : "";
-
-    return {
-      ...bloque,
-      nombre: nombreReal,
-      image_url: finalImageUrl,
-      muscle_group: match?.muscle_group || "General",
-      equipment: match?.equipment || "Libre",
-    };
-  });
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
-      <Button variant="ghost" size="sm" asChild className="rounded-xl hover:bg-gray-100">
-        <Link href="/miembro">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Volver a Mi Panel
-        </Link>
-      </Button>
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <Link
+        href="/miembro"
+        className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" /> Volver al Panel
+      </Link>
 
-      {/* Selector de Pestañas si tiene más de 1 rutina asignada */}
-      {data.routines.length > 1 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-gray-200">
-          {data.routines.map((r) => {
-            const isSelected = r.id === activeRoutine.id;
-            return (
-              <Link
-                key={r.id}
-                href={`/miembro/rutina?routineId=${r.id}`}
-                className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
-                  isSelected
-                    ? "bg-emerald-600 text-white shadow-xs"
-                    : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
-                }`}
-              >
-                <Calendar className="h-3.5 w-3.5" />
-                {r.title}
-              </Link>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Banner de Entrenamiento Completado HOY */}
-      {isCompletedToday && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex items-center gap-4 shadow-2xs">
-          <div className="p-3 bg-emerald-100 text-emerald-700 rounded-xl shrink-0">
-            <CalendarCheck className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-emerald-950">
-              ¡Entrenamiento de hoy completado!
-            </h3>
-            <p className="text-xs text-emerald-800 mt-0.5">
-              Ya registraste esta sesión a las{" "}
-              <span className="font-semibold">
-                {new Date(completedAt).toLocaleTimeString("es-AR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                  timeZone: "America/Argentina/Buenos_Aires",
-                })}
-              </span>{" "}
-              hs. ¡Excelente trabajo por hoy!
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Header Rutina */}
-      <div className="bg-white border rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-none font-semibold">
-              {isCompletedToday ? "Entrenamiento Completado" : "Rutina Activa"}
-            </Badge>
-            {activeRoutine.trainer_first_name && (
-              <span className="text-xs text-muted-foreground font-medium">
-                Entrenador: {activeRoutine.trainer_first_name} {activeRoutine.trainer_last_name || ""}
-              </span>
-            )}
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{activeRoutine.title}</h1>
-        </div>
-        <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl w-fit shrink-0">
-          <Dumbbell className="w-7 h-7" />
-        </div>
-      </div>
-
-      {/* Lista de Ejercicios */}
-      {enrichedBloques.length > 0 ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-800">Ejercicios del Día</h2>
-            <span className="text-xs text-muted-foreground font-medium">
-              {enrichedBloques.length} ejercicio(s) cargado(s)
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5">
-            {enrichedBloques.map((bloque, index) => {
-              const displayName = bloque.nombre || "Ejercicio";
-
-              return (
-                <ExerciseCard
-                  key={index}
-                  index={index}
-                  routineId={activeRoutine.id}
-                  displayName={displayName}
-                  imageUrl={bloque.image_url || ""}
-                  bloque={bloque}
-                  readOnly={isCompletedToday}
-                />
-              );
-            })}
-          </div>
-
-          {!isCompletedToday ? (
-            <div className="pt-6 border-t border-gray-100">
-              <FinishWorkoutButton routineId={activeRoutine.id} />
-            </div>
-          ) : (
-            <div className="pt-4 text-center">
-              <Button asChild variant="outline" className="rounded-xl font-semibold">
-                <Link href="/miembro">Volver al Panel Principal</Link>
-              </Button>
-            </div>
+          <h1 className="text-2xl font-bold text-foreground">{routineData.title}</h1>
+          {routineData.notes && (
+            <p className="text-xs text-muted-foreground mt-1">{routineData.notes}</p>
           )}
         </div>
-      ) : (
-        <Card className="p-6">
-          <CardContent className="pt-4">
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">
-              {activeRoutine.notes || "No hay detalles adicionales registrados para esta rutina."}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+
+        {isCompletedToday && (
+          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs px-3 py-1.5 rounded-full font-medium">
+            <CheckCircle2 className="w-4 h-4" /> Realizada Hoy
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        {routineData.exercises.length > 0 ? (
+          <>
+            {routineData.exercises.map((ex, idx) => (
+              <ExerciseCard
+                key={idx}
+                index={idx}
+                routineId={routineData!.id}
+                displayName={ex.displayName}
+                imageUrl={ex.imageUrl}
+                bloque={ex.bloque}
+                readOnly={isCompletedToday} 
+                isReadOnly={isCompletedToday} 
+              />
+            ))}
+
+            {isCompletedToday ? (
+              <div className="p-4 bg-emerald-950/40 border border-emerald-500/30 rounded-2xl text-center text-xs text-emerald-300 font-medium">
+                ✓ Esta rutina ya fue realizada el día de hoy. Podés consultar los ejercicios en modo vista.
+              </div>
+            ) : (
+              <div className="pt-6">
+                <FinishWorkoutButton routineId={routineData.id} />
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="p-8 border rounded-xl text-center text-xs text-muted-foreground bg-card">
+            Esta rutina no posee ejercicios configurados.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

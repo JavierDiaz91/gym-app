@@ -26,3 +26,4 @@ export async function deleteMember(req: Request, res: Response) {
   await service.deleteMember(Number(req.params.id));
   res.status(204).send();
 }
+

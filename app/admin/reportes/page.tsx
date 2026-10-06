@@ -1,20 +1,7 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { getDashboardStats, getAttendanceStats } from "@/app/actions";
 import { sql } from "@/lib/db";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line
-} from "recharts";
+import { ReportesCharts } from "./ReportesCharts";
 
 async function getRevenueData() {
   try {
@@ -27,12 +14,12 @@ async function getRevenueData() {
       GROUP BY DATE_TRUNC('month', payment_date)
       ORDER BY month
     `;
-    return data.map((d: { month: string; total: string | number }) => ({
+    return (data as unknown as { month: string; total: string | number }[]).map((d) => ({
       month: new Date(d.month).toLocaleDateString("es", { month: "short" }),
       ingresos: Number(d.total)
     }));
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error revenue SQL:", error);
     return [];
   }
 }
@@ -40,31 +27,88 @@ async function getRevenueData() {
 async function getMembershipDistribution() {
   try {
     const data = await sql`
-      SELECT mp.name, COUNT(*) as count
+      SELECT mp.name, COUNT(*)::int as count
       FROM subscriptions s
       JOIN membership_plans mp ON s.plan_id = mp.id
       WHERE s.status = 'active'
       GROUP BY mp.name
+      ORDER BY count DESC
     `;
-    return data;
+    return (data as unknown as { name: string; count: string | number }[]).map((d) => ({
+      name: String(d.name),
+      count: Number(d.count)
+    }));
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error membership SQL:", error);
     return [];
   }
 }
 
-const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))"];
+async function getCalculatedMetrics() {
+  try {
+    // 1. Promedio de visitas por miembro en los últimos 30 días
+    const avgVisits = await sql`
+      SELECT ROUND(COUNT(*)::numeric / NULLIF(COUNT(DISTINCT member_id), 0), 1) as avg
+      FROM attendance
+      WHERE check_in >= NOW() - INTERVAL '30 days'
+    `;
 
+    // 2. Hora pico ajustada a la zona horaria local (Argentina)
+    const peak = await sql`
+      SELECT 
+        EXTRACT(HOUR FROM (check_in AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Buenos_Aires')) as hour, 
+        COUNT(*) as total
+      FROM attendance
+      GROUP BY hour
+      ORDER BY total DESC
+      LIMIT 1
+    `;
+
+    // 3. Ingreso promedio por suscripción activa
+    const avgRevenue = await sql`
+      SELECT ROUND(AVG(mp.price)::numeric, 0) as avg
+      FROM subscriptions s
+      JOIN membership_plans mp ON s.plan_id = mp.id
+      WHERE s.status = 'active'
+    `;
+
+    const peakHourFormatted = peak.length > 0 
+      ? `${Math.floor(Number(peak[0].hour))}:00 - ${Math.floor(Number(peak[0].hour)) + 1}:00 hs` 
+      : "Sin datos suficientes";
+
+    const avgVisitsVal = (avgVisits as unknown as { avg: string | number }[])[0]?.avg;
+    const avgRevenueVal = (avgRevenue as unknown as { avg: string | number }[])[0]?.avg;
+
+    return {
+      avgVisitsPerMember: avgVisitsVal ? `${avgVisitsVal} visitas` : "0 visitas",
+      peakHour: peakHourFormatted,
+      avgRevenuePerMember: avgRevenueVal ? `$${Number(avgRevenueVal).toLocaleString()}` : "$0",
+    };
+  } catch (error) {
+    console.error("Error calculated metrics SQL:", error);
+    return {
+      avgVisitsPerMember: "0 visitas",
+      peakHour: "Sin datos",
+      avgRevenuePerMember: "$0",
+    };
+  }
+}
 export default async function ReportesPage() {
-  const stats = await getDashboardStats();
-  const attendanceStats = await getAttendanceStats();
-  const revenueData = await getRevenueData();
-  const membershipDist = await getMembershipDistribution();
+  const [stats, attendanceStats, revenueData, membershipDist, calculatedMetrics] = await Promise.all([
+    getDashboardStats(),
+    getAttendanceStats(),
+    getRevenueData(),
+    getMembershipDistribution(),
+    getCalculatedMetrics(),
+  ]);
 
-  const attendanceData = attendanceStats.slice(0, 14).reverse().map((stat: { date: string; total_visits: string | number }) => ({
-    date: new Date(stat.date).toLocaleDateString("es", { day: "numeric", month: "short" }),
-    visitas: Number(stat.total_visits),
-  }));
+  const attendanceData = (attendanceStats || [])
+    .slice(0, 14)
+    .reverse()
+    .map((stat: { date: string; total_visits: string | number }) => ({
+      date: new Date(stat.date).toLocaleDateString("es", { day: "numeric", month: "short" }),
+      visitas: Number(stat.total_visits),
+    }));
 
   return (
     <div className="space-y-8">
@@ -76,11 +120,11 @@ export default async function ReportesPage() {
           Reportes
         </h1>
         <p className="text-muted-foreground">
-          Analisis y estadisticas del gimnasio
+          Análisis y estadísticas del gimnasio
         </p>
       </div>
 
-      {/* Summary Cards */}
+      {/* Tarjetas de Resumen */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
@@ -108,136 +152,13 @@ export default async function ReportesPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Attendance Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Asistencia Diaria</CardTitle>
-            <CardDescription>Visitas en los ultimos 14 dias</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={attendanceData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="visitas" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(var(--primary))" }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Revenue Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Ingresos Mensuales</CardTitle>
-            <CardDescription>Ingresos de los ultimos 6 meses</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: number) => [`$${value.toLocaleString()}`, "Ingresos"]}
-                  />
-                  <Bar dataKey="ingresos" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Membership Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribucion de Membresias</CardTitle>
-            <CardDescription>Miembros por tipo de plan</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              {membershipDist.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={membershipDist}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }: { name: string; percent: number }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="count"
-                      nameKey="name"
-                    >
-                      {membershipDist.map((entry: { name: string }, index: number) => (
-                        <Cell key={`cell-${entry.name}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No hay datos de membresias
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Metricas Clave</CardTitle>
-            <CardDescription>Indicadores de rendimiento</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between py-2 border-b">
-              <span className="text-muted-foreground">Tasa de retencion</span>
-              <span className="font-semibold">85%</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b">
-              <span className="text-muted-foreground">Promedio visitas/miembro</span>
-              <span className="font-semibold">3.2/semana</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b">
-              <span className="text-muted-foreground">Clases mas populares</span>
-              <span className="font-semibold">CrossFit, Yoga</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b">
-              <span className="text-muted-foreground">Hora pico</span>
-              <span className="font-semibold">18:00 - 20:00</span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <span className="text-muted-foreground">Ingreso promedio/miembro</span>
-              <span className="font-semibold">$450/mes</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Gráficos de Recharts en Client Component con la prop metrics agregada */}
+      <ReportesCharts 
+        attendanceData={attendanceData}
+        revenueData={revenueData}
+        membershipDist={membershipDist}
+        metrics={calculatedMetrics}
+      />
     </div>
   );
 }

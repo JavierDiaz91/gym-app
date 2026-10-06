@@ -24,58 +24,88 @@ interface RoutineExercise {
 
 export async function registerUser(formData: FormData) {
   try {
-    const email = formData.get("email") as string;
+    const emailRaw = formData.get("email") as string;
     const password = formData.get("password") as string;
     const name = formData.get("name") as string;
     const phone = formData.get("phone") as string | null;
+    const gymIdRaw = formData.get("gym_id") as string | null;
 
-    if (!email || !password || !name) {
+    if (!emailRaw || !password || !name) {
       return { error: "Todos los campos son requeridos" };
     }
 
-    // 1️⃣ Verificar email duplicado
-    const existing = await sql`
-      SELECT id FROM users WHERE email = ${email}
-    `;
-    if (existing.length > 0) {
-      return { error: "El email ya está registrado" };
+    if (!gymIdRaw) {
+      return { error: "No se especificó un gimnasio válido. Por favor escaneá el QR del gimnasio." };
     }
 
-    // Parsear Nombre y Apellido de forma limpia
+    // 1️⃣ Normalizar email
+    const email = emailRaw.trim().toLowerCase();
+    const gymId = parseInt(gymIdRaw, 10);
+
+    // 2️⃣ Verificar si YA TIENE CREDENCIALES (en la tabla users)
+    const existingUser = await sql`
+      SELECT id FROM users WHERE LOWER(TRIM(email)) = ${email}
+    `;
+    if (existingUser.length > 0) {
+      return { error: "El email ya está registrado. Por favor iniciá sesión." };
+    }
+
+    // Parsear Nombre y Apellido
     const nameParts = name.trim().split(/\s+/);
     const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(" ") || ""; // Si no hay apellido, queda vacío sin fallar
+    const lastName = nameParts.slice(1).join(" ") || "";
 
-    // 2️⃣ Hash de contraseña
+    // 3️⃣ Hash de contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 3️⃣ Crear usuario
+    // 4️⃣ Crear usuario en la tabla 'users'
     const userResult = await sql`
-      INSERT INTO users (email, password_hash, role)
-      VALUES (${email}, ${hashedPassword}, 'member')
+      INSERT INTO users (email, password_hash, role, gym_id)
+      VALUES (${email}, ${hashedPassword}, 'member', ${gymId})
       RETURNING id
     `;
     const userId = userResult[0].id;
 
-    // 4️⃣ Crear perfil de miembro
-    await sql`
-      INSERT INTO members (
-        user_id,
-        first_name,
-        last_name,
-        phone,
-        status,
-        join_date
-      )
-      VALUES (
-        ${userId},
-        ${firstName},
-        ${lastName},
-        ${phone},
-        'active',
-        NOW()
-      )
+    // 5️⃣ REVISAR SI EL ADMIN YA LE HABÍA CREADO LA FICHA EN 'members'
+    const existingMember = await sql`
+      SELECT id FROM members 
+      WHERE LOWER(TRIM(email)) = ${email} AND gym_id = ${gymId}
     `;
+
+    if (existingMember.length > 0) {
+      // VINCULAR CON EL LEGAJO EXISTENTE DEL ADMIN
+      await sql`
+        UPDATE members 
+        SET 
+          user_id = ${userId},
+          phone = COALESCE(NULLIF(${phone}, ''), phone)
+        WHERE id = ${existingMember[0].id}
+      `;
+    } else {
+      // CREAR FICHA NUEVA SI NO EXISTÍA
+      await sql`
+        INSERT INTO members (
+          user_id,
+          gym_id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          status,
+          join_date
+        )
+        VALUES (
+          ${userId},
+          ${gymId},
+          ${firstName},
+          ${lastName},
+          ${email},
+          ${phone || null},
+          'active',
+          NOW()
+        )
+      `;
+    }
 
     return { success: true };
   } catch (error) {
@@ -93,8 +123,9 @@ export async function loginUser(formData: FormData) {
       return { error: "Email y contraseña requeridos" };
     }
 
+    // 1. Agregamos gym_id a la consulta SQL
     const users = await sql`
-      SELECT id, email, password_hash, role
+      SELECT id, email, password_hash, role, gym_id
       FROM users
       WHERE email = ${email}
     `;
@@ -110,10 +141,12 @@ export async function loginUser(formData: FormData) {
       return { error: "Credenciales inválidas" };
     }
 
+    // 2. Incluimos gymId dentro del objeto guardado en la cookie
     const sessionData = {
       id: user.id,
       email: user.email,
       role: user.role,
+      gymId: user.gym_id, // <--- CAMBIO CLAVE
     };
 
     const cookieStore = await cookies();
@@ -156,8 +189,10 @@ export async function getSession() {
 
 // ==================== MEMBER ACTIONS ====================
 
-export async function getMembers(): Promise<Member[]> {
+export async function getMembers(query: string = ""): Promise<Member[]> {
   try {
+    const searchTerm = `%${query.trim()}%`;
+
     const members = await sql`
       SELECT 
         m.*,
@@ -169,6 +204,11 @@ export async function getMembers(): Promise<Member[]> {
         ON m.id = s.member_id AND s.status = 'active'
       LEFT JOIN membership_plans mp 
         ON s.plan_id = mp.id
+      WHERE 
+        ${query === ''} OR 
+        m.first_name ILIKE ${searchTerm} OR 
+        m.last_name ILIKE ${searchTerm} OR 
+        m.email ILIKE ${searchTerm}
       ORDER BY m.created_at DESC
     `;
 
@@ -206,15 +246,51 @@ export async function getMemberById(id: number): Promise<Member | null> {
 export async function createMember(formData: FormData) {
   const firstName = formData.get("firstName") as string;
   const lastName = formData.get("lastName") as string;
-  const email = formData.get("email") as string;
+  const emailRaw = formData.get("email") as string;
   const phone = formData.get("phone") as string;
   const emergencyContact = formData.get("emergencyContact") as string;
+  const planIdRaw = formData.get("planId") as string;
+
+  const gymId = 1; // Tu gym_id actual o el id por defecto
+
+  // 1. Normalizar email (sin espacios y en minúsculas)
+  const email = emailRaw ? emailRaw.trim().toLowerCase() : "";
+
+  if (!email) {
+    return { error: "El email es obligatorio" };
+  }
 
   try {
-    await sql`
-      INSERT INTO members (first_name, last_name, email, phone, emergency_contact)
-      VALUES (${firstName}, ${lastName}, ${email}, ${phone || null}, ${emergencyContact || null})
+    // 2. Validar que no exista ya un miembro con ese correo
+    const existingMember = await sql`
+      SELECT id FROM members 
+      WHERE LOWER(TRIM(email)) = ${email} AND gym_id = ${gymId}
     `;
+
+    if (existingMember.length > 0) {
+      return { error: "Ya existe un socio registrado con este correo electrónico." };
+    }
+
+    // 3. Insertar el miembro con el email sanitizado
+    const [member] = await sql`
+      INSERT INTO members (gym_id, first_name, last_name, email, phone, emergency_contact, status)
+      VALUES (${gymId}, ${firstName}, ${lastName}, ${email}, ${phone || null}, ${emergencyContact || null}, 'active')
+      RETURNING id
+    `;
+
+    // 4. Si seleccionó un plan, crear la suscripción inicial
+    if (planIdRaw && planIdRaw !== "") {
+      const planId = Number(planIdRaw);
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 1);
+
+      await sql`
+        INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
+        VALUES (${member.id}, ${planId}, ${startDate.toISOString()}, ${endDate.toISOString()}, 'active')
+      `;
+    }
+
     revalidateTag("members", "max");
     return { success: true };
   } catch (error) {
@@ -223,15 +299,24 @@ export async function createMember(formData: FormData) {
   }
 }
 
+//Actualizar miembro
 export async function updateMember(id: number, formData: FormData) {
   const firstName = formData.get("firstName") as string;
   const lastName = formData.get("lastName") as string;
-  const email = formData.get("email") as string;
+  const emailRaw = formData.get("email") as string;
   const phone = formData.get("phone") as string;
   const status = formData.get("status") as string;
 
+  // 1. Normalizar email
+  const email = emailRaw ? emailRaw.trim().toLowerCase() : "";
+
+  if (!email) {
+    return { error: "El email no puede estar vacío" };
+  }
+
   try {
-    await sql`
+    // 2. Actualizar la ficha en 'members' y obtener el user_id asociado si existe
+    const [updatedMember] = await sql`
       UPDATE members 
       SET first_name = ${firstName}, 
           last_name = ${lastName}, 
@@ -239,7 +324,18 @@ export async function updateMember(id: number, formData: FormData) {
           phone = ${phone || null},
           status = ${status || "active"}
       WHERE id = ${id}
+      RETURNING user_id
     `;
+
+    // 3. Sincronizar email en 'users' si el socio ya tiene credenciales creadas
+    if (updatedMember?.user_id) {
+      await sql`
+        UPDATE users 
+        SET email = ${email}, updated_at = NOW()
+        WHERE id = ${updatedMember.user_id}
+      `;
+    }
+
     revalidateTag("members", "max");
     return { success: true };
   } catch (error) {
@@ -248,18 +344,27 @@ export async function updateMember(id: number, formData: FormData) {
   }
 }
 
+//Eliminar miembro
 export async function deleteMember(id: number) {
   try {
+    // 1. Obtener el user_id asociado antes de borrar el miembro
+    const [member] = await sql`SELECT user_id FROM members WHERE id = ${id}`;
+
+    // 2. Eliminar la ficha del miembro
     await sql`DELETE FROM members WHERE id = ${id}`;
+
+    // 3. (Opcional) Eliminar credenciales de acceso en 'users' si existían
+    if (member?.user_id) {
+      await sql`DELETE FROM users WHERE id = ${member.user_id}`;
+    }
+
     revalidateTag("members", "max");
     return { success: true };
   } catch (error) {
     console.error("Error deleting member:", error);
-    return { error: "Error al eliminar miembro" };
+    return { error: "Error al eliminar miembro. Verifica que no tenga pagos o asistencias registradas." };
   }
 }
-
-
 
 // ==================== MEMBERSHIP PLANS ====================
 
@@ -393,24 +498,22 @@ export async function getTrainers() {
     const trainers = await sql`
       SELECT 
         t.id, 
-        u.first_name, 
-        u.last_name, 
+        t.first_name, 
+        t.last_name, 
         u.email, 
-        t.phone, 
         t.specialization, 
         t.bio, 
         t.is_active 
       FROM trainers t
       JOIN users u ON t.user_id = u.id
-      ORDER BY u.first_name ASC
+      ORDER BY t.first_name ASC
     `;
 
     return trainers.map((trainer: any) => ({
       id: Number(trainer.id),
       first_name: trainer.first_name || "Sin nombre",
       last_name: trainer.last_name || "",
-      email: trainer.email || `${trainer.first_name?.toLowerCase() || "trainer"}@gym.com`,
-      phone: trainer.phone || undefined,
+      email: trainer.email || "",
       specialization: trainer.specialization || undefined,
       bio: trainer.bio || undefined,
       is_active: trainer.is_active === null || trainer.is_active === undefined ? true : Boolean(trainer.is_active),
@@ -425,31 +528,53 @@ export async function getTrainers() {
 
 export async function assignMemberToTrainer(email: string, sessionUserId: number | string) {
   try {
-    // 1. Buscamos el ID del entrenador correspondiente al usuario logueado
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 1. Buscamos el ID y el gym_id del entrenador
     const trainerResult = await sql`
-      SELECT id FROM trainers WHERE user_id = ${sessionUserId} LIMIT 1
+      SELECT id, gym_id FROM trainers WHERE user_id = ${sessionUserId} LIMIT 1
     `;
 
     if (trainerResult.length === 0) {
       return { error: "No se encontró un perfil de entrenador asociado a tu usuario." };
     }
 
-    const trainerId = trainerResult[0].id;
+    const { id: trainerId, gym_id: trainerGymId } = trainerResult[0];
 
-    // 2. Actualizamos el alumno buscando el id de usuario a través de la tabla 'users'
-    const result = await sql`
-      UPDATE members
-      SET 
-        trainer_id = ${trainerId},
-        routine_id = NULL -- Reseteamos la rutina previa para que arranque limpio
-      WHERE user_id = (
-        SELECT id FROM users WHERE LOWER(email) = LOWER(${email})
-      )
-      RETURNING id, first_name, last_name;
+    // 2. Buscamos el usuario por email Y validamos que sea de su mismo gym
+    const userResult = await sql`
+      SELECT id FROM users 
+      WHERE LOWER(email) = ${cleanEmail} 
+        AND gym_id = ${trainerGymId}
+      LIMIT 1
     `;
 
-    if (result.length === 0) {
-      return { error: "No se encontró ningún alumno registrado con ese correo electrónico." };
+    if (userResult.length === 0) {
+      return { error: "No se encontró ningún alumno registrado en tu gimnasio con ese correo." };
+    }
+
+    const userId = userResult[0].id;
+
+    // 3. Verificamos si el alumno ya existe en la tabla members
+    const memberResult = await sql`
+      SELECT id FROM members WHERE user_id = ${userId} LIMIT 1
+    `;
+
+    if (memberResult.length === 0) {
+      // Si el usuario existe pero no tiene fila en 'members', la creamos
+      await sql`
+        INSERT INTO members (user_id, trainer_id, first_name, last_name)
+        VALUES (${userId}, ${trainerId}, 'Alumno', 'Registrado')
+      `;
+    } else {
+      // Si ya existe en 'members', actualizamos el trainer_id
+      await sql`
+        UPDATE members
+        SET 
+          trainer_id = ${trainerId},
+          routine_id = NULL
+        WHERE user_id = ${userId}
+      `;
     }
 
     revalidatePath("/trainer/alumnos");
@@ -457,6 +582,53 @@ export async function assignMemberToTrainer(email: string, sessionUserId: number
   } catch (error) {
     console.error("Error al vincular alumno:", error);
     return { error: "Ocurrió un error al vincular el alumno." };
+  }
+}
+
+export async function createTrainer(formData: FormData) {
+  const firstName = formData.get("first_name") as string;
+  const lastName = formData.get("last_name") as string;
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string || "123456"; 
+  const specialization = formData.get("specialization") as string;
+  const bio = formData.get("bio") as string;
+  const gymId = formData.get("gym_id") ? Number(formData.get("gym_id")) : null;
+
+  if (!firstName || !lastName || !email) {
+    return { error: "Nombre, apellido y correo son obligatorios." };
+  }
+
+  try {
+    // 1. Encriptamos la clave con bcryptjs
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 2. Insertamos el hash en la columna password_hash
+    const userResult = await sql`
+      INSERT INTO users (email, password_hash, role, gym_id)
+      VALUES (${email.toLowerCase()}, ${hashedPassword}, 'trainer', ${gymId})
+      RETURNING id
+    `;
+
+    if (userResult.length === 0) {
+      return { error: "No se pudo crear el usuario base." };
+    }
+
+    const userId = userResult[0].id;
+
+    // 3. Insertamos el perfil del entrenador
+    await sql`
+      INSERT INTO trainers (user_id, first_name, last_name, specialization, bio, is_active, gym_id)
+      VALUES (${userId}, ${firstName.trim()}, ${lastName.trim()}, ${specialization || null}, ${bio || null}, true, ${gymId})
+    `;
+
+    revalidatePath("/admin/entrenadores");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error al crear entrenador:", error);
+    if (error?.code === "23505") {
+      return { error: "Ya existe un usuario registrado con este correo electrónico." };
+    }
+    return { error: "Ocurrió un error al intentar crear el entrenador." };
   }
 }
 
@@ -809,14 +981,17 @@ export async function getTrainerStats(userId: number) {
 export async function logWorkout(routineId: number, details: any) {
   const session = await getSession();
 
-  if (!session || session.role !== "member") {
+  if (!session) {
     return { success: false, error: "No autorizado" };
   }
+
+  // Extraer la ID de la sesión de manera segura
+  const currentUserId = session.id || session.userId || session.user?.id;
 
   try {
     // 1. Obtener el id de miembro correspondiente al usuario logueado
     const memberRes = await sql`
-      SELECT id FROM members WHERE user_id = ${session.id} LIMIT 1
+      SELECT id FROM members WHERE user_id = ${currentUserId} LIMIT 1
     `;
 
     if (memberRes.length === 0) {
@@ -825,14 +1000,15 @@ export async function logWorkout(routineId: number, details: any) {
 
     const memberId = memberRes[0].id;
 
-    // 2. Insertar el registro en workout_logs asegurando el timestamp
+    // 2. Insertar el registro en workout_logs
     await sql`
       INSERT INTO workout_logs (member_id, routine_id, completed_at, details)
       VALUES (${memberId}, ${routineId}, NOW(), ${JSON.stringify(details)})
     `;
 
-    // Revalidamos ambas rutas para que el profesor vea el cambio al instante
+    // 3. Revalidar TODAS las rutas afectadas para purgar el caché de Next.js
     revalidatePath("/miembro");
+    revalidatePath("/miembro/rutina");
     revalidatePath("/trainer/alumnos");
     
     return { success: true };
@@ -1326,70 +1502,625 @@ export async function assignRoutineToMultipleMembersBulk(
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-export async function getGymsAction() {
+// app/actions.ts
+export async function getGymStatusAction(gymId: number | string) {
+  if (!gymId) return null;
+
   try {
-    const response = await fetch(`${API_URL}/gyms`, {
+    const res = await fetch(`http://localhost:3001/api/gyms/${gymId}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
     });
 
-    if (!response.ok) return { success: false, data: [] };
+    if (!res.ok) return null;
+
+    const result = await res.json();
+    
+    // Si tu API devuelve { data: { status: "suspended" } }, retornamos directamente 'data'
+    return result.data || result; 
+  } catch (error) {
+    console.error("Error al obtener estado del gimnasio:", error);
+    return null;
+  }
+}
+
+// app/actions.ts
+
+export async function createGymAction(formData: any): Promise<{
+  success: boolean;
+  data?: any;
+  error?: string;
+}> {
+  try {
+    const response = await fetch("http://localhost:3001/api/gyms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
 
     const result = await response.json();
-    
-    // Express responde { success: true, data: [...] }
-    return { success: true, data: result.data || [] };
+
+    if (!response.ok) {
+      return { success: false, error: result.error || "Error al crear gimnasio" };
+    }
+
+    return { success: true, data: result.data || result };
   } catch (error) {
-    console.error("Error fetching gyms:", error);
+    return { success: false, error: "Error de conexión con el servidor" };
+  }
+}
+export async function toggleGymStatusAction(gymId: number, newStatus: string) {
+  try {
+    const res = await fetch(`http://localhost:3001/api/gyms/${gymId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      // Invalida la caché del Server Component para esta ruta
+      revalidatePath("/admin/gimnasios");
+    }
+
+    return data;
+  } catch (error) {
+    return { success: false, error: "Error al actualizar estado" };
+  }
+}
+
+
+
+export async function getGymsAction() {
+  try {
+    const res = await fetch("http://localhost:3001/api/gyms", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store", // Garantiza datos frescos de los gimnasios
+    });
+
+    if (!res.ok) {
+      return { success: false, data: [] };
+    }
+
+    const data = await res.json();
+    return { success: true, data: data.data || data };
+  } catch (error) {
+    console.error("Error al obtener gimnasios:", error);
     return { success: false, data: [] };
   }
 }
 
-export async function createGymAction(formData: {
-  name: string;
-  slug: string;
-  adminEmail: string;
-  adminPasswordHash: string; // Recibe el valor plano del formulario
-}) {
-  try {
-    const payload = {
-      name: formData.name,
-      slug: formData.slug,
-      adminEmail: formData.adminEmail,
-      adminPasswordHash: formData.adminPasswordHash, // ❌ NO apliques bcrypt.hash acá
-      adminFirstName: "Admin",
-      adminLastName: formData.name,
-    };
+export async function processCheckInAction(identifier: string) {
+  const session = await getSession();
+  const gymId = session?.gymId || session?.gym_id;
 
-    const res = await fetch(`${API_URL}/gyms`, {
+  if (!gymId) {
+    return { success: false, message: "Sesión inválida o gimnasio no detectado" };
+  }
+
+  try {
+    const res = await fetch("http://localhost:3001/api/attendance/check-in", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ gymId, identifier }),
+      cache: "no-store",
     });
 
-    const data = await res.json();
-    if (data.success) revalidatePath("/admin/gimnasios");
-    return data;
+    return await res.json();
   } catch (error) {
-    console.error("Error creating gym:", error);
-    return { success: false, error: "No se pudo crear el gimnasio" };
+    console.error("Error en processCheckInAction:", error);
+    return { success: false, message: "Error al conectar con el servidor" };
   }
 }
 
-export async function toggleGymStatusAction(gymId: number, status: string) {
+//Gestionar planes 
+export async function getPlansAction() {
+  const session = await getSession();
+  const gymId = session?.gymId || session?.gym_id;
+  if (!gymId) return [];
+
   try {
-    const res = await fetch(`${API_URL}/gyms/${gymId}/status`, {
-      method: "PATCH",
+    const res = await fetch(`http://localhost:3001/api/memberships/plans?gymId=${gymId}`, {
+      cache: "no-store",
+    });
+    return await res.json();
+  } catch (error) {
+    console.error("Error al obtener planes:", error);
+    return [];
+  }
+}
+
+
+//Creacion de planes
+export async function createPlanAction(formData: FormData) {
+  const session = await getSession();
+  const gymId = session?.gymId || session?.gym_id || 1; 
+
+  const name = formData.get("name") as string;
+  const price = formData.get("price");
+  const durationMonths = formData.get("durationMonths");
+  const description = formData.get("description") as string;
+
+  try {
+    const res = await fetch("http://localhost:3001/api/memberships/plans", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ gymId, name, price, durationMonths, description }),
     });
 
-    const data = await res.json();
-    if (data.success) revalidatePath("/admin/gimnasios");
-    return data;
+    const text = await res.text();
+
+    try {
+      const data = JSON.parse(text);
+      return data;
+    } catch {
+      console.error("Respuesta inesperada del servidor (no es JSON):", text);
+      return { success: false, error: "Respuesta no válida del servidor" };
+    }
   } catch (error) {
-    console.error("Error updating status:", error);
-    return { success: false, error: "No se pudo actualizar el estado" };
+    console.error("Error al crear plan:", error);
+    return { success: false, error: "Error de conexión" };
+  }
+}
+
+//Editar, eliminar y actualizar planes
+export async function updatePlanAction(id: number, formData: FormData) {
+  const name = formData.get("name") as string;
+  const price = formData.get("price");
+  const durationMonths = formData.get("durationMonths");
+  const description = formData.get("description") as string;
+  const isActive = formData.get("isActive") === "true";
+
+  try {
+    const res = await fetch(`http://localhost:3001/api/memberships/plans/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, price, durationMonths, description, isActive }),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error("Error al actualizar plan:", error);
+    return { success: false, error: "Error de conexión" };
+  }
+}
+
+export async function deletePlanAction(id: number) {
+  try {
+    const res = await fetch(`http://localhost:3001/api/memberships/plans/${id}`, {
+      method: "DELETE",
+    });
+    return await res.json();
+  } catch (error) {
+    console.error("Error al desactivar plan:", error);
+    return { success: false, error: "Error de conexión" };
+  }
+}
+
+// Actualizar estado del miembro (active, suspended, inactive)
+export async function updateMemberStatusAction(memberId: number, status: string) {
+  try {
+    await sql`
+      UPDATE members 
+      SET status = ${status}, updated_at = NOW() 
+      WHERE id = ${memberId}
+    `;
+    revalidateTag("members", "max");
+    return { success: true };
+  } catch (error) {
+    console.error("Error al actualizar estado:", error);
+    return { error: "Error al cambiar el estado del miembro" };
+  }
+}
+
+// Eliminar miembro
+export async function deleteMemberAction(memberId: number) {
+  try {
+    // Si tenés ON DELETE CASCADE en subscriptions se borra auto,
+    // de lo contrario eliminamos sus suscripciones primero:
+    await sql`DELETE FROM subscriptions WHERE member_id = ${memberId}`;
+    await sql`DELETE FROM members WHERE id = ${memberId}`;
+    
+    revalidateTag("members", "max");
+    return { success: true };
+  } catch (error) {
+    console.error("Error al eliminar miembro:", error);
+    return { error: "Error al eliminar el miembro" };
+  }
+}
+
+export async function updateMemberAction(
+  id: number, 
+  data: { 
+    first_name: string; 
+    last_name: string; 
+    email: string; 
+    phone: string;
+    plan_id?: number;
+  }
+) {
+  try {
+    // 1. Actualizar datos en 'members'
+    await sql`
+      UPDATE members
+      SET 
+        first_name = ${data.first_name},
+        last_name = ${data.last_name},
+        email = ${data.email},
+        phone = ${data.phone},
+        updated_at = NOW()
+      WHERE id = ${id}
+    `;
+
+    // 2. Si se seleccionó un plan, cancelar anterior e insertar nuevo en 'subscriptions'
+    if (data.plan_id) {
+      await sql`
+        UPDATE subscriptions 
+        SET status = 'cancelled' 
+        WHERE member_id = ${id} AND status = 'active'
+      `;
+
+      await sql`
+        INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
+        VALUES (
+          ${id},
+          ${data.plan_id},
+          NOW(),
+          NOW() + INTERVAL '30 days',
+          'active'
+        )
+      `;
+    }
+
+    // 3. Revalidar caché de la ruta
+    revalidatePath("/admin/miembros");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating member:", error);
+    return { success: false, error: "Error al actualizar los datos del miembro" };
+  }
+}
+
+
+// Registros de miembros (vía QR)
+export async function registerMemberAction(formData: FormData) {
+  const emailRaw = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const fullName = formData.get("fullName") as string;
+  const phone = formData.get("phone") as string;
+  const gymIdParam = formData.get("gymId") as string;
+
+  // Normalizar email para evitar fallas por espacios o mayúsculas
+  const email = emailRaw ? emailRaw.trim().toLowerCase() : "";
+  const gymId = Number(gymIdParam);
+
+  if (!gymId || isNaN(gymId)) {
+    return { success: false, error: "Gimnasio no especificado o inválido" };
+  }
+
+  try {
+    // 1. Verificar si la cuenta de usuario (login) ya existe
+    const existingUser = await sql`SELECT id FROM users WHERE LOWER(email) = ${email}`;
+    if (existingUser.length > 0) {
+      return { success: false, error: "El email ya se encuentra registrado" };
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const nameParts = fullName.trim().split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+
+    // 2. Crear credenciales en la tabla 'users'
+    const [newUser] = await sql`
+      INSERT INTO users (email, password_hash, role, gym_id, created_at, updated_at)
+      VALUES (${email}, ${passwordHash}, 'member', ${gymId}, NOW(), NOW())
+      RETURNING id
+    `;
+
+    // 3. BUSCAR si el admin ya le creó un legajo previo en 'members' sin user_id
+const existingMember = await sql`
+  SELECT id FROM members 
+  WHERE LOWER(TRIM(email)) = ${email} 
+    AND gym_id = ${gymId}
+  ORDER BY created_at ASC
+  LIMIT 1
+`;
+
+if (existingMember.length > 0) {
+  // ---- CASO A: VINCULAR FICHA EXISTENTE
+  await sql`
+    UPDATE members 
+    SET 
+      user_id = ${newUser.id},
+      phone = COALESCE(NULLIF(${phone}, ''), phone),
+      updated_at = NOW()
+    WHERE id = ${existingMember[0].id}
+  `;
+} else {
+  // ---- CASO B: CREAR FICHA NUEVA ----
+  await sql`
+    INSERT INTO members (user_id, gym_id, first_name, last_name, email, phone, status, created_at, updated_at)
+    VALUES (${newUser.id}, ${gymId}, ${firstName}, ${lastName}, ${email}, ${phone}, 'active', NOW(), NOW())
+  `;
+}
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error en el registro:", error);
+    return { success: false, error: "Error al registrar la cuenta" };
+  }
+}
+
+export async function assignMembershipAction(memberId: number, membershipId: number) {
+  try {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+    
+    const res = await fetch(`${API_BASE_URL}/members/${memberId}/memberships`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ membership_id: membershipId }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      return { success: false, error: errorData.error || "Error al asignar la membresía" };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Error de conexión" };
+  }
+}
+
+
+
+
+export async function createSuperAdminSeed() {
+  try {
+    const hashedPassword = await bcrypt.hash("123456", 10);
+    
+    // Eliminamos registros previos para evitar duplicados
+    await sql`DELETE FROM users WHERE LOWER(email) = 'diazjavier769@gmail.com'`;
+
+    // Insertamos el usuario con el hash generado por tu mismo entorno
+    await sql`
+      INSERT INTO users (email, password_hash, role)
+      VALUES ('diazjavier769@gmail.com', ${hashedPassword}, 'superadmin')
+    `;
+
+    return { success: true, message: "Usuario superadmin creado correctamente." };
+  } catch (error) {
+    console.error("Error al crear seed:", error);
+    return { error: "No se pudo crear el usuario." };
+  }
+}
+
+
+//Funcion para registrar asistencia de alumnos
+export async function registerAttendanceAction(memberIdentifier: string) {
+  try {
+    const session = await getSession();
+    const gymId = session?.gymId || 1;
+    const cleanInput = memberIdentifier.trim();
+    const isNumber = /^\d+$/.test(cleanInput);
+    const searchTerm = `%${cleanInput.toLowerCase()}%`;
+
+    // 1. Búsqueda inteligente adaptada al tipo de dato
+    const members = isNumber
+      ? await sql`
+          SELECT 
+            m.id,
+            m.first_name,
+            m.last_name,
+            m.status,
+            mp.name AS plan_name,
+            s.end_date AS subscription_end,
+            s.status AS subscription_status
+          FROM members m
+          LEFT JOIN subscriptions s 
+            ON m.id = s.member_id AND s.status = 'active'
+          LEFT JOIN membership_plans mp 
+            ON s.plan_id = mp.id
+          WHERE m.gym_id = ${gymId}
+            AND m.id = ${parseInt(cleanInput, 10)}
+          LIMIT 1
+        `
+      : await sql`
+          SELECT 
+            m.id,
+            m.first_name,
+            m.last_name,
+            m.status,
+            mp.name AS plan_name,
+            s.end_date AS subscription_end,
+            s.status AS subscription_status
+          FROM members m
+          LEFT JOIN subscriptions s 
+            ON m.id = s.member_id AND s.status = 'active'
+          LEFT JOIN membership_plans mp 
+            ON s.plan_id = mp.id
+          WHERE m.gym_id = ${gymId}
+            AND (
+              LOWER(m.email) = LOWER(${cleanInput})
+              OR LOWER(m.first_name) LIKE ${searchTerm}
+              OR LOWER(m.last_name) LIKE ${searchTerm}
+              OR LOWER(m.first_name || ' ' || m.last_name) LIKE ${searchTerm}
+            )
+          ORDER BY m.id DESC
+          LIMIT 1
+        `;
+
+    if (members.length === 0) {
+      return { success: false, error: "Miembro no encontrado" };
+    }
+
+    const member = members[0];
+    const now = new Date();
+    const isSubscriptionValid = member.subscription_end && new Date(member.subscription_end) >= now;
+
+    // 2. Determinar estado de acceso
+    let accessGranted = false;
+    let message = "";
+
+    if (member.status !== "active") {
+      const statusTranslation: Record<string, string> = {
+        suspended: "Suspendido",
+        inactive: "Inactivo",
+      };
+      const statusLabel = statusTranslation[member.status] || member.status;
+
+      message = `Acceso Denegado: Miembro ${statusLabel}`;
+    } else if (!isSubscriptionValid) {
+      message = "Acceso Denegado: Membresía vencida o no asignada";
+    } else {
+      accessGranted = true;
+      message = "Acceso Permitido";
+    }
+
+    // 3. Registrar únicamente si el acceso es permitido
+    if (accessGranted) {
+      await sql`
+        INSERT INTO attendance (member_id, check_in)
+        VALUES (${member.id}, NOW())
+      `;
+    }
+
+    revalidatePath("/admin/asistencias");
+
+    return {
+      success: true,
+      accessGranted,
+      message,
+      member: {
+        id: member.id,
+        name: `${member.first_name} ${member.last_name}`,
+        plan: member.plan_name ?? "Sin plan",
+        expiration: member.subscription_end
+          ? new Date(member.subscription_end).toLocaleDateString("es-AR")
+          : "-",
+      },
+    };
+  } catch (error) {
+    console.error("Error al registrar asistencia:", error);
+    return { success: false, error: "Error interno al procesar el ingreso" };
+  }
+}
+
+//Registrar pagos e historial de pagos
+export async function createPayment(formData: FormData) {
+  const memberId = Number(formData.get("memberId"));
+  const planId = Number(formData.get("planId"));
+  const amount = Number(formData.get("amount"));
+  const paymentMethod = formData.get("paymentMethod") as string;
+  const transactionId = (formData.get("transactionId") as string) || null;
+  const notes = (formData.get("notes") as string) || null;
+
+  try {
+    // 1. Activar el estado del socio en la tabla 'members' (por si estaba suspendido o inactivo)
+    await sql`
+      UPDATE members
+      SET status = 'active'
+      WHERE id = ${memberId}
+    `;
+
+    // 2. Buscar si el socio ya tiene una suscripción registrada
+    const existingSub = await sql`
+      SELECT id FROM subscriptions WHERE member_id = ${memberId} LIMIT 1
+    `;
+
+    let subscriptionId: number;
+
+    if (existingSub.length > 0) {
+      // Actualizar la suscripción existente: plan, vigencia de 30 días y estado activo
+      subscriptionId = existingSub[0].id;
+      await sql`
+        UPDATE subscriptions 
+        SET plan_id = ${planId},
+            start_date = NOW(),
+            end_date = NOW() + INTERVAL '30 days',
+            status = 'active'
+        WHERE id = ${subscriptionId}
+      `;
+    } else {
+      // Crear nueva suscripción activa si no tenía ninguna
+      const newSub = await sql`
+        INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
+        VALUES (${memberId}, ${planId}, NOW(), NOW() + INTERVAL '30 days', 'active')
+        RETURNING id
+      `;
+      subscriptionId = newSub[0].id;
+    }
+
+    // 3. Insertar el cobro en la tabla 'payments'
+    await sql`
+      INSERT INTO payments (
+        member_id, 
+        subscription_id, 
+        amount, 
+        payment_method, 
+        transaction_id, 
+        status, 
+        notes, 
+        payment_date
+      )
+      VALUES (
+        ${memberId}, 
+        ${subscriptionId}, 
+        ${amount}, 
+        ${paymentMethod}, 
+        ${transactionId}, 
+        'completed', 
+        ${notes}, 
+        NOW()
+      )
+    `;
+
+    // Revalidar las rutas necesarias para reflejar los cambios en la UI
+    revalidatePath("/admin/pagos");
+    revalidatePath("/admin/miembros");
+    revalidatePath("/admin/reportes");
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Error exacto al registrar cobro:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Error de base de datos al registrar el pago." 
+    };
+  }
+}
+
+export async function getPaymentsHistory() {
+  try {
+    const payments = await sql`
+      SELECT 
+        p.id,
+        p.amount,
+        p.payment_method,
+        p.transaction_id,
+        p.status,
+        p.payment_date,
+        p.notes,
+        m.first_name,
+        m.last_name,
+        COALESCE(m.dni, 'Sin DNI') as dni,
+        mp.name as plan_name
+      FROM payments p
+      JOIN members m ON p.member_id = m.id
+      LEFT JOIN subscriptions s ON p.subscription_id = s.id
+      LEFT JOIN membership_plans mp ON s.plan_id = mp.id
+      ORDER BY p.payment_date DESC
+      LIMIT 100
+    `;
+    return payments;
+  } catch (error) {
+    console.error("Error al obtener pagos:", error);
+    return [];
   }
 }

@@ -1,7 +1,8 @@
 import { getSession } from "@/app/actions";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
-import { CreditCard, Calendar, CheckCircle2, AlertTriangle, Clock, History } from "lucide-react";
+import { CreditCard, Calendar, CheckCircle2, AlertTriangle, Clock, History, Lock } from "lucide-react";
+import { PayButton } from "./PayButton"; // Creamos este cliente para el botón de pago
 
 // Helper para formatear y traducir estados de pago
 function formatStatus(status: string) {
@@ -37,6 +38,9 @@ function formatDate(dateString: string | null | undefined) {
 }
 
 interface SubscriptionData {
+  member_id: number;
+  member_status: string;
+  plan_id: number;
   start_date: string;
   end_date: string;
   status: string;
@@ -63,25 +67,29 @@ export default async function MembershipPage() {
   let payments: PaymentData[] = [];
 
   try {
-    // 1. Obtener datos de la suscripción
-    const subResult = await sql`
-      SELECT 
-        s.start_date,
-        s.end_date,
-        s.status,
-        p.name AS plan_name,
-        p.price,
-        p.description
-      FROM subscriptions s
-      JOIN membership_plans p ON p.id = s.plan_id
-      JOIN members m ON m.id = s.member_id
-      WHERE m.user_id = ${userId} OR m.id = ${userId}
-      ORDER BY s.end_date DESC
-      LIMIT 1
-    `;
+    // 1. Obtener datos de la membresía + estado del socio (m.status)
+   // 1. Obtener datos de membresía con Fallback al plan por defecto del gimnasio
+const subResult = await sql`
+  SELECT 
+    m.id AS member_id,
+    m.status AS member_status,
+    COALESCE(s.plan_id, p_default.id) AS plan_id,
+    s.start_date,
+    s.end_date,
+    s.status AS subscription_status,
+    COALESCE(p_sub.name, p_default.name, 'Pase Libre') AS plan_name,
+    COALESCE(p_sub.price, p_default.price, 0) AS price
+  FROM members m
+  LEFT JOIN subscriptions s ON s.member_id = m.id AND s.status = 'active'
+  LEFT JOIN membership_plans p_sub ON p_sub.id = s.plan_id
+  LEFT JOIN membership_plans p_default ON p_default.is_active = true AND (p_default.gym_id = m.gym_id OR m.gym_id IS NULL)
+  WHERE m.user_id = ${userId} OR m.id = ${userId}
+  ORDER BY s.end_date DESC NULLS LAST
+  LIMIT 1
+`;
 
-    const subRows = Array.isArray(subResult) ? subResult : (subResult as any).rows || [];
-    subscription = (subRows[0] as SubscriptionData) || null;
+const subRows = Array.isArray(subResult) ? subResult : (subResult as any).rows || [];
+subscription = (subRows[0] as SubscriptionData) || null;
 
     // 2. Obtener el historial de pagos
     const payResult = await sql`
@@ -103,10 +111,13 @@ export default async function MembershipPage() {
     console.error("Error al obtener datos de membresía:", error);
   }
 
-  // Evaluar si la cuota está vencida comparando con el día de hoy
-  const isExpired = subscription?.end_date 
+  // Evaluar si la cuenta está suspendida o la cuota vencida
+  const isSuspended = subscription?.member_status === "suspended" || subscription?.member_status === "inactive";
+  const isDateExpired = subscription?.end_date 
     ? new Date(subscription.end_date) < new Date() 
     : true;
+
+  const isBlocked = isSuspended || isDateExpired;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 p-6">
@@ -139,9 +150,10 @@ export default async function MembershipPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {isExpired ? (
+            {isBlocked ? (
               <span className="px-3 py-1 bg-red-500/10 text-red-600 border border-red-500/20 rounded-full text-xs font-semibold flex items-center gap-1.5">
-                <AlertTriangle className="w-4 h-4" /> Cuota Vencida
+                <AlertTriangle className="w-4 h-4" /> 
+                {isSuspended ? "Cuenta Suspendida" : "Cuota Vencida"}
               </span>
             ) : (
               <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-full text-xs font-semibold flex items-center gap-1.5">
@@ -150,6 +162,33 @@ export default async function MembershipPage() {
             )}
           </div>
         </div>
+
+        {/* Banner de Regularización / Pagar con Mercado Pago */}
+        {isBlocked && (
+          <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-red-500/10 text-red-600 rounded-lg shrink-0">
+                <Lock className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-bold text-foreground text-sm">
+                  Regularizá tu cuenta para entrenar
+                </h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Aboná tu cuota mensual para volver a habilitar tu acceso a las rutinas del gimnasio.
+                </p>
+              </div>
+            </div>
+
+            {/* Componente botón de pago en el cliente */}
+            <PayButton 
+              memberId={subscription?.member_id}
+              planId={subscription?.plan_id}
+              planName={subscription?.plan_name || 'Plan Fitness'}
+              price={subscription?.price || 0}
+            />
+          </div>
+        )}
 
         {/* Detalles de Fechas */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -8,6 +8,7 @@ export type Member = {
   status: string;
   created_at: string;
   updated_at: string;
+  membership_id?: number | null;
 
   // joins
   plan_name?: string | null;
