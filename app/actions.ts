@@ -1553,16 +1553,36 @@ export async function assignRoutineToMultipleMembersBulk(
 }
 
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001")
+  .replace(/\/api\/?$/, "")
+  .replace(/\/$/, "");
+
+function apiUrl(path: string) {
+  return `${API_URL}/api${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+async function getApiAuthHeaders() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("session")?.value;
+
+  if (!token) {
+    throw new Error("Sesión requerida para acceder a la API.");
+  }
+
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+}
 
 // app/actions.ts
 export async function getGymStatusAction(gymId: number | string) {
   if (!gymId) return null;
 
   try {
-    const res = await fetch(`http://localhost:3001/api/gyms/${gymId}`, {
+    const res = await fetch(apiUrl(`/gyms/${gymId}`), {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: await getApiAuthHeaders(),
       cache: "no-store",
     });
 
@@ -1586,9 +1606,9 @@ export async function createGymAction(formData: any): Promise<{
   error?: string;
 }> {
   try {
-    const response = await fetch("http://localhost:3001/api/gyms", {
+    const response = await fetch(apiUrl("/gyms"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await getApiAuthHeaders(),
       body: JSON.stringify(formData),
     });
 
@@ -1605,9 +1625,9 @@ export async function createGymAction(formData: any): Promise<{
 }
 export async function toggleGymStatusAction(gymId: number, newStatus: string) {
   try {
-    const res = await fetch(`http://localhost:3001/api/gyms/${gymId}/status`, {
+    const res = await fetch(apiUrl(`/gyms/${gymId}/status`), {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: await getApiAuthHeaders(),
       body: JSON.stringify({ status: newStatus }),
       cache: "no-store",
     });
@@ -1629,11 +1649,9 @@ export async function toggleGymStatusAction(gymId: number, newStatus: string) {
 
 export async function getGymsAction() {
   try {
-    const res = await fetch("http://localhost:3001/api/gyms", {
+    const res = await fetch(apiUrl("/gyms"), {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: await getApiAuthHeaders(),
       cache: "no-store", // Garantiza datos frescos de los gimnasios
     });
 
@@ -1651,17 +1669,17 @@ export async function getGymsAction() {
 
 export async function processCheckInAction(identifier: string) {
   const session = await getSession();
-  const gymId = session?.gymId || session?.gym_id;
+  const gymId = session?.gymId;
 
   if (!gymId) {
     return { success: false, message: "Sesión inválida o gimnasio no detectado" };
   }
 
   try {
-    const res = await fetch("http://localhost:3001/api/attendance/check-in", {
+    const res = await fetch(apiUrl("/attendance/check-in"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gymId, identifier }),
+      headers: await getApiAuthHeaders(),
+      body: JSON.stringify({ identifier }),
       cache: "no-store",
     });
 
@@ -1675,11 +1693,12 @@ export async function processCheckInAction(identifier: string) {
 //Gestionar planes 
 export async function getPlansAction() {
   const session = await getSession();
-  const gymId = session?.gymId || session?.gym_id;
+  const gymId = session?.gymId;
   if (!gymId) return [];
 
   try {
-    const res = await fetch(`http://localhost:3001/api/memberships/plans?gymId=${gymId}`, {
+    const res = await fetch(apiUrl("/memberships/plans"), {
+      headers: await getApiAuthHeaders(),
       cache: "no-store",
     });
     return await res.json();
@@ -1693,7 +1712,7 @@ export async function getPlansAction() {
 //Creacion de planes
 export async function createPlanAction(formData: FormData) {
   const session = await getSession();
-  const gymId = session?.gymId || session?.gym_id || 1; 
+  const gymId = session?.gymId; 
 
   const name = formData.get("name") as string;
   const price = formData.get("price");
@@ -1701,10 +1720,10 @@ export async function createPlanAction(formData: FormData) {
   const description = formData.get("description") as string;
 
   try {
-    const res = await fetch("http://localhost:3001/api/memberships/plans", {
+    const res = await fetch(apiUrl("/memberships/plans"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gymId, name, price, durationMonths, description }),
+      headers: await getApiAuthHeaders(),
+      body: JSON.stringify({ name, price, durationMonths, description }),
     });
 
     const text = await res.text();
@@ -1731,9 +1750,9 @@ export async function updatePlanAction(id: number, formData: FormData) {
   const isActive = formData.get("isActive") === "true";
 
   try {
-    const res = await fetch(`http://localhost:3001/api/memberships/plans/${id}`, {
+    const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: await getApiAuthHeaders(),
       body: JSON.stringify({ name, price, durationMonths, description, isActive }),
     });
     return await res.json();
@@ -1745,7 +1764,7 @@ export async function updatePlanAction(id: number, formData: FormData) {
 
 export async function deletePlanAction(id: number) {
   try {
-    const res = await fetch(`http://localhost:3001/api/memberships/plans/${id}`, {
+    const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "DELETE",
     });
     return await res.json();
@@ -1912,11 +1931,9 @@ if (existingMember.length > 0) {
 
 export async function assignMembershipAction(memberId: number, membershipId: number) {
   try {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    
-    const res = await fetch(`${API_BASE_URL}/members/${memberId}/memberships`, {
+    const res = await fetch(apiUrl(`/members/${memberId}/memberships`), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await getApiAuthHeaders(),
       body: JSON.stringify({ membership_id: membershipId }),
     });
 
