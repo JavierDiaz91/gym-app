@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createRoutine } from "@/app/actions";
+import { saveOrUpdateRoutine } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,8 +20,7 @@ export default function NuevaRutinaPage() {
 
     const formData = new FormData(e.currentTarget);
 
-    const result = await createRoutine(
-      Number(formData.get("trainerUserId")),
+    const result = await saveOrUpdateRoutine(
       formData.get("name") as string,
       formData.get("description") as string
     );
