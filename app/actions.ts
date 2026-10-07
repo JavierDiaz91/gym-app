@@ -1766,6 +1766,7 @@ export async function deletePlanAction(id: number) {
   try {
     const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "DELETE",
+      headers: await getApiAuthHeaders(),
     });
     return await res.json();
   } catch (error) {
@@ -1777,11 +1778,20 @@ export async function deletePlanAction(id: number) {
 // Actualizar estado del miembro (active, suspended, inactive)
 export async function updateMemberStatusAction(memberId: number, status: string) {
   try {
-    await sql`
+    const session = await requireTenantSession();
+
+    const result = await sql`
       UPDATE members 
       SET status = ${status}, updated_at = NOW() 
       WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+      RETURNING id
     `;
+
+    if (result.length === 0) {
+      return { error: "Miembro no encontrado" };
+    }
+
     revalidateTag("members", "max");
     return { success: true };
   } catch (error) {
@@ -1790,14 +1800,32 @@ export async function updateMemberStatusAction(memberId: number, status: string)
   }
 }
 
-// Eliminar miembro
 export async function deleteMemberAction(memberId: number) {
   try {
-    // Si tenés ON DELETE CASCADE en subscriptions se borra auto,
-    // de lo contrario eliminamos sus suscripciones primero:
-    await sql`DELETE FROM subscriptions WHERE member_id = ${memberId}`;
-    await sql`DELETE FROM members WHERE id = ${memberId}`;
-    
+    const session = await requireTenantSession();
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+    `;
+
+    if (!member) {
+      return { error: "Miembro no encontrado" };
+    }
+
+    await sql`
+      DELETE FROM subscriptions
+      WHERE member_id = ${memberId}
+    `;
+
+    await sql`
+      DELETE FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+    `;
+
     revalidateTag("members", "max");
     return { success: true };
   } catch (error) {
@@ -1807,18 +1835,19 @@ export async function deleteMemberAction(memberId: number) {
 }
 
 export async function updateMemberAction(
-  id: number, 
-  data: { 
-    first_name: string; 
-    last_name: string; 
-    email: string; 
+  id: number,
+  data: {
+    first_name: string;
+    last_name: string;
+    email: string;
     phone: string;
     plan_id?: number;
   }
 ) {
   try {
-    // 1. Actualizar datos en 'members'
-    await sql`
+    const session = await requireTenantSession();
+
+    const updated = await sql`
       UPDATE members
       SET 
         first_name = ${data.first_name},
@@ -1827,14 +1856,32 @@ export async function updateMemberAction(
         phone = ${data.phone},
         updated_at = NOW()
       WHERE id = ${id}
+        AND gym_id = ${session.gymId}
+      RETURNING id
     `;
 
-    // 2. Si se seleccionó un plan, cancelar anterior e insertar nuevo en 'subscriptions'
+    if (updated.length === 0) {
+      return { success: false, error: "Miembro no encontrado" };
+    }
+
     if (data.plan_id) {
+      const [plan] = await sql`
+        SELECT id
+        FROM membership_plans
+        WHERE id = ${data.plan_id}
+          AND gym_id = ${session.gymId}
+          AND is_active = true
+      `;
+
+      if (!plan) {
+        return { success: false, error: "Plan no encontrado" };
+      }
+
       await sql`
         UPDATE subscriptions 
         SET status = 'cancelled' 
-        WHERE member_id = ${id} AND status = 'active'
+        WHERE member_id = ${id}
+          AND status = 'active'
       `;
 
       await sql`
@@ -1849,9 +1896,7 @@ export async function updateMemberAction(
       `;
     }
 
-    // 3. Revalidar caché de la ruta
     revalidatePath("/admin/miembros");
-
     return { success: true };
   } catch (error) {
     console.error("Error updating member:", error);
