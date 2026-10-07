@@ -4,9 +4,32 @@ import { Badge } from "@/components/ui/badge";
 import { getClasses, getClassSchedule } from "@/app/actions";
 import { Clock, Users, Calendar } from "lucide-react";
 
+type ClassRow = {
+  id: number;
+  name: string;
+  description?: string;
+  duration_minutes: number;
+  max_capacity: number;
+  trainer_first_name?: string;
+  trainer_last_name?: string;
+};
+
+type ScheduleRow = {
+  id: number;
+  class_name: string;
+  description?: string;
+  start_time: string;
+  duration_minutes: number;
+  trainer_first_name?: string;
+  trainer_last_name?: string;
+  booked_count: number;
+  max_capacity: number;
+};
+
+
 export default async function ClasesPage() {
-  const classes = await getClasses();
-  const schedule = await getClassSchedule();
+  const classes = (await getClasses()) as ClassRow[];
+  const schedule = (await getClassSchedule()) as ScheduleRow[];
 
   return (
     <div className="space-y-8">
@@ -26,15 +49,7 @@ export default async function ClasesPage() {
       <div>
         <h2 className="text-xl font-semibold mb-4">Tipos de Clases</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {classes.length > 0 ? classes.map((cls: {
-            id: number;
-            name: string;
-            description: string;
-            duration_minutes: number;
-            max_capacity: number;
-            trainer_first_name?: string;
-            trainer_last_name?: string;
-          }) => (
+          {classes.length > 0 ? classes.map((cls) => (
             <Card key={cls.id}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">{cls.name}</CardTitle>
@@ -77,17 +92,7 @@ export default async function ClasesPage() {
           <CardContent className="p-0">
             {schedule.length > 0 ? (
               <div className="divide-y">
-                {schedule.map((item: {
-                  id: number;
-                  class_name: string;
-                  description?: string;
-                  start_time: string;
-                  duration_minutes: number;
-                  trainer_first_name?: string;
-                  trainer_last_name?: string;
-                  booked_count: number;
-                  max_capacity: number;
-                }) => {
+                {schedule.map((item) => {
                   const startTime = new Date(item.start_time);
                   const spotsLeft = (item.max_capacity || 20) - Number(item.booked_count || 0);
 
