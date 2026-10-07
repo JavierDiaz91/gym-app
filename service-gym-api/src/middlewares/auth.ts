@@ -170,6 +170,20 @@ export async function authenticate(
   }
 }
 
+export function getRequestGymId(
+  req: AuthenticatedRequest,
+  explicitGymId?: unknown
+): number | null {
+  if (!req.auth) return null;
+
+  if (req.auth.role !== "superadmin") {
+    return req.auth.gymId;
+  }
+
+  const parsed = Number(explicitGymId);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function requireRole(...roles: UserRole[]) {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     if (!req.auth) {
