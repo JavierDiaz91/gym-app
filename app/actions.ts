@@ -1672,38 +1672,67 @@ export async function assignRoutineToMultipleMembersBulk(
   }
 
   try {
-    // 1. Obtener los IDs reales de la tabla 'members' para los IDs seleccionados
-    const realMembersRes = await sql`
-      SELECT id FROM members 
-      WHERE id = ANY(${memberIds}::int[]) OR user_id = ANY(${memberIds}::int[]);
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { success: false, count: 0, error: "No autorizado" };
+    }
+
+    const [trainer] = await sql`
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
-    const realMemberIds = Array.isArray(realMembersRes) 
-      ? realMembersRes.map((m: any) => Number(m.id)) 
-      : (realMembersRes as any).rows?.map((m: any) => Number(m.id)) || [];
+    if (!trainer) {
+      return { success: false, count: 0, error: "Entrenador no encontrado" };
+    }
+
+    const [routine] = await sql`
+      SELECT id
+      FROM routines
+      WHERE id = ${routineId}
+        AND trainer_id = ${trainer.id}
+        AND (is_archived IS FALSE OR is_archived IS NULL)
+      LIMIT 1
+    `;
+
+    if (!routine) {
+      return { success: false, count: 0, error: "Rutina no encontrada" };
+    }
+
+    const realMembersRes = await sql`
+      SELECT id
+      FROM members
+      WHERE (id = ANY(${memberIds}::int[]) OR user_id = ANY(${memberIds}::int[]))
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
+    `;
+
+    const realMemberIds = realMembersRes.map((m: any) => Number(m.id));
 
     if (realMemberIds.length === 0) {
       return { success: false, count: 0, error: "No se encontraron alumnos válidos." };
     }
 
-    // 2. Insertar en member_routines evitando duplicados (ON CONFLICT DO NOTHING)
     for (const mId of realMemberIds) {
       await sql`
         INSERT INTO member_routines (member_id, routine_id)
         VALUES (${mId}, ${routineId})
-        ON CONFLICT DO NOTHING;
+        ON CONFLICT DO NOTHING
       `;
     }
 
-    // 3. Actualizar la columna 'routine_id' direct en members
     await sql`
       UPDATE members
       SET routine_id = ${routineId},
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = ANY(${realMemberIds}::int[]);
+      WHERE id = ANY(${realMemberIds}::int[])
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
     `;
 
-    // 4. Revalidar vistas
     revalidatePath("/trainer");
     revalidatePath("/trainer/alumnos");
     revalidatePath("/miembro");
@@ -2360,6 +2389,8 @@ export async function createPayment(formData: FormData) {
 
 export async function getPaymentsHistory() {
   try {
+    const session = await requireTenantSession();
+
     const payments = await sql`
       SELECT 
         p.id,
@@ -2377,6 +2408,7 @@ export async function getPaymentsHistory() {
       JOIN members m ON p.member_id = m.id
       LEFT JOIN subscriptions s ON p.subscription_id = s.id
       LEFT JOIN membership_plans mp ON s.plan_id = mp.id
+      WHERE m.gym_id = ${session.gymId}
       ORDER BY p.payment_date DESC
       LIMIT 100
     `;
