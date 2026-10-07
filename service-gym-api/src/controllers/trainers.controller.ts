@@ -1,11 +1,20 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import * as trainersService from "../services/trainers.service";
+import { AuthenticatedRequest, getRequestGymId } from "../middlewares/auth";
 
-// Obtener todos los entrenadores
-export const getTrainers = async (req: Request, res: Response): Promise<void> => {
+function resolveGymId(req: AuthenticatedRequest): number | null {
+  return getRequestGymId(req, req.query.gymId ?? req.body?.gymId);
+}
+
+export const getTrainers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    // Usamos el método real de tu servicio
-    const trainers = await trainersService.getTrainers();
+    const gymId = resolveGymId(req);
+    if (!gymId) {
+      res.status(400).json({ error: "gymId requerido" });
+      return;
+    }
+
+    const trainers = await trainersService.getTrainers(gymId);
     res.json(trainers);
   } catch (error) {
     console.error("Error en getTrainers:", error);
@@ -13,20 +22,23 @@ export const getTrainers = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// Obtener un entrenador por ID
-export const getTrainerById = async (req: Request, res: Response): Promise<void> => {
+export const getTrainerById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    const gymId = resolveGymId(req);
+    if (!gymId) {
+      res.status(400).json({ error: "gymId requerido" });
+      return;
+    }
+
     const { id } = req.params;
-    
-    // Traemos la lista y filtramos por ID acá en el controlador
-    const trainers = await trainersService.getTrainers();
-    const trainer = trainers.find((t: any) => t.id === Number(id) || t.id === id);
-    
+    const trainers = await trainersService.getTrainers(gymId);
+    const trainer = trainers.find((t: any) => Number(t.id) === Number(id));
+
     if (!trainer) {
       res.status(404).json({ error: "Entrenador no encontrado" });
       return;
     }
-    
+
     res.json(trainer);
   } catch (error) {
     console.error("Error en getTrainerById:", error);
