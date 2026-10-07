@@ -20,9 +20,15 @@ export interface AuthContext {
   gymStatus: string | null;
 }
 
-export interface AuthenticatedRequest extends Request {
-  auth?: AuthContext;
+declare global {
+  namespace Express {
+    interface Request {
+      auth?: AuthContext;
+    }
+  }
 }
+
+export type AuthenticatedRequest = Request;
 
 function getSessionSecret(): string {
   const secret = process.env.SESSION_SECRET;
