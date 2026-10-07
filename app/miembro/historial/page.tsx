@@ -5,15 +5,9 @@ import { Calendar, CheckCircle2, Dumbbell, History } from "lucide-react";
 
 export default async function MemberHistoryPage() {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session || session.role !== "member" || session.gymId == null) redirect("/login");
 
-  // Capturamos el userId independientemente de si la sesión guarda { user: { id } } o { id }
-  const userId = session.user?.id || session.id || session.userId;
-
-  if (!userId) {
-    console.error("No se encontró el ID de usuario en la sesión:", session);
-    return null;
-  }
+  const userId = session.id;
 
   let logs: any[] = [];
 
@@ -26,7 +20,8 @@ export default async function MemberHistoryPage() {
       FROM workout_logs wl
       JOIN routines r ON r.id = wl.routine_id
       JOIN members m ON m.id = wl.member_id
-      WHERE m.user_id = ${userId} OR wl.member_id = ${userId}
+      WHERE m.user_id = ${userId}
+        AND m.gym_id = ${session.gymId}
       ORDER BY wl.completed_at DESC
     `;
     
