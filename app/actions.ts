@@ -8,6 +8,7 @@ import { Member } from "./types/member";
 import { AttendanceStat } from "./types/attendance";
 import { TrainerMember } from "./types/trainer";
 import { MemberRoutine } from "@/app/types/routine";
+import { createSessionToken, sessionCookieOptions, verifySessionToken } from "@/lib/session";
 
 
 
@@ -141,22 +142,16 @@ export async function loginUser(formData: FormData) {
       return { error: "Credenciales inválidas" };
     }
 
-    // 2. Incluimos gymId dentro del objeto guardado en la cookie
     const sessionData = {
-      id: user.id,
-      email: user.email,
+      id: Number(user.id),
+      email: String(user.email),
       role: user.role,
-      gymId: user.gym_id, // <--- CAMBIO CLAVE
+      gymId: user.gym_id == null ? null : Number(user.gym_id),
     };
 
+    const token = await createSessionToken(sessionData);
     const cookieStore = await cookies();
-    cookieStore.set("session", JSON.stringify(sessionData), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    });
+    cookieStore.set("session", token, sessionCookieOptions);
 
     return {
       success: true,
@@ -175,16 +170,12 @@ export async function logoutUser() {
 }
 
 export async function getSession() {
-  const cookieStore = await cookies(); 
+  const cookieStore = await cookies();
   const session = cookieStore.get("session");
 
   if (!session) return null;
 
-  try {
-    return JSON.parse(session.value);
-  } catch {
-    return null;
-  }
+  return verifySessionToken(session.value);
 }
 
 // ==================== MEMBER ACTIONS ====================
