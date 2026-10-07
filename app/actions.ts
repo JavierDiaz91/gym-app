@@ -1198,7 +1198,7 @@ export async function logWorkout(routineId: number, details: any) {
   }
 
   // Extraer la ID de la sesión de manera segura
-  const currentUserId = session.id || session.userId || session.user?.id;
+  const currentUserId = session.id;
 
   try {
     // 1. Obtener el id de miembro correspondiente al usuario logueado
@@ -1484,7 +1484,7 @@ export async function getMemberWorkoutHistory(memberId: number) {
 
 export async function updateProfile(formData: FormData) {
   const session = await getSession();
-  const userId = session?.user?.id || session?.id || session?.userId;
+  const userId = session?.id;
   if (!userId) return { error: "No autorizado" };
 
   const firstName = formData.get("firstName") as string;
@@ -1514,7 +1514,7 @@ export async function updateProfile(formData: FormData) {
 
 export async function updateAvatar(imageUrl: string) {
   const session = await getSession();
-  const userId = session?.user?.id || session?.id || session?.userId;
+  const userId = session?.id;
   if (!userId) return { error: "No autorizado" };
 
   try {
@@ -1535,7 +1535,7 @@ export async function updatePassword(prevState: any, formData: FormData) {
   "use server";
 
   const session = await getSession();
-  const userId = session?.user?.id || session?.id || session?.userId;
+  const userId = session?.id;
   if (!userId) return { error: "No autorizado" };
 
   const currentPassword = formData.get("currentPassword") as string;
