@@ -18,15 +18,23 @@ import mercadoPagoRoutes from "./routes/mercadopago.routes";
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-// Verificación en consola al arrancar
-console.log("--- VARIABLES DE ENTORNO CARGADAS ---");
-console.log("MP_CLIENT_ID:", process.env.MP_CLIENT_ID);
-console.log("NEXT_PUBLIC_APP_URL:", process.env.NEXT_PUBLIC_APP_URL);
-console.log("MP_ACCESS_TOKEN:", process.env.MP_ACCESS_TOKEN ? "CARGADO CORRECTAMENTE" : "NO ENCONTRADO ❌");
-console.log("-------------------------------------");
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin no permitido por CORS"));
+    },
+  })
+);
+app.use(express.json());
 
 app.use("/api/memberships", membershipRoutes);
 app.use("/api/attendance", attendanceRoutes);
