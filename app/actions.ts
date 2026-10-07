@@ -475,13 +475,20 @@ export async function createSubscription(memberId: number, planId: number) {
 
 export async function getClasses() {
   try {
+    const session = await requireTenantSession();
+
     const classes = await sql`
-      SELECT c.*, t.first_name as trainer_first_name, t.last_name as trainer_last_name
+      SELECT
+        c.*,
+        t.first_name AS trainer_first_name,
+        t.last_name AS trainer_last_name
       FROM classes c
-      LEFT JOIN trainers t ON c.trainer_id = t.id
+      JOIN trainers t ON c.trainer_id = t.id
       WHERE c.is_active = true
+        AND t.gym_id = ${session.gymId}
       ORDER BY c.name
     `;
+
     return classes;
   } catch (error) {
     console.error("Error fetching classes:", error);
@@ -491,17 +498,31 @@ export async function getClasses() {
 
 export async function getClassSchedule() {
   try {
+    const session = await requireTenantSession();
+
     const schedule = await sql`
-      SELECT cs.*, c.name as class_name, c.description, c.duration_minutes,
-        t.first_name as trainer_first_name, t.last_name as trainer_last_name,
-        (SELECT COUNT(*) FROM class_bookings cb WHERE cb.schedule_id = cs.id AND cb.status = 'booked') as booked_count
+      SELECT
+        cs.*,
+        c.name AS class_name,
+        c.description,
+        c.duration_minutes,
+        t.first_name AS trainer_first_name,
+        t.last_name AS trainer_last_name,
+        (
+          SELECT COUNT(*)
+          FROM class_bookings cb
+          WHERE cb.schedule_id = cs.id
+            AND cb.status = 'booked'
+        ) AS booked_count
       FROM class_schedule cs
       JOIN classes c ON cs.class_id = c.id
-      LEFT JOIN trainers t ON cs.trainer_id = t.id
+      JOIN trainers t ON COALESCE(cs.trainer_id, c.trainer_id) = t.id
       WHERE cs.start_time >= NOW()
+        AND t.gym_id = ${session.gymId}
       ORDER BY cs.start_time ASC
       LIMIT 20
     `;
+
     return schedule;
   } catch (error) {
     console.error("Error fetching schedule:", error);
@@ -511,23 +532,51 @@ export async function getClassSchedule() {
 
 export async function bookClass(memberId: number, scheduleId: number) {
   try {
-    // Check if already booked
-    const existing = await sql`
-      SELECT id FROM class_bookings 
-      WHERE member_id = ${memberId} AND schedule_id = ${scheduleId} AND status = 'booked'
+    const session = await requireTenantSession();
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
+
+    if (!member) return { error: "Miembro no encontrado" };
+
+    const schedule = await sql`
+      SELECT
+        cs.id,
+        cs.max_capacity,
+        (
+          SELECT COUNT(*)
+          FROM class_bookings cb
+          WHERE cb.schedule_id = cs.id
+            AND cb.status = 'booked'
+        ) AS booked
+      FROM class_schedule cs
+      JOIN classes c ON cs.class_id = c.id
+      JOIN trainers t ON COALESCE(cs.trainer_id, c.trainer_id) = t.id
+      WHERE cs.id = ${scheduleId}
+        AND t.gym_id = ${session.gymId}
+      LIMIT 1
+    `;
+
+    if (schedule.length === 0) return { error: "Clase no encontrada" };
+
+    const existing = await sql`
+      SELECT id
+      FROM class_bookings
+      WHERE member_id = ${memberId}
+        AND schedule_id = ${scheduleId}
+        AND status = 'booked'
+    `;
+
     if (existing.length > 0) {
       return { error: "Ya tienes reserva para esta clase" };
     }
 
-    // Check capacity
-    const schedule = await sql`
-      SELECT cs.max_capacity, 
-        (SELECT COUNT(*) FROM class_bookings cb WHERE cb.schedule_id = cs.id AND cb.status = 'booked') as booked
-      FROM class_schedule cs WHERE id = ${scheduleId}
-    `;
-    if (schedule.length === 0) return { error: "Clase no encontrada" };
-    if (schedule[0].booked >= schedule[0].max_capacity) {
+    if (Number(schedule[0].booked) >= Number(schedule[0].max_capacity)) {
       return { error: "Clase llena" };
     }
 
@@ -548,17 +597,20 @@ export async function bookClass(memberId: number, scheduleId: number) {
 
 export async function getTrainers() {
   try {
+    const session = await requireTenantSession();
+
     const trainers = await sql`
-      SELECT 
-        t.id, 
-        t.first_name, 
-        t.last_name, 
-        u.email, 
-        t.specialization, 
-        t.bio, 
-        t.is_active 
+      SELECT
+        t.id,
+        t.first_name,
+        t.last_name,
+        u.email,
+        t.specialization,
+        t.bio,
+        t.is_active
       FROM trainers t
       JOIN users u ON t.user_id = u.id
+      WHERE t.gym_id = ${session.gymId}
       ORDER BY t.first_name ASC
     `;
 
@@ -569,14 +621,17 @@ export async function getTrainers() {
       email: trainer.email || "",
       specialization: trainer.specialization || undefined,
       bio: trainer.bio || undefined,
-      is_active: trainer.is_active === null || trainer.is_active === undefined ? true : Boolean(trainer.is_active),
+      is_active:
+        trainer.is_active === null || trainer.is_active === undefined
+          ? true
+          : Boolean(trainer.is_active),
     }));
-
   } catch (error) {
     console.error("Error fetching trainers:", error);
     return [];
   }
 }
+
 // ==================== TRAINER ↔ MEMBERS ====================
 
 export async function assignMemberToTrainer(email: string, sessionUserId: number | string) {
@@ -642,16 +697,17 @@ export async function createTrainer(formData: FormData) {
   const firstName = formData.get("first_name") as string;
   const lastName = formData.get("last_name") as string;
   const email = formData.get("email") as string;
-  const password = formData.get("password") as string || "123456"; 
+  const password = formData.get("password") as string;
   const specialization = formData.get("specialization") as string;
   const bio = formData.get("bio") as string;
-  const gymId = formData.get("gym_id") ? Number(formData.get("gym_id")) : null;
 
-  if (!firstName || !lastName || !email) {
-    return { error: "Nombre, apellido y correo son obligatorios." };
+  if (!firstName || !lastName || !email || !password) {
+    return { error: "Nombre, apellido, correo y contraseña son obligatorios." };
   }
 
   try {
+    const session = await requireTenantSession();
+    const gymId = session.gymId;
     // 1. Encriptamos la clave con bcryptjs
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -689,10 +745,22 @@ export async function createTrainer(formData: FormData) {
 
 export async function recordAttendance(memberId: number) {
   try {
+    const session = await requireTenantSession();
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+    `;
+
+    if (!member) return { error: "Miembro no encontrado" };
+
     await sql`
       INSERT INTO attendance (member_id, check_in)
       VALUES (${memberId}, NOW())
     `;
+
     revalidateTag("attendance", "max");
     return { success: true };
   } catch (error) {
@@ -703,16 +771,21 @@ export async function recordAttendance(memberId: number) {
 
 export async function getAttendanceStats(): Promise<AttendanceStat[]> {
   try {
+    const session = await requireTenantSession();
+
     const stats = await sql`
-      SELECT 
-        COUNT(*) as total_visits,
-        COUNT(DISTINCT member_id) as unique_members,
-        DATE(check_in) as date
-      FROM attendance
-      WHERE check_in >= NOW() - INTERVAL '30 days'
-      GROUP BY DATE(check_in)
+      SELECT
+        COUNT(*) AS total_visits,
+        COUNT(DISTINCT a.member_id) AS unique_members,
+        DATE(a.check_in) AS date
+      FROM attendance a
+      JOIN members m ON a.member_id = m.id
+      WHERE a.check_in >= NOW() - INTERVAL '30 days'
+        AND m.gym_id = ${session.gymId}
+      GROUP BY DATE(a.check_in)
       ORDER BY date DESC
     `;
+
     return stats as AttendanceStat[];
   } catch (error) {
     console.error("Error fetching attendance stats:", error);
@@ -724,12 +797,37 @@ export async function getAttendanceStats(): Promise<AttendanceStat[]> {
 
 export async function getDashboardStats() {
   try {
+    const session = await requireTenantSession();
+
     const [members, activeSubscriptions, todayAttendance, revenue] =
       await Promise.all([
-        sql`SELECT COUNT(*) as count FROM members WHERE status = 'active'`,
-        sql`SELECT COUNT(*) as count FROM subscriptions WHERE status = 'active'`,
-        sql`SELECT COUNT(*) as count FROM attendance WHERE DATE(check_in) = CURRENT_DATE`,
-        sql`SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE DATE(payment_date) >= DATE_TRUNC('month', CURRENT_DATE)`,
+        sql`
+          SELECT COUNT(*) AS count
+          FROM members
+          WHERE status = 'active'
+            AND gym_id = ${session.gymId}
+        `,
+        sql`
+          SELECT COUNT(*) AS count
+          FROM subscriptions s
+          JOIN members m ON s.member_id = m.id
+          WHERE s.status = 'active'
+            AND m.gym_id = ${session.gymId}
+        `,
+        sql`
+          SELECT COUNT(*) AS count
+          FROM attendance a
+          JOIN members m ON a.member_id = m.id
+          WHERE DATE(a.check_in) = CURRENT_DATE
+            AND m.gym_id = ${session.gymId}
+        `,
+        sql`
+          SELECT COALESCE(SUM(p.amount), 0) AS total
+          FROM payments p
+          JOIN members m ON p.member_id = m.id
+          WHERE DATE(p.payment_date) >= DATE_TRUNC('month', CURRENT_DATE)
+            AND m.gym_id = ${session.gymId}
+        `,
       ]);
 
     return {
