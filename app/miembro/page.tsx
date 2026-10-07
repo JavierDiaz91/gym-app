@@ -46,94 +46,12 @@ interface PageProps {
 
 export default async function MiembroDashboardPage({ searchParams }: PageProps) {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session || session.role !== "member" || session.gymId == null) redirect("/login");
 
-  const userId = session.user?.id || session.id || session.userId;
-  const userEmail = session.user?.email || "";
+  const userId = session.id;
 
-  // 0. Sincronización de respaldo si el usuario regresa tras pagar en Mercado Pago
-  const resolvedSearchParams = await searchParams;
-  const paymentId = resolvedSearchParams?.payment_id || resolvedSearchParams?.collection_id;
-  const collectionStatus = resolvedSearchParams?.collection_status || resolvedSearchParams?.status;
-
-  if (paymentId && collectionStatus === "approved") {
-    try {
-      // Validar directamente contra Mercado Pago
-      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-        headers: {
-          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-        },
-        cache: 'no-store' // IMPORTANTE: Para evitar respuestas cacheadas de la API
-      });
-
-      if (mpRes.ok) {
-        const paymentData = await mpRes.json();
-        
-        if (paymentData.status === "approved") {
-          const rawRef = paymentData.external_reference;
-          let memberId: number | null = null;
-          let tenantId: string | null = null;
-
-          if (rawRef) {
-            try {
-              const parsed = typeof rawRef === 'string' ? JSON.parse(rawRef) : rawRef;
-              memberId = Number(parsed.memberId);
-              tenantId = parsed.tenantId;
-            } catch (e) {
-              console.error("Error parseando external_reference:", e);
-            }
-          }
-
-          if (memberId && !isNaN(memberId)) {
-            const newEndDate = new Date();
-            newEndDate.setDate(newEndDate.getDate() + 30);
-
-            // 1. Activar miembro
-            await sql`
-              UPDATE members
-              SET status = 'active', updated_at = NOW()
-              WHERE id = ${memberId}
-            `;
-
-            // 2. Activar suscripción (Si no existe, crear la fila)
-            const subCheck = await sql`
-              SELECT id FROM subscriptions WHERE member_id = ${memberId} LIMIT 1
-            `;
-
-            if (Array.isArray(subCheck) && subCheck.length > 0) {
-              await sql`
-                UPDATE subscriptions
-                SET 
-                  status = 'active',
-                  start_date = NOW(),
-                  end_date = ${newEndDate.toISOString()},
-                  updated_at = NOW()
-                WHERE member_id = ${memberId}
-              `;
-            } else {
-              // Si por alguna razón no tenía suscripción creada previa
-              await sql`
-                INSERT INTO subscriptions (tenant_id, member_id, status, start_date, end_date, created_at, updated_at)
-                VALUES (${tenantId || 'gym-default'}, ${memberId}, 'active', NOW(), ${newEndDate.toISOString()}, NOW(), NOW())
-              `;
-            }
-
-            console.log(`[SYNC FRONTEND] Miembro #${memberId} reactivado exitosamente.`);
-
-            // REDIRECCIONAR A /miembro SIN QUERY PARAMS
-            // Esto limpia los datos de la URL y fuerza un render completamente limpio con estado activo
-            redirect("/miembro");
-          }
-        }
-      }
-    } catch (err) {
-      // Ignoramos el error si fue provocado por el propio redirect() de Next.js
-      if ((err as any)?.digest?.startsWith("NEXT_REDIRECT")) {
-        throw err;
-      }
-      console.error("Error al sincronizar pago de retorno:", err);
-    }
-  }
+  // El estado de pagos se sincroniza exclusivamente por webhook de Mercado Pago.
+  await searchParams;
 
 
   let memberData: MemberDashboardData | null = null;
@@ -153,12 +71,11 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
         s.status AS sub_status,
         mp.name AS plan_name
       FROM members m
-      LEFT JOIN users u ON m.user_id = u.id OR LOWER(m.email) = LOWER(u.email)
+      LEFT JOIN users u ON m.user_id = u.id
       LEFT JOIN subscriptions s ON m.id = s.member_id
       LEFT JOIN membership_plans mp ON s.plan_id = mp.id
-      WHERE m.user_id = ${userId} 
-         OR u.id = ${userId}
-         OR LOWER(m.email) = LOWER(${userEmail})
+      WHERE m.user_id = ${userId}
+        AND m.gym_id = ${session.gymId}
       ORDER BY s.updated_at DESC, s.end_date DESC
       LIMIT 1
     `;
