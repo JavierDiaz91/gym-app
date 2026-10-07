@@ -178,10 +178,21 @@ export async function getSession() {
   return verifySessionToken(session.value);
 }
 
+async function requireTenantSession() {
+  const session = await getSession();
+
+  if (!session || session.gymId == null) {
+    throw new Error("Sesión inválida o sin gimnasio asociado.");
+  }
+
+  return session;
+}
+
 // ==================== MEMBER ACTIONS ====================
 
 export async function getMembers(query: string = ""): Promise<Member[]> {
   try {
+    const session = await requireTenantSession();
     const searchTerm = `%${query.trim()}%`;
 
     const members = await sql`
@@ -195,11 +206,13 @@ export async function getMembers(query: string = ""): Promise<Member[]> {
         ON m.id = s.member_id AND s.status = 'active'
       LEFT JOIN membership_plans mp 
         ON s.plan_id = mp.id
-      WHERE 
-        ${query === ''} OR 
-        m.first_name ILIKE ${searchTerm} OR 
-        m.last_name ILIKE ${searchTerm} OR 
-        m.email ILIKE ${searchTerm}
+      WHERE m.gym_id = ${session.gymId}
+        AND (
+          ${query === ''} OR 
+          m.first_name ILIKE ${searchTerm} OR 
+          m.last_name ILIKE ${searchTerm} OR 
+          m.email ILIKE ${searchTerm}
+        )
       ORDER BY m.created_at DESC
     `;
 
@@ -212,6 +225,8 @@ export async function getMembers(query: string = ""): Promise<Member[]> {
 
 export async function getMemberById(id: number): Promise<Member | null> {
   try {
+    const session = await requireTenantSession();
+
     const members = await sql`
       SELECT 
         m.*,
@@ -225,6 +240,7 @@ export async function getMemberById(id: number): Promise<Member | null> {
       LEFT JOIN membership_plans mp 
         ON s.plan_id = mp.id
       WHERE m.id = ${id}
+        AND m.gym_id = ${session.gymId}
     `;
 
     return (members[0] as Member) ?? null;
@@ -242,7 +258,8 @@ export async function createMember(formData: FormData) {
   const emergencyContact = formData.get("emergencyContact") as string;
   const planIdRaw = formData.get("planId") as string;
 
-  const gymId = 1; // Tu gym_id actual o el id por defecto
+  const session = await requireTenantSession();
+  const gymId = session.gymId;
 
   // 1. Normalizar email (sin espacios y en minúsculas)
   const email = emailRaw ? emailRaw.trim().toLowerCase() : "";
@@ -306,7 +323,9 @@ export async function updateMember(id: number, formData: FormData) {
   }
 
   try {
-    // 2. Actualizar la ficha en 'members' y obtener el user_id asociado si existe
+    const session = await requireTenantSession();
+
+    // 2. Actualizar únicamente dentro del gimnasio autenticado
     const [updatedMember] = await sql`
       UPDATE members 
       SET first_name = ${firstName}, 
@@ -315,8 +334,13 @@ export async function updateMember(id: number, formData: FormData) {
           phone = ${phone || null},
           status = ${status || "active"}
       WHERE id = ${id}
+        AND gym_id = ${session.gymId}
       RETURNING user_id
     `;
+
+    if (!updatedMember) {
+      return { error: "Miembro no encontrado." };
+    }
 
     // 3. Sincronizar email en 'users' si el socio ya tiene credenciales creadas
     if (updatedMember?.user_id) {
@@ -324,6 +348,7 @@ export async function updateMember(id: number, formData: FormData) {
         UPDATE users 
         SET email = ${email}, updated_at = NOW()
         WHERE id = ${updatedMember.user_id}
+          AND gym_id = ${session.gymId}
       `;
     }
 
@@ -338,15 +363,31 @@ export async function updateMember(id: number, formData: FormData) {
 //Eliminar miembro
 export async function deleteMember(id: number) {
   try {
-    // 1. Obtener el user_id asociado antes de borrar el miembro
-    const [member] = await sql`SELECT user_id FROM members WHERE id = ${id}`;
+    const session = await requireTenantSession();
 
-    // 2. Eliminar la ficha del miembro
-    await sql`DELETE FROM members WHERE id = ${id}`;
+    const [member] = await sql`
+      SELECT user_id
+      FROM members
+      WHERE id = ${id}
+        AND gym_id = ${session.gymId}
+    `;
 
-    // 3. (Opcional) Eliminar credenciales de acceso en 'users' si existían
-    if (member?.user_id) {
-      await sql`DELETE FROM users WHERE id = ${member.user_id}`;
+    if (!member) {
+      return { error: "Miembro no encontrado." };
+    }
+
+    await sql`
+      DELETE FROM members
+      WHERE id = ${id}
+        AND gym_id = ${session.gymId}
+    `;
+
+    if (member.user_id) {
+      await sql`
+        DELETE FROM users
+        WHERE id = ${member.user_id}
+          AND gym_id = ${session.gymId}
+      `;
     }
 
     revalidateTag("members", "max");
@@ -361,9 +402,12 @@ export async function deleteMember(id: number) {
 
 export async function getMembershipPlans() {
   try {
+    const session = await requireTenantSession();
+
     const plans = await sql`
       SELECT * FROM membership_plans 
-      WHERE is_active = true 
+      WHERE is_active = true
+        AND gym_id = ${session.gymId}
       ORDER BY price ASC
     `;
     return plans;
@@ -375,7 +419,25 @@ export async function getMembershipPlans() {
 
 export async function createSubscription(memberId: number, planId: number) {
   try {
-    const plans = await sql`SELECT * FROM membership_plans WHERE id = ${planId}`;
+    const session = await requireTenantSession();
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+    `;
+
+    if (!member) return { error: "Miembro no encontrado" };
+
+    const plans = await sql`
+      SELECT *
+      FROM membership_plans
+      WHERE id = ${planId}
+        AND gym_id = ${session.gymId}
+        AND is_active = true
+    `;
+
     if (plans.length === 0) return { error: "Plan no encontrado" };
 
     const plan = plans[0];
@@ -383,10 +445,11 @@ export async function createSubscription(memberId: number, planId: number) {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + plan.duration_days);
 
-    // Deactivate existing subscriptions
     await sql`
-      UPDATE subscriptions SET status = 'cancelled' 
-      WHERE member_id = ${memberId} AND status = 'active'
+      UPDATE subscriptions
+      SET status = 'cancelled'
+      WHERE member_id = ${memberId}
+        AND status = 'active'
     `;
 
     await sql`
@@ -394,7 +457,6 @@ export async function createSubscription(memberId: number, planId: number) {
       VALUES (${memberId}, ${planId}, ${startDate.toISOString()}, ${endDate.toISOString()}, 'active')
     `;
 
-    // Record payment
     await sql`
       INSERT INTO payments (member_id, amount, payment_type, description)
       VALUES (${memberId}, ${plan.price}, 'subscription', ${`Membresia: ${plan.name}`})
