@@ -1,11 +1,23 @@
-// service-gym-api/src/middlewares/checkTenantStatus.ts
-import { Request, Response, NextFunction } from "express";
+import { NextFunction, Response } from "express";
+import { AuthenticatedRequest } from "./auth";
 
-export function checkTenantStatus(req: Request, res: Response, next: NextFunction) {
-  // Asumimos que req.gym fue inyectado en un middleware previo (ej. autenticación o resolveTenant)
-  const gym = (req as any).gym;
+export function checkTenantStatus(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (!req.auth) {
+    return res.status(401).json({
+      success: false,
+      code: "AUTH_REQUIRED",
+      error: "Autenticación requerida.",
+    });
+  }
 
-  if (gym && gym.status === "suspended") {
+  if (
+    req.auth.role !== "superadmin" &&
+    req.auth.gymStatus === "suspended"
+  ) {
     return res.status(403).json({
       success: false,
       code: "TENANT_SUSPENDED",
