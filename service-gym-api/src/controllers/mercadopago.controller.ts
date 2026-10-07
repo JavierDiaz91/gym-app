@@ -442,159 +442,256 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
 // 4. Webhook para recibir notificaciones de pago
 export const handleWebhook = async (req: Request, res: Response) => {
   try {
-    const { type, data, action } = req.body;
+    const { type, data, action, user_id: bodyUserId } = req.body || {};
 
-    if ((type === 'payment' || action?.startsWith('payment.')) && data?.id) {
-      const paymentId = data.id;
-      console.log(`[MP WEBHOOK] Notificación recibida para el pago ID: ${paymentId}`);
-
-      const accessToken = process.env.MP_ACCESS_TOKEN;
-
-      if (!accessToken) {
-        console.error('[MP WEBHOOK ERROR] No se encontró MP_ACCESS_TOKEN en process.env');
-        return res.status(200).send('OK');
-      }
-
-      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (!mpRes.ok) {
-        console.error(`[MP WEBHOOK ERROR] No se pudo obtener la información del pago ${paymentId}`);
-        return res.status(200).send('OK');
-      }
-
-      const paymentData = await mpRes.json();
-
-      if (paymentData.status === 'approved') {
-        const transactionAmount = paymentData.transaction_amount;
-
-        let externalRef: { tenantId?: string; memberId?: string | number; planId?: string | number } = {};
-        try {
-          externalRef = JSON.parse(paymentData.external_reference || '{}');
-        } catch (e) {
-          console.warn('[MP WEBHOOK WARN] No se pudo parsear el external_reference JSON');
-        }
-
-        const { tenantId = 'gym-demo-1', memberId } = externalRef;
-
-        console.log(`[MP WEBHOOK APROBADO] Pago de $${transactionAmount} para Tenant: ${tenantId}, Miembro: ${memberId}`);
-
-        if (memberId) {
-          const numMemberId = Number(memberId);
-          const planId = externalRef?.planId ? Number(externalRef.planId) : null;
-
-          const memberFind = await sql`
-            SELECT id FROM members 
-            WHERE id = ${numMemberId} OR user_id = ${numMemberId} 
-            LIMIT 1
-          `;
-          const realMemberRows = Array.isArray(memberFind) ? memberFind : (memberFind as any)?.rows || [];
-          const realMemberId = realMemberRows[0]?.id || numMemberId;
-
-          await sql`
-            UPDATE members 
-            SET status = 'active', updated_at = NOW()
-            WHERE id = ${realMemberId};
-          `;
-
-          const existingSub = await sql`
-            SELECT id FROM subscriptions WHERE member_id = ${realMemberId} ORDER BY id DESC LIMIT 1
-          `;
-          const subRows = Array.isArray(existingSub) ? existingSub : (existingSub as any)?.rows || [];
-
-          let subscriptionId: number | null = null;
-
-          if (subRows.length > 0) {
-            subscriptionId = subRows[0].id;
-
-            if (planId) {
-              await sql`
-                UPDATE subscriptions
-                SET 
-                  status = 'active',
-                  plan_id = ${planId},
-                  start_date = CURRENT_DATE,
-                  end_date = CURRENT_DATE + INTERVAL '30 days',
-                  updated_at = NOW()
-                WHERE id = ${subscriptionId};
-              `;
-            } else {
-              await sql`
-                UPDATE subscriptions
-                SET 
-                  status = 'active',
-                  start_date = CURRENT_DATE,
-                  end_date = CURRENT_DATE + INTERVAL '30 days',
-                  updated_at = NOW()
-                WHERE id = ${subscriptionId};
-              `;
-            }
-          } else {
-            let finalPlanId = planId;
-
-            if (!finalPlanId) {
-              const defaultPlan = await sql`
-                SELECT id FROM membership_plans WHERE is_active = true ORDER BY id ASC LIMIT 1
-              `;
-              const defaultPlanRows = Array.isArray(defaultPlan) ? defaultPlan : (defaultPlan as any)?.rows || [];
-              finalPlanId = defaultPlanRows[0]?.id || 1;
-            }
-
-            const newSub = await sql`
-              INSERT INTO subscriptions (
-                member_id,
-                plan_id,
-                status,
-                start_date,
-                end_date,
-                created_at,
-                updated_at
-              ) VALUES (
-                ${realMemberId},
-                ${finalPlanId},
-                'active',
-                CURRENT_DATE,
-                CURRENT_DATE + INTERVAL '30 days',
-                NOW(),
-                NOW()
-              )
-              RETURNING id;
-            `;
-            const newSubRows = Array.isArray(newSub) ? newSub : (newSub as any)?.rows || [];
-            subscriptionId = newSubRows[0]?.id || null;
-          }
-
-          await sql`
-            INSERT INTO payments (
-              member_id,
-              subscription_id,
-              amount,
-              payment_method,
-              transaction_id,
-              status,
-              created_at
-            ) VALUES (
-              ${realMemberId},
-              ${subscriptionId},
-              ${transactionAmount},
-              'mercadopago',
-              ${String(paymentId)},
-              'completed',
-              NOW()
-            );
-          `;
-
-          console.log(`[MP WEBHOOK ÉXITO] Miembro #${realMemberId} activado correctamente con suscripción #${subscriptionId}.`);
-        }
-      }
+    if (
+      !((type === "payment" || String(action || "").startsWith("payment.")) &&
+        data?.id)
+    ) {
+      return res.status(200).send("OK");
     }
 
-    return res.status(200).send('OK');
+    const paymentId = String(data.id);
+    const notificationUserId = String(
+      bodyUserId || req.query.user_id || ""
+    ).trim();
+
+    if (!notificationUserId) {
+      console.warn(
+        `[MP WEBHOOK] Pago ${paymentId} sin user_id; no se procesa por seguridad.`
+      );
+      return res.status(200).send("OK");
+    }
+
+    const configResult = await sql`
+      SELECT tenant_id, access_token, mp_user_id
+      FROM tenant_payment_configs
+      WHERE provider = 'mercadopago'
+        AND mp_user_id = ${notificationUserId}
+      LIMIT 1
+    `;
+
+    const config = configResult[0];
+    if (!config?.access_token) {
+      console.warn(
+        `[MP WEBHOOK] No existe configuración para mp_user_id=${notificationUserId}`
+      );
+      return res.status(200).send("OK");
+    }
+
+    const mpRes = await fetch(
+      `https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${config.access_token}`,
+        },
+      }
+    );
+
+    if (!mpRes.ok) {
+      console.error(
+        `[MP WEBHOOK] No se pudo consultar el pago ${paymentId} con el token del tenant.`
+      );
+      return res.status(200).send("OK");
+    }
+
+    const paymentData = await mpRes.json();
+
+    if (String(paymentData.user_id || "") !== String(config.mp_user_id)) {
+      console.warn(
+        `[MP WEBHOOK] El pago ${paymentId} no pertenece a la cuenta configurada.`
+      );
+      return res.status(200).send("OK");
+    }
+
+    if (paymentData.status !== "approved") {
+      return res.status(200).send("OK");
+    }
+
+    let externalRef: {
+      tenantId?: string;
+      memberId?: string | number;
+      planId?: string | number;
+    } = {};
+
+    try {
+      externalRef = JSON.parse(paymentData.external_reference || "{}");
+    } catch {
+      console.warn(
+        `[MP WEBHOOK] external_reference inválido para pago ${paymentId}`
+      );
+      return res.status(200).send("OK");
+    }
+
+    const tenantId = Number(externalRef.tenantId);
+    const memberId = Number(externalRef.memberId);
+    const planId = Number(externalRef.planId);
+
+    if (
+      !Number.isFinite(tenantId) ||
+      !Number.isFinite(memberId) ||
+      !Number.isFinite(planId) ||
+      String(tenantId) !== String(config.tenant_id)
+    ) {
+      console.warn(
+        `[MP WEBHOOK] Referencia inconsistente para pago ${paymentId}`
+      );
+      return res.status(200).send("OK");
+    }
+
+    const [member] = await sql`
+      SELECT id, gym_id
+      FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${tenantId}
+      LIMIT 1
+    `;
+
+    if (!member) {
+      console.warn(
+        `[MP WEBHOOK] Miembro ${memberId} no pertenece al tenant ${tenantId}`
+      );
+      return res.status(200).send("OK");
+    }
+
+    const [plan] = await sql`
+      SELECT id, price, duration_months
+      FROM membership_plans
+      WHERE id = ${planId}
+        AND gym_id = ${tenantId}
+      LIMIT 1
+    `;
+
+    if (!plan) {
+      console.warn(
+        `[MP WEBHOOK] Plan ${planId} no pertenece al tenant ${tenantId}`
+      );
+      return res.status(200).send("OK");
+    }
+
+    const expectedAmount = Number(plan.price);
+    const paidAmount = Number(paymentData.transaction_amount);
+
+    if (
+      !Number.isFinite(expectedAmount) ||
+      !Number.isFinite(paidAmount) ||
+      Math.abs(expectedAmount - paidAmount) > 0.01
+    ) {
+      console.warn(
+        `[MP WEBHOOK] Importe inválido para pago ${paymentId}. Esperado=${expectedAmount} recibido=${paidAmount}`
+      );
+      return res.status(200).send("OK");
+    }
+
+    const existingPayment = await sql`
+      SELECT id
+      FROM payments
+      WHERE transaction_id = ${paymentId}
+        AND member_id = ${memberId}
+      LIMIT 1
+    `;
+
+    if (existingPayment.length > 0) {
+      return res.status(200).send("OK");
+    }
+
+    const existingSub = await sql`
+      SELECT id
+      FROM subscriptions
+      WHERE member_id = ${memberId}
+      ORDER BY id DESC
+      LIMIT 1
+    `;
+
+    let subscriptionId: number | null = null;
+    const durationMonths = Math.max(1, Number(plan.duration_months) || 1);
+
+    if (existingSub.length > 0) {
+      subscriptionId = Number(existingSub[0].id);
+
+      await sql`
+        UPDATE subscriptions
+        SET
+          status = 'active',
+          plan_id = ${planId},
+          start_date = CURRENT_DATE,
+          end_date = CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
+          payment_status = 'paid',
+          amount_paid = ${paidAmount},
+          updated_at = NOW()
+        WHERE id = ${subscriptionId}
+          AND member_id = ${memberId}
+      `;
+    } else {
+      const newSub = await sql`
+        INSERT INTO subscriptions (
+          member_id,
+          plan_id,
+          status,
+          start_date,
+          end_date,
+          payment_status,
+          amount_paid,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ${memberId},
+          ${planId},
+          'active',
+          CURRENT_DATE,
+          CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
+          'paid',
+          ${paidAmount},
+          NOW(),
+          NOW()
+        )
+        RETURNING id
+      `;
+
+      subscriptionId = Number(newSub[0]?.id || 0) || null;
+    }
+
+    await sql`
+      UPDATE members
+      SET status = 'active', updated_at = NOW()
+      WHERE id = ${memberId}
+        AND gym_id = ${tenantId}
+    `;
+
+    await sql`
+      INSERT INTO payments (
+        member_id,
+        subscription_id,
+        amount,
+        payment_method,
+        transaction_id,
+        status,
+        payment_date,
+        created_at
+      )
+      VALUES (
+        ${memberId},
+        ${subscriptionId},
+        ${paidAmount},
+        'mercadopago',
+        ${paymentId},
+        'completed',
+        NOW(),
+        NOW()
+      )
+    `;
+
+    console.log(
+      `[MP WEBHOOK] Pago ${paymentId} aplicado al miembro ${memberId} del tenant ${tenantId}.`
+    );
+
+    return res.status(200).send("OK");
   } catch (error) {
-    console.error('[MP WEBHOOK EXCEPTION]:', error);
-    return res.status(200).send('OK');
+    console.error("[MP WEBHOOK EXCEPTION]:", error);
+
+    // Mercado Pago reintentará según su política. Respondemos 500 sólo ante
+    // errores internos inesperados para no perder eventos transitorios.
+    return res.status(500).send("ERROR");
   }
 };
