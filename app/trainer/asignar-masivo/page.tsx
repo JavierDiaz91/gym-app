@@ -5,9 +5,9 @@ import BulkAssignClient from "./BulkAssignClient";
 
 export default async function BulkAssignPage() {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session || session.role !== "trainer" || session.gymId == null) redirect("/login");
 
-  const userId = session.user?.id || session.id || session.userId;
+  const userId = session.id;
 
   let trainerId: number | null = null;
   let members: any[] = [];
@@ -16,7 +16,10 @@ export default async function BulkAssignPage() {
   try {
     // 1. Obtener ID del Entrenador
     const trainerResult = await sql`
-      SELECT id FROM trainers WHERE user_id = ${userId} OR id = ${userId} LIMIT 1
+      SELECT id FROM trainers
+      WHERE user_id = ${userId}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
     const trainerRows = Array.isArray(trainerResult)
       ? trainerResult
