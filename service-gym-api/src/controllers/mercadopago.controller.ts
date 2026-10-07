@@ -1,72 +1,161 @@
-import { Request, Response } from 'express';
-import { sql } from '../db/neon';
-import { AuthenticatedRequest } from '../middlewares/auth';
+import { createHmac, timingSafeEqual } from "crypto";
+import { Request, Response } from "express";
+import { sql } from "../db/neon";
+import { AuthenticatedRequest, getRequestGymId } from "../middlewares/auth";
 
-export const connectMercadoPago = async (req: Request, res: Response) => {
-  const { tenantId } = req.query;
+const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 
-  if (!tenantId) {
-    return res.status(400).json({ error: 'El parámetro tenantId es obligatorio' });
+function getOAuthStateSecret() {
+  const secret = process.env.MP_OAUTH_STATE_SECRET || process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      "MP_OAUTH_STATE_SECRET o SESSION_SECRET debe tener al menos 32 caracteres."
+    );
   }
+  return secret;
+}
 
-  const clientId = process.env.MP_CLIENT_ID;
-  const publicUrl = process.env.PUBLIC_URL?.replace(/\/$/, '');
+function signOAuthState(gymId: number) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      gymId,
+      exp: Math.floor(Date.now() / 1000) + OAUTH_STATE_TTL_SECONDS,
+    }),
+    "utf8"
+  ).toString("base64url");
 
-  if (!clientId || !publicUrl) {
+  const signature = createHmac("sha256", getOAuthStateSecret())
+    .update(payload)
+    .digest("base64url");
+
+  return `${payload}.${signature}`;
+}
+
+function verifyOAuthState(state: string): { gymId: number } | null {
+  try {
+    const [payload, signature, ...rest] = state.split(".");
+    if (!payload || !signature || rest.length > 0) return null;
+
+    const expected = createHmac("sha256", getOAuthStateSecret())
+      .update(payload)
+      .digest();
+
+    const received = Buffer.from(signature, "base64url");
+    if (
+      received.length !== expected.length ||
+      !timingSafeEqual(received, expected)
+    ) {
+      return null;
+    }
+
+    const decoded = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8")
+    );
+
+    if (
+      !Number.isFinite(Number(decoded.gymId)) ||
+      Number(decoded.gymId) <= 0 ||
+      !Number.isFinite(Number(decoded.exp)) ||
+      Number(decoded.exp) <= Math.floor(Date.now() / 1000)
+    ) {
+      return null;
+    }
+
+    return { gymId: Number(decoded.gymId) };
+  } catch {
+    return null;
+  }
+}
+
+export const connectMercadoPago = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    if (!req.auth) {
+      return res.status(401).json({ error: "Autenticación requerida." });
+    }
+
+    const gymId = getRequestGymId(req, req.query.tenantId);
+    if (!gymId) {
+      return res.status(400).json({ error: "Gimnasio inválido." });
+    }
+
+    const clientId = process.env.MP_CLIENT_ID;
+    const publicUrl = process.env.PUBLIC_URL?.replace(/\/$/, "");
+
+    if (!clientId || !publicUrl) {
+      return res.status(500).json({
+        error:
+          "Configuración incompleta: MP_CLIENT_ID o PUBLIC_URL no están definidos.",
+      });
+    }
+
+    const redirectUri = `${publicUrl}/api/mercadopago/callback`;
+    const state = signOAuthState(gymId);
+
+    res.setHeader("ngrok-skip-browser-warning", "true");
+
+    const mpAuthUrl =
+      "https://auth.mercadopago.com/authorization" +
+      `?client_id=${encodeURIComponent(clientId)}` +
+      "&response_type=code&platform_id=mp" +
+      `&state=${encodeURIComponent(state)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+    return res.redirect(mpAuthUrl);
+  } catch (error) {
+    console.error("Error iniciando OAuth de Mercado Pago:", error);
+    return res.status(500).json({ error: "No se pudo iniciar la vinculación." });
+  }
+};
+
+export const mercadoPagoCallback = async (req: Request, res: Response) => {
+  const { code, state, error } = req.query;
+  const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, "");
+
+  if (!frontendUrl) {
     return res.status(500).json({
-      error: 'Configuración incompleta: MP_CLIENT_ID o PUBLIC_URL no están definidos en el entorno.',
+      error: "FRONTEND_URL no está configurada en el entorno.",
     });
   }
 
-  const redirectUri = `${publicUrl}/api/auth/mercadopago/callback`;
-
-  res.setHeader('ngrok-skip-browser-warning', 'true');
-
-  const mpAuthUrl = `https://auth.mercadopago.com/authorization?client_id=${clientId}&response_type=code&platform_id=mp&state=${tenantId}&redirect_uri=${encodeURIComponent(
-    redirectUri
-  )}`;
-
-  return res.redirect(mpAuthUrl);
-};
-
-// 2. Callback OAuth de Mercado Pago para guardar credenciales por tenant
-export const mercadoPagoCallback = async (req: Request, res: Response) => {
-  const { code, state: tenantId, error } = req.query;
-  const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '');
-
-  if (!frontendUrl) {
-    return res.status(500).json({ error: 'FRONTEND_URL no está configurada en el entorno.' });
+  if (error || !code || !state) {
+    return res.redirect(
+      `${frontendUrl}/admin/pagos?status=error&message=access_denied`
+    );
   }
 
-  if (error || !code) {
-    return res.redirect(`${frontendUrl}/admin/pagos?status=error&message=access_denied`);
-  }
-
-  if (!tenantId) {
-    return res.status(400).json({ error: 'tenantId no especificado en el parámetro state' });
+  const stateData = verifyOAuthState(String(state));
+  if (!stateData) {
+    return res.redirect(
+      `${frontendUrl}/admin/pagos?status=error&message=invalid_state`
+    );
   }
 
   try {
-    const publicUrl = process.env.PUBLIC_URL?.replace(/\/$/, '');
+    const publicUrl = process.env.PUBLIC_URL?.replace(/\/$/, "");
     const clientId = process.env.MP_CLIENT_ID;
     const clientSecret = process.env.MP_CLIENT_SECRET;
 
     if (!publicUrl || !clientId || !clientSecret) {
-      return res.status(500).json({ error: 'Configuración de servidor incompleta para OAuth.' });
+      return res.status(500).json({
+        error: "Configuración de servidor incompleta para OAuth.",
+      });
     }
 
-    const redirectUri = `${publicUrl}/api/auth/mercadopago/callback`;
+    const redirectUri = `${publicUrl}/api/mercadopago/callback`;
 
-    const response = await fetch('https://api.mercadopago.com/oauth/token', {
-      method: 'POST',
+    const response = await fetch("https://api.mercadopago.com/oauth/token", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
       },
       body: new URLSearchParams({
         client_secret: clientSecret,
         client_id: clientId,
-        grant_type: 'authorization_code',
+        grant_type: "authorization_code",
         code: String(code),
         redirect_uri: redirectUri,
       }),
@@ -75,12 +164,21 @@ export const mercadoPagoCallback = async (req: Request, res: Response) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Error al intercambiar token en Mercado Pago:', data);
+      console.error("Error al intercambiar token en Mercado Pago:", data);
       return res.redirect(`${frontendUrl}/admin/pagos?status=error`);
     }
 
     const { access_token, refresh_token, public_key, user_id, expires_in } = data;
-    const tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
+
+    if (!access_token || !user_id) {
+      return res.redirect(
+        `${frontendUrl}/admin/pagos?status=error&message=invalid_token_response`
+      );
+    }
+
+    const tokenExpiresAt = new Date(
+      Date.now() + Number(expires_in || 0) * 1000
+    );
 
     await sql`
       INSERT INTO tenant_payment_configs (
@@ -94,11 +192,11 @@ export const mercadoPagoCallback = async (req: Request, res: Response) => {
         updated_at
       )
       VALUES (
-        ${String(tenantId)},
+        ${String(stateData.gymId)},
         'mercadopago',
         ${access_token},
-        ${refresh_token},
-        ${public_key},
+        ${refresh_token || null},
+        ${public_key || null},
         ${String(user_id)},
         ${tokenExpiresAt.toISOString()},
         NOW()
@@ -110,12 +208,12 @@ export const mercadoPagoCallback = async (req: Request, res: Response) => {
         public_key = EXCLUDED.public_key,
         mp_user_id = EXCLUDED.mp_user_id,
         token_expires_at = EXCLUDED.token_expires_at,
-        updated_at = NOW();
+        updated_at = NOW()
     `;
 
     return res.redirect(`${frontendUrl}/admin/pagos?status=success`);
   } catch (err) {
-    console.error('Error en el flujo OAuth de Mercado Pago:', err);
+    console.error("Error en el flujo OAuth de Mercado Pago:", err);
     return res.redirect(`${frontendUrl}/admin/pagos?status=error`);
   }
 };
