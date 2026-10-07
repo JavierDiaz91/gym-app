@@ -24,8 +24,19 @@ router.get(
 router.get(
   "/:id/members",
   requireRole("admin", "trainer", "superadmin"),
-  async (req, res) => {
-    res.json(await service.getTrainerMembers(Number(req.params.id)));
+  async (req: any, res) => {
+    const gymId =
+      req.auth?.role === "superadmin"
+        ? Number(req.query.gymId)
+        : req.auth?.gymId;
+
+    if (!gymId) {
+      return res.status(400).json({ error: "gymId requerido" });
+    }
+
+    res.json(
+      await service.getTrainerMembers(Number(gymId), Number(req.params.id))
+    );
   }
 );
 
