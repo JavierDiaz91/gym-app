@@ -900,11 +900,16 @@ export async function saveOrUpdateRoutine(
 }
 
 // 1. OBTENER RUTINAS
-export async function getTrainerRoutines(userId: number) {
+export async function getTrainerRoutines(_userId: number) {
   try {
-    // Buscamos primero el realTrainerId a partir del session.id
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) return [];
+
     const trainerResult = await sql`
-      SELECT id FROM trainers WHERE user_id = ${userId}
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
     `;
 
     if (trainerResult.length === 0) return [];
@@ -927,10 +932,17 @@ export async function getTrainerRoutines(userId: number) {
   }
 }
 
-export async function getTrainerMembers(userId: number) {
+export async function getTrainerMembers(_userId: number) {
   try {
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) return [];
+
     const trainerRes = await sql`
-      SELECT id FROM trainers WHERE user_id = ${userId} LIMIT 1
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
     if (!trainerRes.length) return [];
     const trainerId = trainerRes[0].id;
@@ -985,40 +997,81 @@ export async function assignRoutineToMember(
   routineId: number
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // 1. Obtener el ID real de la tabla 'members'
-    const memberRes = await sql`
-      SELECT id FROM members 
-      WHERE id = ${memberIdOrUserId} OR user_id = ${memberIdOrUserId}
-      LIMIT 1;
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { success: false, error: "No autorizado." };
+    }
+
+    const [trainer] = await sql`
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
-    if (!memberRes || memberRes.length === 0) {
-      return { success: false, error: "El alumno no existe en la base de datos." };
+    if (!trainer) {
+      return { success: false, error: "Perfil de entrenador no encontrado." };
+    }
+
+    const [routine] = await sql`
+      SELECT id
+      FROM routines
+      WHERE id = ${routineId}
+        AND trainer_id = ${trainer.id}
+        AND (is_archived IS FALSE OR is_archived IS NULL)
+      LIMIT 1
+    `;
+
+    if (!routine) {
+      return { success: false, error: "Rutina no encontrada." };
+    }
+
+    const memberRes = await sql`
+      SELECT id
+      FROM members
+      WHERE (id = ${memberIdOrUserId} OR user_id = ${memberIdOrUserId})
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
+      LIMIT 1
+    `;
+
+    if (!memberRes.length) {
+      return { success: false, error: "El alumno no existe o no está asignado a este entrenador." };
     }
 
     const realMemberId = Number(memberRes[0].id);
 
-    // 2. Insertar o activar en member_routines
     const existing = await sql`
-      SELECT id FROM member_routines 
-      WHERE member_id = ${realMemberId} AND routine_id = ${routineId}
-      LIMIT 1;
+      SELECT id
+      FROM member_routines
+      WHERE member_id = ${realMemberId}
+        AND routine_id = ${routineId}
+      LIMIT 1
     `;
 
     if (existing.length === 0) {
       await sql`
         INSERT INTO member_routines (member_id, routine_id, is_active)
-        VALUES (${realMemberId}, ${routineId}, true);
+        VALUES (${realMemberId}, ${routineId}, true)
       `;
     } else {
       await sql`
-        UPDATE member_routines 
-        SET is_active = true 
-        WHERE member_id = ${realMemberId} AND routine_id = ${routineId};
+        UPDATE member_routines
+        SET is_active = true
+        WHERE member_id = ${realMemberId}
+          AND routine_id = ${routineId}
       `;
     }
 
-    // 3. Revalidar las rutas afectadas
+    await sql`
+      UPDATE members
+      SET routine_id = ${routineId}, updated_at = NOW()
+      WHERE id = ${realMemberId}
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
+    `;
+
     revalidatePath("/trainer/alumnos");
     revalidatePath("/miembro");
     revalidatePath("/miembro/rutina");
@@ -1026,9 +1079,9 @@ export async function assignRoutineToMember(
     return { success: true };
   } catch (error) {
     console.error("Error al asignar rutina:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Error al asignar rutina" 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al asignar rutina",
     };
   }
 }
@@ -1087,11 +1140,19 @@ export async function getMemberRoutines(memberUserId: number) {
 
 // ==================== TRAINER STATS ====================
 
-export async function getTrainerStats(userId: number) {
+export async function getTrainerStats(_userId: number) {
   try {
-    // 1. Obtener el ID real de la tabla trainers
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { totalAlumnos: 0, totalRutinas: 0 };
+    }
+
     const trainerRes = await sql`
-      SELECT id FROM trainers WHERE user_id = ${userId} LIMIT 1
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
     if (!trainerRes || trainerRes.length === 0) {
@@ -1530,11 +1591,19 @@ export async function updatePassword(prevState: any, formData: FormData) {
 
 // En app/actions.ts
 
-export async function getTrainerMembersAndRoutines(userId: number) {
+export async function getTrainerMembersAndRoutines(_userId: number) {
   try {
-    // 1. Obtener el ID del entrenador correspondiente al usuario
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { members: [], routines: [] };
+    }
+
     const trainerRes = await sql`
-      SELECT id FROM trainers WHERE user_id = ${userId} LIMIT 1
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
     if (!trainerRes || trainerRes.length === 0) {
@@ -2094,32 +2163,12 @@ export async function assignMembershipAction(memberId: number, membershipId: num
 
 
 
-export async function createSuperAdminSeed() {
-  try {
-    const hashedPassword = await bcrypt.hash("123456", 10);
-    
-    // Eliminamos registros previos para evitar duplicados
-    await sql`DELETE FROM users WHERE LOWER(email) = 'diazjavier769@gmail.com'`;
-
-    // Insertamos el usuario con el hash generado por tu mismo entorno
-    await sql`
-      INSERT INTO users (email, password_hash, role)
-      VALUES ('diazjavier769@gmail.com', ${hashedPassword}, 'superadmin')
-    `;
-
-    return { success: true, message: "Usuario superadmin creado correctamente." };
-  } catch (error) {
-    console.error("Error al crear seed:", error);
-    return { error: "No se pudo crear el usuario." };
-  }
-}
-
-
 //Funcion para registrar asistencia de alumnos
 export async function registerAttendanceAction(memberIdentifier: string) {
   try {
     const session = await getSession();
-    const gymId = session?.gymId || 1;
+    const gymId = session?.gymId;
+    if (!gymId) return { success: false, error: "Sesión inválida o sin gimnasio asociado" };
     const cleanInput = memberIdentifier.trim();
     const isNumber = /^\d+$/.test(cleanInput);
     const searchTerm = `%${cleanInput.toLowerCase()}%`;
