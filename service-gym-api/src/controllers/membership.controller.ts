@@ -1,38 +1,45 @@
-import { Request, Response } from "express";
-import { 
-  getGymPlans, 
-  createGymPlan, 
-  updateGymPlan, 
+import { Response } from "express";
+import {
+  getGymPlans,
+  createGymPlan,
+  updateGymPlan,
   deleteGymPlan,
   assignSubscription,
-  assignMembershipToMember
+  assignMembershipToMember,
 } from "../services/membership.service";
+import { AuthenticatedRequest, getRequestGymId } from "../middlewares/auth";
+
+function resolveGymId(req: AuthenticatedRequest): number | null {
+  return getRequestGymId(req, req.query.gymId ?? req.body?.gymId);
+}
 
 export class MembershipController {
-  static async getPlans(req: Request, res: Response) {
+  static async getPlans(req: AuthenticatedRequest, res: Response) {
     try {
-      const { gymId } = req.query;
-      if (!gymId) return res.status(400).json({ error: "gymId es requerido" });
+      const gymId = resolveGymId(req);
+      if (!gymId) return res.status(400).json({ error: "gymId requerido" });
 
-      const plans = await getGymPlans(Number(gymId));
+      const plans = await getGymPlans(gymId);
       return res.json(plans);
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
   }
 
-  static async createPlan(req: Request, res: Response) {
+  static async createPlan(req: AuthenticatedRequest, res: Response) {
     try {
-      const { gymId, name, price, durationMonths, description } = req.body;
+      const gymId = resolveGymId(req);
+      const { name, price, durationMonths, description } = req.body;
+
       if (!gymId || !name || price === undefined) {
-        return res.status(400).json({ error: "Campos requeridos faltantes: gymId, name, price" });
+        return res.status(400).json({ error: "Campos requeridos faltantes" });
       }
 
       const plan = await createGymPlan({
-        gymId: Number(gymId),
+        gymId,
         name,
         price: Number(price),
-        durationMonths: durationMonths ? Number(durationMonths) : 1, // Por defecto 1 mes
+        durationMonths: durationMonths ? Number(durationMonths) : 1,
         description: description || "",
       });
 
@@ -42,55 +49,61 @@ export class MembershipController {
     }
   }
 
-  static async updatePlan(req: Request, res: Response) {
+  static async updatePlan(req: AuthenticatedRequest, res: Response) {
     try {
+      const gymId = resolveGymId(req);
+      if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+
       const { id } = req.params;
       const { name, price, durationMonths, description, isActive } = req.body;
 
-      // Construimos el payload de actualización solo con los campos enviados
-      const updateData: any = {};
-      if (name !== undefined) updateData.name = name;
-      if (price !== undefined) updateData.price = Number(price);
-      if (durationMonths !== undefined) updateData.durationMonths = Number(durationMonths);
-      if (description !== undefined) updateData.description = description;
-      if (isActive !== undefined) updateData.isActive = Boolean(isActive);
+      const plan = await updateGymPlan(gymId, Number(id), {
+        name,
+        price: price === undefined ? undefined : Number(price),
+        durationMonths:
+          durationMonths === undefined ? undefined : Number(durationMonths),
+        description,
+        isActive: isActive === undefined ? undefined : Boolean(isActive),
+      });
 
-      const plan = await updateGymPlan(Number(id), updateData);
-
+      if (!plan) return res.status(404).json({ error: "Plan no encontrado" });
       return res.json({ success: true, plan });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
   }
 
-  static async deletePlan(req: Request, res: Response) {
+  static async deletePlan(req: AuthenticatedRequest, res: Response) {
     try {
+      const gymId = resolveGymId(req);
+      if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+
       const { id } = req.params;
-      await deleteGymPlan(Number(id));
+      const plan = await deleteGymPlan(gymId, Number(id));
+      if (!plan) return res.status(404).json({ error: "Plan no encontrado" });
+
       return res.json({ success: true });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
   }
 
-  static async subscribeMember(req: Request, res: Response) {
+  static async subscribeMember(req: AuthenticatedRequest, res: Response) {
     try {
+      const gymId = resolveGymId(req);
       const { memberId, planId, durationMonths } = req.body;
 
-      if (!memberId) {
-        return res.status(400).json({ error: "El memberId es obligatorio" });
+      if (!gymId || !memberId || !planId) {
+        return res.status(400).json({
+          error: "gymId, memberId y planId son obligatorios",
+        });
       }
 
-      // Si no envían planId o durationMonths, asignamos fallbacks seguros (Plan 1 y 1 Mes)
-      const targetPlanId = planId ? Number(planId) : 1;
-      const targetDuration = durationMonths ? Number(durationMonths) : 1;
-
-      console.log(`[SUBSCRIBE] Asignando suscripción a Socio ID: ${memberId}, Plan ID: ${targetPlanId}`);
-
       const sub = await assignSubscription({
+        gymId,
         memberId: Number(memberId),
-        planId: targetPlanId,
-        durationMonths: targetDuration,
+        planId: Number(planId),
+        durationMonths: durationMonths ? Number(durationMonths) : 1,
       });
 
       return res.json({ success: true, sub });
@@ -100,16 +113,31 @@ export class MembershipController {
     }
   }
 
-  static async assignMembership(req: Request, res: Response) {
+  static async assignMembership(req: AuthenticatedRequest, res: Response) {
     try {
+      const gymId = resolveGymId(req);
       const { id } = req.params;
       const { membership_id } = req.body;
 
-      if (!membership_id) {
-        return res.status(400).json({ success: false, error: "El ID de la membresía es requerido" });
+      if (!gymId || !membership_id) {
+        return res.status(400).json({
+          success: false,
+          error: "gymId y membership_id son requeridos",
+        });
       }
 
-      const updatedMember = await assignMembershipToMember(Number(id), Number(membership_id));
+      const updatedMember = await assignMembershipToMember(
+        gymId,
+        Number(id),
+        Number(membership_id)
+      );
+
+      if (!updatedMember) {
+        return res.status(404).json({
+          success: false,
+          error: "Miembro no encontrado",
+        });
+      }
 
       return res.json({ success: true, data: updatedMember });
     } catch (error: any) {
