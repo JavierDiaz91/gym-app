@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { sql } from '../db/neon';
+import { AuthenticatedRequest } from '../middlewares/auth';
 
 export const connectMercadoPago = async (req: Request, res: Response) => {
   const { tenantId } = req.query;
@@ -120,161 +121,211 @@ export const mercadoPagoCallback = async (req: Request, res: Response) => {
 };
 
 // 3. Crear Preferencia de Pago dinámicamente
-export const createPreference = async (req: Request, res: Response) => {
+export const createPreference = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { memberId, planId, tenantId, price } = req.body;
+    const { memberId, planId } = req.body;
 
-    if (!memberId) {
-      return res.status(400).json({ error: 'El memberId es obligatorio.' });
+    if (!req.auth) {
+      return res.status(401).json({ error: "Autenticación requerida." });
     }
 
-    // 1. Obtención de datos reales del socio desde la BD
-    const memberResult = await sql`
-      SELECT 
-        m.id AS member_id,
-        m.first_name,
-        m.last_name,
-        m.gym_id,
-        COALESCE(m.email, u.email) AS email
-      FROM members m
-      LEFT JOIN users u ON u.id = m.user_id
-      WHERE m.id = ${Number(memberId)} OR m.user_id = ${Number(memberId)}
-      LIMIT 1
-    `;
+    if (!memberId) {
+      return res.status(400).json({ error: "El memberId es obligatorio." });
+    }
 
-    const memberRows = Array.isArray(memberResult) ? memberResult : (memberResult as any).rows || [];
+    const requestedMemberId = Number(memberId);
+
+    const memberResult =
+      req.auth.role === "superadmin"
+        ? await sql`
+            SELECT
+              m.id AS member_id,
+              m.first_name,
+              m.last_name,
+              m.gym_id,
+              m.user_id,
+              COALESCE(m.email, u.email) AS email
+            FROM members m
+            LEFT JOIN users u ON u.id = m.user_id
+            WHERE m.id = ${requestedMemberId}
+               OR m.user_id = ${requestedMemberId}
+            LIMIT 1
+          `
+        : req.auth.role === "member"
+        ? await sql`
+            SELECT
+              m.id AS member_id,
+              m.first_name,
+              m.last_name,
+              m.gym_id,
+              m.user_id,
+              COALESCE(m.email, u.email) AS email
+            FROM members m
+            LEFT JOIN users u ON u.id = m.user_id
+            WHERE m.user_id = ${req.auth.userId}
+              AND m.gym_id = ${req.auth.gymId}
+            LIMIT 1
+          `
+        : await sql`
+            SELECT
+              m.id AS member_id,
+              m.first_name,
+              m.last_name,
+              m.gym_id,
+              m.user_id,
+              COALESCE(m.email, u.email) AS email
+            FROM members m
+            LEFT JOIN users u ON u.id = m.user_id
+            WHERE (m.id = ${requestedMemberId} OR m.user_id = ${requestedMemberId})
+              AND m.gym_id = ${req.auth.gymId}
+            LIMIT 1
+          `;
+
+    const memberRows = Array.isArray(memberResult)
+      ? memberResult
+      : (memberResult as any).rows || [];
     const member = memberRows[0];
 
     if (!member) {
-      return res.status(404).json({ error: 'No se encontró el socio especificado en la base de datos.' });
+      return res.status(404).json({
+        error: "No se encontró el socio especificado.",
+      });
     }
 
     if (!member.email) {
-      return res.status(400).json({ error: 'El socio no tiene un correo electrónico registrado en la base de datos.' });
+      return res.status(400).json({
+        error: "El socio no tiene un correo electrónico registrado.",
+      });
     }
 
-    // 2. Obtención dinámica del Plan desde la BD
     let plan = null;
 
     if (planId) {
       const planResult = await sql`
-        SELECT id, name, price 
-        FROM membership_plans 
-        WHERE id = ${Number(planId)} 
+        SELECT id, name, price
+        FROM membership_plans
+        WHERE id = ${Number(planId)}
+          AND gym_id = ${Number(member.gym_id)}
+          AND is_active = true
         LIMIT 1
       `;
-      const planRows = Array.isArray(planResult) ? planResult : (planResult as any).rows || [];
+
+      const planRows = Array.isArray(planResult)
+        ? planResult
+        : (planResult as any).rows || [];
       plan = planRows[0];
     }
 
     if (!plan) {
       const activePlanResult = await sql`
-        SELECT p.id, p.name, p.price 
+        SELECT p.id, p.name, p.price
         FROM subscriptions s
         JOIN membership_plans p ON p.id = s.plan_id
         WHERE s.member_id = ${member.member_id}
+          AND p.gym_id = ${Number(member.gym_id)}
         ORDER BY s.created_at DESC
         LIMIT 1
       `;
-      const activePlanRows = Array.isArray(activePlanResult) ? activePlanResult : (activePlanResult as any).rows || [];
+
+      const activePlanRows = Array.isArray(activePlanResult)
+        ? activePlanResult
+        : (activePlanResult as any).rows || [];
       plan = activePlanRows[0];
     }
 
     if (!plan) {
-      const defaultPlanResult = await sql`
-        SELECT id, name, price 
-        FROM membership_plans 
-        WHERE is_active = true ${member.gym_id ? sql`AND gym_id = ${member.gym_id}` : sql``}
-        ORDER BY id ASC 
-        LIMIT 1
-      `;
-      const defaultPlanRows = Array.isArray(defaultPlanResult) ? defaultPlanResult : (defaultPlanResult as any).rows || [];
-      plan = defaultPlanRows[0];
-    }
-
-    if (!plan) {
-      return res.status(404).json({ error: 'No se encontró un plan de membresía válido para este socio o gimnasio.' });
-    }
-
-    // 3. Determinación de precio dinámico
-    let unitPrice = Number(price) > 0 ? Number(price) : Number(plan.price);
-    if (unitPrice < 1000) {
-      unitPrice = unitPrice * 1000; // Ajuste en caso de montos sin mil
-    }
-
-    // 4. Obtención del token del gimnasio desde tenant_payment_configs
-    const tenantIdParam = String(tenantId || member.gym_id || '');
-
-    const tenantConfigRes = await sql`
-      SELECT access_token 
-      FROM tenant_payment_configs 
-      WHERE tenant_id = ${tenantIdParam} AND provider = 'mercadopago'
-      LIMIT 1
-    `;
-    const tenantConfigRows = Array.isArray(tenantConfigRes) ? tenantConfigRes : (tenantConfigRes as any)?.rows || [];
-    const tenantAccessToken = tenantConfigRows[0]?.access_token || process.env.MP_ACCESS_TOKEN;
-
-    if (!tenantAccessToken) {
-      return res.status(400).json({
-        error: 'El gimnasio especificado no tiene configuradas sus credenciales de Mercado Pago.',
+      return res.status(404).json({
+        error: "No se encontró un plan válido para este socio.",
       });
     }
 
-    // 5. Configuración de URLs desde .env
-    const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '');
-    const publicUrl = process.env.PUBLIC_URL?.replace(/\/$/, '');
+    const unitPrice = Number(plan.price);
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      return res.status(500).json({
+        error: "El plan tiene un precio inválido.",
+      });
+    }
+
+    const tenantIdParam = String(member.gym_id);
+
+    const tenantConfigRes = await sql`
+      SELECT access_token
+      FROM tenant_payment_configs
+      WHERE tenant_id = ${tenantIdParam}
+        AND provider = 'mercadopago'
+      LIMIT 1
+    `;
+
+    const tenantConfigRows = Array.isArray(tenantConfigRes)
+      ? tenantConfigRes
+      : (tenantConfigRes as any)?.rows || [];
+    const tenantAccessToken = tenantConfigRows[0]?.access_token;
+
+    if (!tenantAccessToken) {
+      return res.status(400).json({
+        error: "El gimnasio no tiene configuradas sus credenciales de Mercado Pago.",
+      });
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, "");
+    const publicUrl = process.env.PUBLIC_URL?.replace(/\/$/, "");
 
     if (!frontendUrl || !publicUrl) {
       return res.status(500).json({
-        error: 'Configuración de servidor incompleta: FRONTEND_URL y PUBLIC_URL deben estar definidas.',
+        error: "FRONTEND_URL y PUBLIC_URL deben estar definidas.",
       });
     }
 
     const returnUrl = `${frontendUrl}/miembro/membresia`;
     const webhookUrl = `${publicUrl}/api/payments/webhook`;
 
-    // 6. Solicitud a Mercado Pago
-    const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${tenantAccessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        items: [
-          {
-            id: String(plan.id),
-            title: plan.name,
-            quantity: 1,
-            unit_price: unitPrice,
-            currency_id: 'ARS',
+    const mpResponse = await fetch(
+      "https://api.mercadopago.com/checkout/preferences",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tenantAccessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: [
+            {
+              id: String(plan.id),
+              title: plan.name,
+              quantity: 1,
+              unit_price: unitPrice,
+              currency_id: "ARS",
+            },
+          ],
+          payer: {
+            email: member.email,
+            name: member.first_name || "",
+            surname: member.last_name || "",
           },
-        ],
-        payer: {
-          email: member.email,
-          name: member.first_name || '',
-          surname: member.last_name || '',
-        },
-        external_reference: JSON.stringify({
-          tenantId: tenantIdParam,
-          memberId: member.member_id,
-          planId: plan.id,
+          external_reference: JSON.stringify({
+            tenantId: tenantIdParam,
+            memberId: member.member_id,
+            planId: plan.id,
+          }),
+          notification_url: webhookUrl,
+          back_urls: {
+            success: returnUrl,
+            failure: returnUrl,
+            pending: returnUrl,
+          },
+          auto_return: "approved",
         }),
-        notification_url: webhookUrl,
-        back_urls: {
-          success: returnUrl,
-          failure: returnUrl,
-          pending: returnUrl,
-        },
-        auto_return: 'approved',
-      }),
-    });
+      }
+    );
 
     const preference = await mpResponse.json();
 
     if (!mpResponse.ok) {
-      console.error('[MP PREFERENCE ERROR]:', preference);
-      return res.status(500).json({ error: 'Error al comunicarse con Mercado Pago', details: preference });
+      console.error("[MP PREFERENCE ERROR]:", preference);
+      return res.status(500).json({
+        error: "Error al comunicarse con Mercado Pago",
+        details: preference,
+      });
     }
 
     return res.status(200).json({
@@ -283,8 +334,10 @@ export const createPreference = async (req: Request, res: Response) => {
       sandbox_init_point: preference.sandbox_init_point,
     });
   } catch (error: any) {
-    console.error('[MP PREFERENCE EXCEPTION]:', error);
-    return res.status(500).json({ error: error?.message || 'Error interno del servidor' });
+    console.error("[MP PREFERENCE EXCEPTION]:", error);
+    return res.status(500).json({
+      error: error?.message || "Error interno del servidor",
+    });
   }
 };
 
