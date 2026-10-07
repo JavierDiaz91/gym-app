@@ -1,29 +1,51 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import * as service from "../services/members.service";
+import { AuthenticatedRequest, getRequestGymId } from "../middlewares/auth";
 
-export async function getMembers(req: Request, res: Response) {
-  const members = await service.getAllMembers();
+function resolveGymId(req: AuthenticatedRequest): number | null {
+  return getRequestGymId(req, req.query.gymId ?? req.body?.gymId);
+}
+
+export async function getMembers(req: AuthenticatedRequest, res: Response) {
+  const gymId = resolveGymId(req);
+  if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+
+  const members = await service.getAllMembers(gymId);
   res.json(members);
 }
 
-export async function getMember(req: Request, res: Response) {
-  const member = await service.getMemberById(Number(req.params.id));
+export async function getMember(req: AuthenticatedRequest, res: Response) {
+  const gymId = resolveGymId(req);
+  if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+
+  const member = await service.getMemberById(gymId, Number(req.params.id));
   if (!member) return res.status(404).json({ message: "Not found" });
   res.json(member);
 }
 
-export async function createMember(req: Request, res: Response) {
-  const member = await service.createMember(req.body);
+export async function createMember(req: AuthenticatedRequest, res: Response) {
+  const gymId = resolveGymId(req);
+  if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+
+  const member = await service.createMember(gymId, req.body);
   res.status(201).json(member);
 }
 
-export async function updateMember(req: Request, res: Response) {
-  const member = await service.updateMember(Number(req.params.id), req.body);
+export async function updateMember(req: AuthenticatedRequest, res: Response) {
+  const gymId = resolveGymId(req);
+  if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+
+  const member = await service.updateMember(gymId, Number(req.params.id), req.body);
+  if (!member) return res.status(404).json({ message: "Not found" });
   res.json(member);
 }
 
-export async function deleteMember(req: Request, res: Response) {
-  await service.deleteMember(Number(req.params.id));
+export async function deleteMember(req: AuthenticatedRequest, res: Response) {
+  const gymId = resolveGymId(req);
+  if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+
+  const deleted = await service.deleteMember(gymId, Number(req.params.id));
+  if (!deleted) return res.status(404).json({ message: "Not found" });
+
   res.status(204).send();
 }
-
