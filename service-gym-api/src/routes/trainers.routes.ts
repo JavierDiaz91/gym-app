@@ -34,9 +34,14 @@ router.get(
       return res.status(400).json({ error: "gymId requerido" });
     }
 
-    res.json(
-      await service.getTrainerMembers(Number(gymId), Number(req.params.id))
-    );
+    const trainerId = Number(req.params.id);
+    const trainer = await service.getTrainerById(Number(gymId), trainerId);
+
+    if (!trainer) {
+      return res.status(404).json({ error: "Entrenador no encontrado" });
+    }
+
+    res.json(await service.getTrainerMembers(Number(gymId), trainerId));
   }
 );
 
