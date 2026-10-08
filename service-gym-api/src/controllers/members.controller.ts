@@ -20,6 +20,14 @@ export async function getMember(req: AuthenticatedRequest, res: Response) {
 
   const member = await service.getMemberById(gymId, Number(req.params.id));
   if (!member) return res.status(404).json({ message: "Not found" });
+
+  if (
+    req.auth?.role === "member" &&
+    Number(member.user_id) !== req.auth.userId
+  ) {
+    return res.status(404).json({ message: "Not found" });
+  }
+
   res.json(member);
 }
 
