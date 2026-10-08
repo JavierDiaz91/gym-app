@@ -5,7 +5,6 @@ import {
   updateGymPlan,
   deleteGymPlan,
   assignSubscription,
-  assignMembershipToMember,
 } from "../services/membership.service";
 import { AuthenticatedRequest, getRequestGymId } from "../middlewares/auth";
 
@@ -113,36 +112,4 @@ export class MembershipController {
     }
   }
 
-  static async assignMembership(req: AuthenticatedRequest, res: Response) {
-    try {
-      const gymId = resolveGymId(req);
-      const { id } = req.params;
-      const { membership_id } = req.body;
-
-      if (!gymId || !membership_id) {
-        return res.status(400).json({
-          success: false,
-          error: "gymId y membership_id son requeridos",
-        });
-      }
-
-      const updatedMember = await assignMembershipToMember(
-        gymId,
-        Number(id),
-        Number(membership_id)
-      );
-
-      if (!updatedMember) {
-        return res.status(404).json({
-          success: false,
-          error: "Miembro no encontrado",
-        });
-      }
-
-      return res.json({ success: true, data: updatedMember });
-    } catch (error: any) {
-      console.error("Error al asignar membresía:", error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  }
 }
