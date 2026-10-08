@@ -5,6 +5,70 @@ import { AuthenticatedRequest, getRequestGymId } from "../middlewares/auth";
 
 const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 
+
+function getWebhookSecret(): string {
+  const secret = process.env.MP_WEBHOOK_SECRET;
+  if (!secret) {
+    throw new Error("MP_WEBHOOK_SECRET debe estar configurado.");
+  }
+  return secret;
+}
+
+function parseWebhookSignature(value: string): { ts: string; v1: string } | null {
+  const parts = value.split(",");
+  let ts = "";
+  let v1 = "";
+
+  for (const part of parts) {
+    const [rawKey, ...rawValueParts] = part.split("=");
+    const key = rawKey?.trim();
+    const parsedValue = rawValueParts.join("=").trim();
+
+    if (key === "ts") ts = parsedValue;
+    if (key === "v1") v1 = parsedValue;
+  }
+
+  if (!ts || !v1) return null;
+  return { ts, v1 };
+}
+
+function verifyWebhookSignature(req: Request): boolean {
+  const xSignature = String(req.header("x-signature") || "").trim();
+  const xRequestId = String(req.header("x-request-id") || "").trim();
+
+  if (!xSignature || !xRequestId) return false;
+
+  const parsed = parseWebhookSignature(xSignature);
+  if (!parsed) return false;
+
+  const queryDataId = req.query["data.id"];
+  const bodyDataId = req.body?.data?.id;
+  const dataId = String(queryDataId || bodyDataId || "")
+    .trim()
+    .toLowerCase();
+
+  const manifestParts: string[] = [];
+  if (dataId) manifestParts.push(`id:${dataId};`);
+  if (xRequestId) manifestParts.push(`request-id:${xRequestId};`);
+  if (parsed.ts) manifestParts.push(`ts:${parsed.ts};`);
+
+  const manifest = manifestParts.join("");
+  if (!manifest) return false;
+
+  const expected = createHmac("sha256", getWebhookSecret())
+    .update(manifest)
+    .digest();
+
+  if (!/^[0-9a-fA-F]{64}$/.test(parsed.v1)) return false;
+
+  const received = Buffer.from(parsed.v1, "hex");
+
+  return (
+    received.length === expected.length &&
+    timingSafeEqual(received, expected)
+  );
+}
+
 function getOAuthStateSecret() {
   const secret = process.env.MP_OAUTH_STATE_SECRET || process.env.SESSION_SECRET;
   if (!secret || secret.length < 32) {
@@ -442,6 +506,11 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
 // 4. Webhook para recibir notificaciones de pago
 export const handleWebhook = async (req: Request, res: Response) => {
   try {
+    if (!verifyWebhookSignature(req)) {
+      console.warn("[MP WEBHOOK] Firma x-signature inválida o ausente.");
+      return res.status(401).json({ error: "Firma de webhook inválida." });
+    }
+
     const { type, data, action, user_id: bodyUserId } = req.body || {};
 
     if (
