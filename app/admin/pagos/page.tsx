@@ -1,4 +1,4 @@
-import { getPaymentsHistory } from "@/app/actions";
+import { getPaymentsHistory, getSession } from "@/app/actions";
 import { sql } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,11 +12,34 @@ interface PagosPageProps {
 
 export default async function PagosPage({ searchParams }: PagosPageProps) {
   const { status } = await searchParams;
+  const session = await getSession();
+  const gymId = session?.gymId;
+
+  if (!gymId) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        Sesión inválida o gimnasio no asociado.
+      </div>
+    );
+  }
+
   const payments = await getPaymentsHistory();
-  
-  // Obtenemos miembros y planes para pasárselos al diálogo de cobro
-  const membersData = await sql`SELECT id, first_name, last_name, dni FROM members ORDER BY last_name`;
-  const plansData = await sql`SELECT id, name, price FROM membership_plans ORDER BY price`;
+
+  // Los selectores de cobro deben mostrar únicamente datos del tenant autenticado.
+  const membersData = await sql`
+    SELECT id, first_name, last_name, dni
+    FROM members
+    WHERE gym_id = ${gymId}
+    ORDER BY last_name
+  `;
+
+  const plansData = await sql`
+    SELECT id, name, price
+    FROM membership_plans
+    WHERE gym_id = ${gymId}
+      AND is_active = true
+    ORDER BY price
+  `;
 
   const members = (membersData as unknown as any[]).map(m => {
     const cleanDni = m.dni && m.dni !== "null" && String(m.dni).trim() !== "" ? String(m.dni) : "";
