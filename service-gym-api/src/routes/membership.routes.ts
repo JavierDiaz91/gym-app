@@ -33,10 +33,5 @@ router.delete(
   requireRole("admin", "superadmin"),
   MembershipController.deletePlan
 );
-router.post(
-  "/:id/memberships",
-  requireRole("admin", "superadmin"),
-  MembershipController.assignMembership
-);
 
 export default router;
