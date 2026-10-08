@@ -438,8 +438,14 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       });
     }
 
-    const returnUrl = `${frontendUrl}/miembro/membresia`;
+    const returnTarget =
+      req.auth.role === "admin" || req.auth.role === "superadmin"
+        ? "admin"
+        : "member";
     const webhookUrl = `${publicUrl}/api/payments/webhook`;
+    const successUrl = `${publicUrl}/api/payments/return?status=success&target=${returnTarget}`;
+    const failureUrl = `${publicUrl}/api/payments/return?status=failure&target=${returnTarget}`;
+    const pendingUrl = `${publicUrl}/api/payments/return?status=pending&target=${returnTarget}`;
 
     const mpResponse = await fetch(
       "https://api.mercadopago.com/checkout/preferences",
@@ -471,9 +477,9 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
           }),
           notification_url: webhookUrl,
           back_urls: {
-            success: returnUrl,
-            failure: returnUrl,
-            pending: returnUrl,
+            success: successUrl,
+            failure: failureUrl,
+            pending: pendingUrl,
           },
           auto_return: "approved",
         }),
@@ -501,6 +507,31 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       error: error?.message || "Error interno del servidor",
     });
   }
+};
+
+export const handlePaymentReturn = async (req: Request, res: Response) => {
+  const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, "");
+
+  if (!frontendUrl) {
+    return res.status(500).json({
+      error: "FRONTEND_URL no está configurada en el entorno.",
+    });
+  }
+
+  const status = String(req.query.status || "").toLowerCase();
+  const target = String(req.query.target || "member").toLowerCase();
+
+  const normalizedStatus =
+    status === "success" || status === "failure" || status === "pending"
+      ? status
+      : "unknown";
+
+  const destination =
+    target === "admin"
+      ? `${frontendUrl}/admin/pagos?payment=${encodeURIComponent(normalizedStatus)}`
+      : `${frontendUrl}/miembro/membresia?payment=${encodeURIComponent(normalizedStatus)}`;
+
+  return res.redirect(destination);
 };
 
 // 4. Webhook para recibir notificaciones de pago
