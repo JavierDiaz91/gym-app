@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createPayment } from "@/app/actions";
+import { createMercadoPagoPreferenceAction, createPayment } from "@/app/actions";
 import { PlusCircle, Loader2 } from "lucide-react";
 
 interface Member {
@@ -61,34 +61,20 @@ export function RegistrarPagoDialog({ members, plans }: Props) {
     // --- FLUJO MERCADO PAGO ---
     if (paymentMethod === "mercadopago") {
       try {
-        const memberId = formData.get("memberId");
-        const planId = formData.get("planId");
-        const amount = formData.get("amount");
-        const selectedPlan = plans.find((p) => p.id === Number(planId));
+        const memberId = Number(formData.get("memberId"));
+        const planId = Number(formData.get("planId"));
 
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
-        const res = await fetch(`${apiBaseUrl}/api/payments/create-preference`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tenantId: "gym-demo-1",
-            memberId: Number(memberId),
-            planId: Number(planId),
-            planName: selectedPlan?.name || "Membresía",
-            price: Number(amount),
-          }),
-        });
-
-        const data = await res.json();
+        const data = await createMercadoPagoPreferenceAction(memberId, planId);
         setLoading(false);
 
-        if (data.init_point) {
+        if (data.success && data.init_point) {
           setOpen(false);
-          // Abre el Checkout de Mercado Pago en una pestaña nueva para simular el cobro
           window.open(data.init_point, "_blank");
         } else {
-          alert("Error de Mercado Pago: " + (data.error || "No se pudo generar el enlace"));
+          alert(
+            "Error de Mercado Pago: " +
+              (data.error || "No se pudo generar el enlace")
+          );
         }
       } catch (err) {
         setLoading(false);
@@ -166,6 +152,7 @@ export function RegistrarPagoDialog({ members, plans }: Props) {
               defaultValue={selectedPlanPrice}
               key={selectedPlanPrice}
               placeholder="0.00"
+              readOnly
               required
             />
           </div>
