@@ -2170,25 +2170,6 @@ if (existingMember.length > 0) {
   }
 }
 
-export async function assignMembershipAction(memberId: number, membershipId: number) {
-  try {
-    const res = await fetch(apiUrl(`/members/${memberId}/memberships`), {
-      method: "POST",
-      headers: await getApiAuthHeaders(),
-      body: JSON.stringify({ membership_id: membershipId }),
-    });
-
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      return { success: false, error: errorData.error || "Error al asignar la membresía" };
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Error de conexión" };
-  }
-}
-
 
 
 
