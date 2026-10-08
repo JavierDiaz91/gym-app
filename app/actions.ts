@@ -2288,82 +2288,175 @@ export async function registerAttendanceAction(memberIdentifier: string) {
 export async function createPayment(formData: FormData) {
   const memberId = Number(formData.get("memberId"));
   const planId = Number(formData.get("planId"));
-  const amount = Number(formData.get("amount"));
-  const paymentMethod = formData.get("paymentMethod") as string;
-  const transactionId = (formData.get("transactionId") as string) || null;
-  const notes = (formData.get("notes") as string) || null;
+  const paymentMethod = String(formData.get("paymentMethod") || "").trim();
+  const transactionId = String(formData.get("transactionId") || "").trim() || null;
+  const notes = String(formData.get("notes") || "").trim() || null;
 
   try {
-    // 1. Activar el estado del socio en la tabla 'members' (por si estaba suspendido o inactivo)
-    await sql`
-      UPDATE members
-      SET status = 'active'
+    const session = await requireTenantSession();
+
+    if (session.role !== "admin") {
+      return { success: false, error: "No tenés permisos para registrar pagos." };
+    }
+
+    if (
+      !Number.isFinite(memberId) ||
+      memberId <= 0 ||
+      !Number.isFinite(planId) ||
+      planId <= 0 ||
+      !paymentMethod
+    ) {
+      return { success: false, error: "Datos de pago inválidos." };
+    }
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
       WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
-    // 2. Buscar si el socio ya tiene una suscripción registrada
+    if (!member) {
+      return { success: false, error: "Miembro no encontrado." };
+    }
+
+    const [plan] = await sql`
+      SELECT id, price, duration_months
+      FROM membership_plans
+      WHERE id = ${planId}
+        AND gym_id = ${session.gymId}
+        AND is_active = true
+      LIMIT 1
+    `;
+
+    if (!plan) {
+      return { success: false, error: "Plan no encontrado." };
+    }
+
+    const amount = Number(plan.price);
+    const durationMonths = Math.max(1, Number(plan.duration_months) || 1);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { success: false, error: "El plan tiene un precio inválido." };
+    }
+
+    if (transactionId) {
+      const existingPayment = await sql`
+        SELECT p.id
+        FROM payments p
+        JOIN members m ON m.id = p.member_id
+        WHERE p.transaction_id = ${transactionId}
+          AND m.gym_id = ${session.gymId}
+        LIMIT 1
+      `;
+
+      if (existingPayment.length > 0) {
+        return { success: false, error: "La transacción ya fue registrada." };
+      }
+    }
+
     const existingSub = await sql`
-      SELECT id FROM subscriptions WHERE member_id = ${memberId} LIMIT 1
+      SELECT s.id
+      FROM subscriptions s
+      JOIN members m ON m.id = s.member_id
+      WHERE s.member_id = ${memberId}
+        AND m.gym_id = ${session.gymId}
+      ORDER BY s.id DESC
+      LIMIT 1
     `;
 
     let subscriptionId: number;
 
     if (existingSub.length > 0) {
-      // Actualizar la suscripción existente: plan, vigencia de 30 días y estado activo
-      subscriptionId = existingSub[0].id;
+      subscriptionId = Number(existingSub[0].id);
+
       await sql`
-        UPDATE subscriptions 
-        SET plan_id = ${planId},
-            start_date = NOW(),
-            end_date = NOW() + INTERVAL '30 days',
-            status = 'active'
+        UPDATE subscriptions
+        SET
+          plan_id = ${planId},
+          start_date = CURRENT_DATE,
+          end_date = CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
+          status = 'active',
+          payment_status = 'paid',
+          amount_paid = ${amount},
+          updated_at = NOW()
         WHERE id = ${subscriptionId}
+          AND member_id = ${memberId}
       `;
     } else {
-      // Crear nueva suscripción activa si no tenía ninguna
-      const newSub = await sql`
-        INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-        VALUES (${memberId}, ${planId}, NOW(), NOW() + INTERVAL '30 days', 'active')
+      const [newSub] = await sql`
+        INSERT INTO subscriptions (
+          member_id,
+          plan_id,
+          start_date,
+          end_date,
+          status,
+          payment_status,
+          amount_paid,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ${memberId},
+          ${planId},
+          CURRENT_DATE,
+          CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
+          'active',
+          'paid',
+          ${amount},
+          NOW(),
+          NOW()
+        )
         RETURNING id
       `;
-      subscriptionId = newSub[0].id;
+
+      subscriptionId = Number(newSub.id);
     }
 
-    // 3. Insertar el cobro en la tabla 'payments'
+    await sql`
+      UPDATE members
+      SET status = 'active', updated_at = NOW()
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+    `;
+
     await sql`
       INSERT INTO payments (
-        member_id, 
-        subscription_id, 
-        amount, 
-        payment_method, 
-        transaction_id, 
-        status, 
-        notes, 
+        member_id,
+        subscription_id,
+        amount,
+        payment_method,
+        transaction_id,
+        status,
+        notes,
         payment_date
       )
       VALUES (
-        ${memberId}, 
-        ${subscriptionId}, 
-        ${amount}, 
-        ${paymentMethod}, 
-        ${transactionId}, 
-        'completed', 
-        ${notes}, 
+        ${memberId},
+        ${subscriptionId},
+        ${amount},
+        ${paymentMethod},
+        ${transactionId},
+        'completed',
+        ${notes},
         NOW()
       )
     `;
 
-    // Revalidar las rutas necesarias para reflejar los cambios en la UI
     revalidatePath("/admin/pagos");
     revalidatePath("/admin/miembros");
     revalidatePath("/admin/reportes");
-    
+
     return { success: true };
   } catch (error) {
     console.error("Error exacto al registrar cobro:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Error de base de datos al registrar el pago." 
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error de base de datos al registrar el pago.",
     };
   }
 }
