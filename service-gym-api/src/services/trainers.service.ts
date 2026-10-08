@@ -9,6 +9,19 @@ export async function getTrainers(gymId: number) {
   `;
 }
 
+export async function getTrainerById(gymId: number, trainerId: number) {
+  const rows = await sql`
+    SELECT id, first_name, last_name, specialization
+    FROM trainers
+    WHERE id = ${trainerId}
+      AND is_active = true
+      AND gym_id = ${gymId}
+    LIMIT 1
+  `;
+
+  return rows[0] ?? null;
+}
+
 export async function getTrainerMembers(gymId: number, trainerId: number) {
   return await sql`
     SELECT 
