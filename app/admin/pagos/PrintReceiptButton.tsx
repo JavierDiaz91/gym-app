@@ -51,7 +51,9 @@ export function PrintReceiptButton({ payment }: PaymentPrintProps) {
           <div class="content">
             <div class="row"><span class="label">Fecha:</span> <span class="value">${formattedDate}</span></div>
             <div class="row"><span class="label">Socio:</span> <span class="value">${payment.last_name}, ${payment.first_name}</span></div>
-            <div class="row"><span class="label">DNI:</span> <span class="value">${payment.dni}</span></div>
+            ${payment.dni && payment.dni !== "Sin DNI"
+              ? `<div class="row"><span class="label">DNI:</span> <span class="value">${payment.dni}</span></div>`
+              : ""}
             <div class="row"><span class="label">Concepto:</span> <span class="value">${payment.plan_name || "Membresía"}</span></div>
             <div class="row"><span class="label">Método:</span> <span class="value" style="text-transform: capitalize;">${payment.payment_method}</span></div>
             <div class="row total-row">
