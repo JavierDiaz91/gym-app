@@ -2461,6 +2461,61 @@ export async function createPayment(formData: FormData) {
   }
 }
 
+
+export async function createMercadoPagoPreferenceAction(
+  memberId: number,
+  planId: number
+) {
+  try {
+    const session = await requireTenantSession();
+
+    if (session.role !== "admin") {
+      return {
+        success: false,
+        error: "No tenés permisos para generar este cobro.",
+      };
+    }
+
+    if (
+      !Number.isFinite(memberId) ||
+      memberId <= 0 ||
+      !Number.isFinite(planId) ||
+      planId <= 0
+    ) {
+      return { success: false, error: "Miembro o plan inválido." };
+    }
+
+    const response = await fetch(apiUrl("/payments/create-preference"), {
+      method: "POST",
+      headers: await getApiAuthHeaders(),
+      body: JSON.stringify({ memberId, planId }),
+      cache: "no-store",
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || "No se pudo generar la preferencia de pago.",
+      };
+    }
+
+    return {
+      success: true,
+      id: data.id,
+      init_point: data.init_point,
+      sandbox_init_point: data.sandbox_init_point,
+    };
+  } catch (error) {
+    console.error("Error al generar preferencia de Mercado Pago:", error);
+    return {
+      success: false,
+      error: "Error al conectar con el servicio de pagos.",
+    };
+  }
+}
+
 export async function getPaymentsHistory() {
   try {
     const session = await requireTenantSession();
