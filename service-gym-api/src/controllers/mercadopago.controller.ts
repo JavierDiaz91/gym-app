@@ -6,6 +6,23 @@ import { AuthenticatedRequest, getRequestGymId } from "../middlewares/auth";
 const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 
 
+function useTestCredentialsForTenant(tenantId: string): boolean {
+  return (
+    process.env.MP_USE_TEST_CREDENTIALS === "true" &&
+    String(process.env.MP_TEST_TENANT_ID || "").trim() === String(tenantId)
+  );
+}
+
+function getTestAccessToken(): string | null {
+  const token = String(process.env.MP_TEST_ACCESS_TOKEN || "").trim();
+  return token || null;
+}
+
+function getTestSellerUserId(): string | null {
+  const userId = String(process.env.MP_TEST_SELLER_USER_ID || "").trim();
+  return userId || null;
+}
+
 function getWebhookSecret(): string {
   const secret = process.env.MP_WEBHOOK_SECRET;
   if (!secret) {
@@ -421,11 +438,17 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
     const tenantConfigRows = Array.isArray(tenantConfigRes)
       ? tenantConfigRes
       : (tenantConfigRes as any)?.rows || [];
-    const tenantAccessToken = tenantConfigRows[0]?.access_token;
+
+    const useTestCredentials = useTestCredentialsForTenant(tenantIdParam);
+    const tenantAccessToken = useTestCredentials
+      ? getTestAccessToken()
+      : tenantConfigRows[0]?.access_token;
 
     if (!tenantAccessToken) {
       return res.status(400).json({
-        error: "El gimnasio no tiene configuradas sus credenciales de Mercado Pago.",
+        error: useTestCredentials
+          ? "MP_TEST_ACCESS_TOKEN no está configurado para el entorno de prueba."
+          : "El gimnasio no tiene configuradas sus credenciales de Mercado Pago.",
       });
     }
 
@@ -558,15 +581,44 @@ export const handleWebhook = async (req: Request, res: Response) => {
       return res.status(200).send("OK");
     }
 
-    const configResult = await sql`
-      SELECT tenant_id, access_token, mp_user_id
-      FROM tenant_payment_configs
-      WHERE provider = 'mercadopago'
-        AND mp_user_id = ${notificationUserId}
-      LIMIT 1
-    `;
+    const testTenantId = String(process.env.MP_TEST_TENANT_ID || "").trim();
+    const testSellerUserId = getTestSellerUserId();
+    const useTestWebhookCredentials =
+      process.env.MP_USE_TEST_CREDENTIALS === "true" &&
+      !!testTenantId &&
+      !!testSellerUserId &&
+      notificationUserId === testSellerUserId;
 
-    const config = configResult[0];
+    let config: {
+      tenant_id: string;
+      access_token: string;
+      mp_user_id: string;
+    } | null = null;
+
+    if (useTestWebhookCredentials) {
+      const testAccessToken = getTestAccessToken();
+      if (!testAccessToken) {
+        console.error("[MP WEBHOOK] MP_TEST_ACCESS_TOKEN no está configurado.");
+        return res.status(500).send("ERROR");
+      }
+
+      config = {
+        tenant_id: testTenantId,
+        access_token: testAccessToken,
+        mp_user_id: testSellerUserId,
+      };
+    } else {
+      const configResult = await sql`
+        SELECT tenant_id, access_token, mp_user_id
+        FROM tenant_payment_configs
+        WHERE provider = 'mercadopago'
+          AND mp_user_id = ${notificationUserId}
+        LIMIT 1
+      `;
+
+      config = configResult[0] || null;
+    }
+
     if (!config?.access_token) {
       console.warn(
         `[MP WEBHOOK] No existe configuración para mp_user_id=${notificationUserId}`
