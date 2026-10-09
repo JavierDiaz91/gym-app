@@ -573,7 +573,18 @@ export const handlePaymentReturn = async (req: Request, res: Response) => {
 export const handleWebhook = async (req: Request, res: Response) => {
   try {
     if (!verifyWebhookSignature(req)) {
-      console.warn("[MP WEBHOOK] Firma x-signature inválida o ausente.");
+      const hasSignature = Boolean(req.header("x-signature"));
+      const hasRequestId = Boolean(req.header("x-request-id"));
+      const queryDataId = String(req.query["data.id"] || "").trim();
+      const bodyDataId = String(req.body?.data?.id || "").trim();
+
+      console.warn("[MP WEBHOOK] Firma inválida.", {
+        hasSignature,
+        hasRequestId,
+        hasQueryDataId: Boolean(queryDataId),
+        hasBodyDataId: Boolean(bodyDataId),
+      });
+
       return res.status(401).json({ error: "Firma de webhook inválida." });
     }
 
