@@ -465,11 +465,6 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
               currency_id: "ARS",
             },
           ],
-          payer: {
-            email: member.email,
-            name: member.first_name || "",
-            surname: member.last_name || "",
-          },
           external_reference: JSON.stringify({
             tenantId: tenantIdParam,
             memberId: member.member_id,
