@@ -536,12 +536,29 @@ export const handlePaymentReturn = async (req: Request, res: Response) => {
     });
   }
 
-  const status = String(req.query.status || "").toLowerCase();
+  const rawStatus = Array.isArray(req.query.status)
+    ? String(req.query.status[req.query.status.length - 1] || "")
+    : String(req.query.status || "");
+  const rawCollectionStatus = Array.isArray(req.query.collection_status)
+    ? String(
+        req.query.collection_status[
+          req.query.collection_status.length - 1
+        ] || ""
+      )
+    : String(req.query.collection_status || "");
+
+  const status = (rawCollectionStatus || rawStatus).toLowerCase();
   const target = String(req.query.target || "member").toLowerCase();
 
   const normalizedStatus =
-    status === "success" || status === "failure" || status === "pending"
-      ? status
+    status === "approved" || status === "success"
+      ? "success"
+      : status === "pending" || status === "in_process"
+      ? "pending"
+      : status === "rejected" ||
+        status === "cancelled" ||
+        status === "failure"
+      ? "failure"
       : "unknown";
 
   const destination =
