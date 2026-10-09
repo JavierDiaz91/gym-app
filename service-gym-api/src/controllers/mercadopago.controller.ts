@@ -1,5 +1,9 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { Request, Response } from "express";
+import {
+  InvalidWebhookSignatureError,
+  WebhookSignatureValidator,
+} from "mercadopago";
 import { sql } from "../db/neon";
 import { AuthenticatedRequest, getRequestGymId } from "../middlewares/auth";
 
@@ -52,38 +56,27 @@ function parseWebhookSignature(value: string): { ts: string; v1: string } | null
 function verifyWebhookSignature(req: Request): boolean {
   const xSignature = String(req.header("x-signature") || "").trim();
   const xRequestId = String(req.header("x-request-id") || "").trim();
+  const rawDataId = req.query["data.id"];
+  const dataId = Array.isArray(rawDataId)
+    ? String(rawDataId[rawDataId.length - 1] || "")
+    : String(rawDataId || "");
 
   if (!xSignature || !xRequestId) return false;
 
-  const parsed = parseWebhookSignature(xSignature);
-  if (!parsed) return false;
-
-  const queryDataId = req.query["data.id"];
-  const bodyDataId = req.body?.data?.id;
-  const dataId = String(queryDataId || bodyDataId || "")
-    .trim()
-    .toLowerCase();
-
-  const manifestParts: string[] = [];
-  if (dataId) manifestParts.push(`id:${dataId};`);
-  if (xRequestId) manifestParts.push(`request-id:${xRequestId};`);
-  if (parsed.ts) manifestParts.push(`ts:${parsed.ts};`);
-
-  const manifest = manifestParts.join("");
-  if (!manifest) return false;
-
-  const expected = createHmac("sha256", getWebhookSecret())
-    .update(manifest)
-    .digest();
-
-  if (!/^[0-9a-fA-F]{64}$/.test(parsed.v1)) return false;
-
-  const received = Buffer.from(parsed.v1, "hex");
-
-  return (
-    received.length === expected.length &&
-    timingSafeEqual(received, expected)
-  );
+  try {
+    WebhookSignatureValidator.validate({
+      xSignature,
+      xRequestId,
+      dataId,
+      secret: getWebhookSecret(),
+    });
+    return true;
+  } catch (error) {
+    if (error instanceof InvalidWebhookSignatureError) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 function getOAuthStateSecret() {
@@ -583,6 +576,12 @@ export const handleWebhook = async (req: Request, res: Response) => {
         hasRequestId,
         hasQueryDataId: Boolean(queryDataId),
         hasBodyDataId: Boolean(bodyDataId),
+        type: String(req.body?.type || req.query.type || ""),
+        action: String(req.body?.action || ""),
+        applicationId: String(req.body?.application_id || ""),
+        liveMode:
+          typeof req.body?.live_mode === "boolean" ? req.body.live_mode : null,
+        userId: String(req.body?.user_id || req.query.user_id || ""),
       });
 
       return res.status(401).json({ error: "Firma de webhook inválida." });
