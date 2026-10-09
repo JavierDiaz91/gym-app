@@ -616,7 +616,17 @@ export const handleWebhook = async (req: Request, res: Response) => {
         LIMIT 1
       `;
 
-      config = configResult[0] || null;
+      const row = configResult[0] as
+        | { tenant_id?: unknown; access_token?: unknown; mp_user_id?: unknown }
+        | undefined;
+
+      config = row
+        ? {
+            tenant_id: String(row.tenant_id ?? ""),
+            access_token: String(row.access_token ?? ""),
+            mp_user_id: String(row.mp_user_id ?? ""),
+          }
+        : null;
     }
 
     if (!config?.access_token) {
