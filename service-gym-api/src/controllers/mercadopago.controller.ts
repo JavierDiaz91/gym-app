@@ -646,7 +646,11 @@ export const handleWebhook = async (req: Request, res: Response) => {
 
     const paymentData = await mpRes.json();
 
-    if (String(paymentData.user_id || "") !== String(config.mp_user_id)) {
+    const paymentSellerUserId = String(
+      paymentData.collector_id ?? paymentData.user_id ?? ""
+    );
+
+    if (paymentSellerUserId !== String(config.mp_user_id)) {
       console.warn(
         `[MP WEBHOOK] El pago ${paymentId} no pertenece a la cuenta configurada.`
       );
@@ -745,7 +749,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
     }
 
     const existingSub = await sql`
-      SELECT id
+      SELECT id, start_date, end_date
       FROM subscriptions
       WHERE member_id = ${memberId}
       ORDER BY id DESC
@@ -763,8 +767,16 @@ export const handleWebhook = async (req: Request, res: Response) => {
         SET
           status = 'active',
           plan_id = ${planId},
-          start_date = CURRENT_DATE,
-          end_date = CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
+          start_date = CASE
+            WHEN end_date IS NOT NULL AND end_date >= CURRENT_DATE
+              THEN start_date
+            ELSE CURRENT_DATE
+          END,
+          end_date = CASE
+            WHEN end_date IS NOT NULL AND end_date >= CURRENT_DATE
+              THEN end_date + (${durationMonths} || ' month')::INTERVAL
+            ELSE CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL
+          END,
           payment_status = 'paid',
           amount_paid = ${paidAmount},
           updated_at = NOW()
