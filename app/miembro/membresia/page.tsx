@@ -192,6 +192,26 @@ subscription = (subRows[0] as SubscriptionData) || null;
           </div>
         )}
 
+        {!isBlocked && subscription?.member_id && subscription?.plan_id && Number(subscription?.price || 0) > 0 && (
+          <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h4 className="font-bold text-foreground text-sm">
+                ¿Querés renovar tu cuota por adelantado?
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Podés generar un nuevo pago ahora y mantener tu membresía al día.
+              </p>
+            </div>
+
+            <PayButton
+              memberId={subscription.member_id}
+              planId={subscription.plan_id}
+              price={Number(subscription.price || 0)}
+              label="Renovar ahora"
+            />
+          </div>
+        )}
+
         {/* Detalles de Fechas */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex items-center gap-3 p-4 border rounded-lg bg-background">
