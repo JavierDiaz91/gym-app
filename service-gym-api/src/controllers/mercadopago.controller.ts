@@ -568,14 +568,21 @@ export const handleWebhook = async (req: Request, res: Response) => {
     if (!verifyWebhookSignature(req)) {
       const hasSignature = Boolean(req.header("x-signature"));
       const hasRequestId = Boolean(req.header("x-request-id"));
-      const queryDataId = String(req.query["data.id"] || "").trim();
+      const rawQueryDataId = req.query["data.id"];
+      const queryDataId = Array.isArray(rawQueryDataId)
+        ? String(rawQueryDataId[rawQueryDataId.length - 1] || "").trim()
+        : String(rawQueryDataId || "").trim();
       const bodyDataId = String(req.body?.data?.id || "").trim();
 
       console.warn("[MP WEBHOOK] Firma inválida.", {
         hasSignature,
         hasRequestId,
-        hasQueryDataId: Boolean(queryDataId),
-        hasBodyDataId: Boolean(bodyDataId),
+        queryDataId,
+        bodyDataId,
+        dataIdsMatch: Boolean(queryDataId && bodyDataId && queryDataId === bodyDataId),
+        queryDataIdKind: Array.isArray(rawQueryDataId)
+          ? "array"
+          : typeof rawQueryDataId,
         type: String(req.body?.type || req.query.type || ""),
         action: String(req.body?.action || ""),
         applicationId: String(req.body?.application_id || ""),
