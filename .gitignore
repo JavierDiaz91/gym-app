@@ -47,3 +47,6 @@ coverage/
 *.tmp
 Thumbs.db
 Desktop.ini
+
+gym-app/
+test-tenants.ps1
