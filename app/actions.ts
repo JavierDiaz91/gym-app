@@ -2469,26 +2469,44 @@ export async function createMercadoPagoPreferenceAction(
   try {
     const session = await requireTenantSession();
 
-    if (session.role !== "admin") {
+    if (!["admin", "member", "superadmin"].includes(session.role)) {
       return {
         success: false,
         error: "No tenés permisos para generar este cobro.",
       };
     }
 
-    if (
-      !Number.isFinite(memberId) ||
-      memberId <= 0 ||
-      !Number.isFinite(planId) ||
-      planId <= 0
-    ) {
-      return { success: false, error: "Miembro o plan inválido." };
+    if (!Number.isFinite(planId) || planId <= 0) {
+      return { success: false, error: "Plan inválido." };
+    }
+
+    let effectiveMemberId = memberId;
+
+    if (session.role === "member") {
+      const [ownMember] = await sql`
+        SELECT id
+        FROM members
+        WHERE user_id = ${session.id}
+          AND gym_id = ${session.gymId}
+        LIMIT 1
+      `;
+
+      if (!ownMember) {
+        return {
+          success: false,
+          error: "No se encontró tu perfil de socio.",
+        };
+      }
+
+      effectiveMemberId = Number(ownMember.id);
+    } else if (!Number.isFinite(memberId) || memberId <= 0) {
+      return { success: false, error: "Miembro inválido." };
     }
 
     const response = await fetch(apiUrl("/payments/create-preference"), {
       method: "POST",
       headers: await getApiAuthHeaders(),
-      body: JSON.stringify({ memberId, planId }),
+      body: JSON.stringify({ memberId: effectiveMemberId, planId }),
       cache: "no-store",
     });
 
