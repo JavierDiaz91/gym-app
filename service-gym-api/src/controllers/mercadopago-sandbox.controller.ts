@@ -58,7 +58,11 @@ export const reconcileSandboxPayment = async (req: Request, res: Response) => {
 
     const paymentData = await mpRes.json();
 
-    if (String(paymentData.user_id || "") !== sellerUserId) {
+    const paymentSellerUserId = String(
+      paymentData.collector_id ?? paymentData.user_id ?? ""
+    ).trim();
+
+    if (paymentSellerUserId !== sellerUserId) {
       return res.status(403).json({
         error: "El pago no pertenece al vendedor sandbox configurado.",
       });
