@@ -9,12 +9,14 @@ interface PayButtonProps {
   memberId?: number;
   planId?: number;
   price?: number;
+  label?: string;
 }
 
 export function PayButton({
   memberId,
   planId,
   price = 0,
+  label = "Pagar ahora",
 }: PayButtonProps) {
   const [loading, setLoading] = useState(false);
 
@@ -65,7 +67,7 @@ export function PayButton({
       ) : (
         <>
           <CreditCard className="w-4 h-4" />
-          Pagar ahora
+          {label}
           {price > 0
             ? ` ($${price.toLocaleString("es-AR")})`
             : ""}
