@@ -183,10 +183,9 @@ subscription = (subRows[0] as SubscriptionData) || null;
             </div>
 
             {/* Componente botón de pago en el cliente */}
-            <PayButton 
+            <PayButton
               memberId={subscription?.member_id}
               planId={subscription?.plan_id}
-              planName={subscription?.plan_name || 'Plan Fitness'}
               price={subscription?.price || 0}
             />
           </div>
