@@ -53,6 +53,65 @@ function parseWebhookSignature(value: string): { ts: string; v1: string } | null
   return { ts, v1 };
 }
 
+function safeHexEqual(left: string, right: string): boolean {
+  const normalizedLeft = left.trim().toLowerCase();
+  const normalizedRight = right.trim().toLowerCase();
+
+  if (!/^[0-9a-f]+$/.test(normalizedLeft) || !/^[0-9a-f]+$/.test(normalizedRight)) {
+    return false;
+  }
+
+  const leftBuffer = Buffer.from(normalizedLeft, "hex");
+  const rightBuffer = Buffer.from(normalizedRight, "hex");
+
+  return (
+    leftBuffer.length > 0 &&
+    leftBuffer.length === rightBuffer.length &&
+    timingSafeEqual(leftBuffer, rightBuffer)
+  );
+}
+
+function getWebhookSignatureDiagnostics(req: Request) {
+  const xSignature = String(req.header("x-signature") || "").trim();
+  const xRequestId = String(req.header("x-request-id") || "").trim();
+  const parsedSignature = parseWebhookSignature(xSignature);
+
+  const rawQueryDataId = req.query["data.id"];
+  const queryDataId = Array.isArray(rawQueryDataId)
+    ? String(rawQueryDataId[rawQueryDataId.length - 1] || "").trim()
+    : String(rawQueryDataId || "").trim();
+  const bodyDataId = String(req.body?.data?.id || "").trim();
+
+  const compareCandidate = (dataId: string): boolean | null => {
+    if (!parsedSignature || !xRequestId || !dataId) return null;
+
+    const manifest =
+      `id:${dataId};request-id:${xRequestId};ts:${parsedSignature.ts};`;
+    const expected = createHmac("sha256", getWebhookSecret())
+      .update(manifest)
+      .digest("hex");
+
+    return safeHexEqual(expected, parsedSignature.v1);
+  };
+
+  return {
+    signatureParsed: Boolean(parsedSignature),
+    signatureTimestamp: parsedSignature?.ts || "",
+    requestId: xRequestId,
+    requestIdLength: xRequestId.length,
+    queryDataId,
+    bodyDataId,
+    dataIdsMatch: Boolean(
+      queryDataId && bodyDataId && queryDataId === bodyDataId
+    ),
+    queryDataIdKind: Array.isArray(rawQueryDataId)
+      ? "array"
+      : typeof rawQueryDataId,
+    manualQuerySignatureMatches: compareCandidate(queryDataId),
+    manualBodySignatureMatches: compareCandidate(bodyDataId),
+  };
+}
+
 function verifyWebhookSignature(req: Request): boolean {
   const xSignature = String(req.header("x-signature") || "").trim();
   const xRequestId = String(req.header("x-request-id") || "").trim();
@@ -568,21 +627,12 @@ export const handleWebhook = async (req: Request, res: Response) => {
     if (!verifyWebhookSignature(req)) {
       const hasSignature = Boolean(req.header("x-signature"));
       const hasRequestId = Boolean(req.header("x-request-id"));
-      const rawQueryDataId = req.query["data.id"];
-      const queryDataId = Array.isArray(rawQueryDataId)
-        ? String(rawQueryDataId[rawQueryDataId.length - 1] || "").trim()
-        : String(rawQueryDataId || "").trim();
-      const bodyDataId = String(req.body?.data?.id || "").trim();
+      const signatureDiagnostics = getWebhookSignatureDiagnostics(req);
 
       console.warn("[MP WEBHOOK] Firma inválida.", {
         hasSignature,
         hasRequestId,
-        queryDataId,
-        bodyDataId,
-        dataIdsMatch: Boolean(queryDataId && bodyDataId && queryDataId === bodyDataId),
-        queryDataIdKind: Array.isArray(rawQueryDataId)
-          ? "array"
-          : typeof rawQueryDataId,
+        ...signatureDiagnostics,
         type: String(req.body?.type || req.query.type || ""),
         action: String(req.body?.action || ""),
         applicationId: String(req.body?.application_id || ""),
