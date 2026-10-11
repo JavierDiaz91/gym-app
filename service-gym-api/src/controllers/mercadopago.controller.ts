@@ -27,12 +27,24 @@ function getTestSellerUserId(): string | null {
   return userId || null;
 }
 
-function getWebhookSecret(): string {
-  const secret = process.env.MP_WEBHOOK_SECRET;
-  if (!secret) {
-    throw new Error("MP_WEBHOOK_SECRET debe estar configurado.");
+function getWebhookSecrets(): string[] {
+  const candidates = [
+    process.env.MP_WEBHOOK_SECRET_TEST,
+    process.env.MP_WEBHOOK_SECRET_PROD,
+    process.env.MP_WEBHOOK_SECRET,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  const uniqueSecrets = Array.from(new Set(candidates));
+
+  if (uniqueSecrets.length === 0) {
+    throw new Error(
+      "Debe configurarse MP_WEBHOOK_SECRET_TEST, MP_WEBHOOK_SECRET_PROD o MP_WEBHOOK_SECRET."
+    );
   }
-  return secret;
+
+  return uniqueSecrets;
 }
 
 function verifyWebhookSignature(req: Request): boolean {
@@ -45,20 +57,24 @@ function verifyWebhookSignature(req: Request): boolean {
 
   if (!xSignature || !xRequestId) return false;
 
-  try {
-    WebhookSignatureValidator.validate({
-      xSignature,
-      xRequestId,
-      dataId,
-      secret: getWebhookSecret(),
-    });
-    return true;
-  } catch (error) {
-    if (error instanceof InvalidWebhookSignatureError) {
-      return false;
+  for (const secret of getWebhookSecrets()) {
+    try {
+      WebhookSignatureValidator.validate({
+        xSignature,
+        xRequestId,
+        dataId,
+        secret,
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof InvalidWebhookSignatureError) {
+        continue;
+      }
+      throw error;
     }
-    throw error;
   }
+
+  return false;
 }
 
 function getOAuthStateSecret() {
