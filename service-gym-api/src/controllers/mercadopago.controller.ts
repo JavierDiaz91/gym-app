@@ -542,6 +542,10 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       id: preference.id,
       init_point: preference.init_point,
       sandbox_init_point: preference.sandbox_init_point,
+      checkout_url: useTestCredentials
+        ? preference.sandbox_init_point
+        : preference.init_point,
+      checkout_mode: useTestCredentials ? "sandbox" : "production",
     });
   } catch (error: any) {
     console.error("[MP PREFERENCE EXCEPTION]:", error);
