@@ -736,55 +736,54 @@ export const handleWebhook = async (req: Request, res: Response) => {
       return res.status(200).send("OK");
     }
 
-    const existingPayment = await sql`
-      SELECT id
-      FROM payments
-      WHERE transaction_id = ${paymentId}
-        AND member_id = ${memberId}
-      LIMIT 1
-    `;
-
-    if (existingPayment.length > 0) {
-      return res.status(200).send("OK");
-    }
-
-    const existingSub = await sql`
-      SELECT id, start_date, end_date
-      FROM subscriptions
-      WHERE member_id = ${memberId}
-      ORDER BY id DESC
-      LIMIT 1
-    `;
-
-    let subscriptionId: number | null = null;
     const durationMonths = Math.max(1, Number(plan.duration_months) || 1);
 
-    if (existingSub.length > 0) {
-      subscriptionId = Number(existingSub[0].id);
-
-      await sql`
-        UPDATE subscriptions
+    // Aplicamos suscripción + pago en una única sentencia atómica.
+    // El advisory lock serializa notificaciones concurrentes del mismo paymentId.
+    // Así evitamos extender dos veces la membresía antes de que el índice único
+    // de transaction_id pueda frenar el segundo INSERT.
+    const applied = await sql`
+      WITH payment_lock AS MATERIALIZED (
+        SELECT pg_advisory_xact_lock(hashtext(${paymentId})::bigint)
+      ),
+      existing_payment AS MATERIALIZED (
+        SELECT p.id
+        FROM payments p
+        CROSS JOIN payment_lock
+        WHERE p.transaction_id = ${paymentId}
+        LIMIT 1
+      ),
+      latest_sub AS MATERIALIZED (
+        SELECT s.id
+        FROM subscriptions s
+        CROSS JOIN payment_lock
+        WHERE s.member_id = ${memberId}
+        ORDER BY s.id DESC
+        LIMIT 1
+      ),
+      updated_sub AS (
+        UPDATE subscriptions s
         SET
           status = 'active',
           plan_id = ${planId},
           start_date = CASE
-            WHEN end_date IS NOT NULL AND end_date >= CURRENT_DATE
-              THEN start_date
+            WHEN s.end_date IS NOT NULL AND s.end_date >= CURRENT_DATE
+              THEN s.start_date
             ELSE CURRENT_DATE
           END,
           end_date = CASE
-            WHEN end_date IS NOT NULL AND end_date >= CURRENT_DATE
-              THEN end_date + (${durationMonths} || ' month')::INTERVAL
+            WHEN s.end_date IS NOT NULL AND s.end_date >= CURRENT_DATE
+              THEN s.end_date + (${durationMonths} || ' month')::INTERVAL
             ELSE CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL
           END,
           payment_status = 'paid',
           amount_paid = ${paidAmount},
           updated_at = NOW()
-        WHERE id = ${subscriptionId}
-          AND member_id = ${memberId}
-      `;
-    } else {
-      const newSub = await sql`
+        WHERE s.id = (SELECT id FROM latest_sub)
+          AND NOT EXISTS (SELECT 1 FROM existing_payment)
+        RETURNING s.id
+      ),
+      inserted_sub AS (
         INSERT INTO subscriptions (
           member_id,
           plan_id,
@@ -796,7 +795,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
           created_at,
           updated_at
         )
-        VALUES (
+        SELECT
           ${memberId},
           ${planId},
           'active',
@@ -806,21 +805,23 @@ export const handleWebhook = async (req: Request, res: Response) => {
           ${paidAmount},
           NOW(),
           NOW()
-        )
+        WHERE NOT EXISTS (SELECT 1 FROM existing_payment)
+          AND NOT EXISTS (SELECT 1 FROM latest_sub)
         RETURNING id
-      `;
-
-      subscriptionId = Number(newSub[0]?.id || 0) || null;
-    }
-
-    await sql`
-      UPDATE members
-      SET status = 'active', updated_at = NOW()
-      WHERE id = ${memberId}
-        AND gym_id = ${tenantId}
-    `;
-
-    await sql`
+      ),
+      chosen_sub AS MATERIALIZED (
+        SELECT id FROM updated_sub
+        UNION ALL
+        SELECT id FROM inserted_sub
+      ),
+      updated_member AS (
+        UPDATE members m
+        SET status = 'active', updated_at = NOW()
+        WHERE m.id = ${memberId}
+          AND m.gym_id = ${tenantId}
+          AND EXISTS (SELECT 1 FROM chosen_sub)
+        RETURNING m.id
+      )
       INSERT INTO payments (
         member_id,
         subscription_id,
@@ -831,17 +832,27 @@ export const handleWebhook = async (req: Request, res: Response) => {
         payment_date,
         created_at
       )
-      VALUES (
+      SELECT
         ${memberId},
-        ${subscriptionId},
+        cs.id,
         ${paidAmount},
         'mercadopago',
         ${paymentId},
         'completed',
         NOW(),
         NOW()
-      )
+      FROM chosen_sub cs
+      CROSS JOIN updated_member
+      ON CONFLICT (transaction_id) WHERE transaction_id IS NOT NULL DO NOTHING
+      RETURNING id, subscription_id
     `;
+
+    if (applied.length === 0) {
+      console.log(
+        `[MP WEBHOOK] Pago ${paymentId} ya procesado; no se vuelve a extender la suscripción.`
+      );
+      return res.status(200).send("OK");
+    }
 
     console.log(
       `[MP WEBHOOK] Pago ${paymentId} aplicado al miembro ${memberId} del tenant ${tenantId}.`
