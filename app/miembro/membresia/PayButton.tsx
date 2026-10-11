@@ -36,7 +36,8 @@ export function PayButton({
         return;
       }
 
-      const checkoutUrl = result.init_point || result.sandbox_init_point;
+      const checkoutUrl =
+        result.checkout_url || result.sandbox_init_point || result.init_point;
 
       if (!checkoutUrl) {
         alert("Mercado Pago no devolvió una URL de checkout.");
