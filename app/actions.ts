@@ -1087,30 +1087,37 @@ export async function assignRoutineToMember(
 }
 // ==================== MIEMBRO → VER RUTINA ====================
 
-export async function getMemberRoutines(memberUserId: number) {
+export async function getMemberRoutines(_memberUserId: number) {
   try {
-    // 1. Obtener el id de la tabla 'members'
+    const session = await getSession();
+    if (!session || session.role !== "member" || session.gymId == null) {
+      return [];
+    }
+
     const memberResult = await sql`
-      SELECT id FROM members WHERE user_id = ${memberUserId}
+      SELECT id
+      FROM members
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
     if (memberResult.length === 0) return [];
     const memberId = Number(memberResult[0].id);
 
-    // 2. Traer las rutinas asignadas en la tabla pivote que NO estén archivadas
     const routinesResult = await sql`
       SELECT r.id, r.title, r.notes, mr.id as assignment_id
       FROM member_routines mr
       JOIN routines r ON mr.routine_id = r.id
+      JOIN trainers t ON t.id = r.trainer_id
       WHERE mr.member_id = ${memberId}
+        AND t.gym_id = ${session.gymId}
+        AND (mr.is_active IS TRUE OR mr.is_active IS NULL)
         AND (r.is_archived IS FALSE OR r.is_archived IS NULL)
       ORDER BY mr.id DESC
     `;
 
-    if (routinesResult.length === 0) return [];
-
-    // 3. Mapear y parsear los ejercicios de cada rutina
-    const routines = routinesResult.map((routine) => {
+    return routinesResult.map((routine) => {
       let exercises = [];
       try {
         if (typeof routine.notes === "string" && routine.notes.trim().startsWith("[")) {
@@ -1125,12 +1132,10 @@ export async function getMemberRoutines(memberUserId: number) {
       return {
         id: Number(routine.id),
         title: routine.title || "Sin título",
-        exercises: exercises,
+        exercises,
         exercise_count: exercises.length,
       };
     });
-
-    return routines;
   } catch (error) {
     console.error("Error fetching member routines:", error);
     return [];
@@ -1193,36 +1198,63 @@ export async function getTrainerStats(_userId: number) {
 export async function logWorkout(routineId: number, details: any) {
   const session = await getSession();
 
-  if (!session) {
+  if (!session || session.role !== "member" || session.gymId == null) {
     return { success: false, error: "No autorizado" };
   }
 
-  // Extraer la ID de la sesión de manera segura
-  const currentUserId = session.id;
-
   try {
-    // 1. Obtener el id de miembro correspondiente al usuario logueado
     const memberRes = await sql`
-      SELECT id FROM members WHERE user_id = ${currentUserId} LIMIT 1
+      SELECT id
+      FROM members
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
     if (memberRes.length === 0) {
       return { success: false, error: "Miembro no encontrado" };
     }
 
-    const memberId = memberRes[0].id;
+    const memberId = Number(memberRes[0].id);
 
-    // 2. Insertar el registro en workout_logs
-    await sql`
-      INSERT INTO workout_logs (member_id, routine_id, completed_at, details)
-      VALUES (${memberId}, ${routineId}, NOW(), ${JSON.stringify(details)})
+    const assignedRoutine = await sql`
+      SELECT r.id
+      FROM routines r
+      JOIN trainers t ON t.id = r.trainer_id
+      WHERE r.id = ${Number(routineId)}
+        AND t.gym_id = ${session.gymId}
+        AND (r.is_archived IS FALSE OR r.is_archived IS NULL)
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM member_routines mr
+            WHERE mr.member_id = ${memberId}
+              AND mr.routine_id = r.id
+              AND (mr.is_active IS TRUE OR mr.is_active IS NULL)
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM members m
+            WHERE m.id = ${memberId}
+              AND m.routine_id = r.id
+          )
+        )
+      LIMIT 1
     `;
 
-    // 3. Revalidar TODAS las rutas afectadas para purgar el caché de Next.js
+    if (assignedRoutine.length === 0) {
+      return { success: false, error: "La rutina no está asignada a este miembro" };
+    }
+
+    await sql`
+      INSERT INTO workout_logs (member_id, routine_id, completed_at, details)
+      VALUES (${memberId}, ${Number(routineId)}, NOW(), ${JSON.stringify(details)})
+    `;
+
     revalidatePath("/miembro");
     revalidatePath("/miembro/rutina");
     revalidatePath("/trainer/alumnos");
-    
+
     return { success: true };
   } catch (error) {
     console.error("Error al guardar el entrenamiento:", error);
@@ -1230,59 +1262,64 @@ export async function logWorkout(routineId: number, details: any) {
   }
 }
 
+
 export async function getCurrentUserId(): Promise<number | null> {
   try {
-    const cookieStore = await cookies();
-    const userIdCookie = cookieStore.get("session_user_id")?.value; // 👈 Ajustá el nombre de tu cookie
-
-    if (!userIdCookie) return null;
-    return Number(userIdCookie);
+    const session = await getSession();
+    return session ? Number(session.id) : null;
   } catch (error) {
     console.error("Error obteniendo usuario actual:", error);
     return null;
   }
 }
 
-export async function getMemberRoutinesWithStatus(userId: number) {
-  try {
-    // 1. Buscamos al miembro verificando que TENGA ENTRENADOR ASIGNADO y routine_id
-    const memberRes = await sql`
-      SELECT id, routine_id, trainer_id 
-      FROM members 
-      WHERE user_id = ${userId} 
-        AND trainer_id IS NOT NULL 
-        AND routine_id IS NOT NULL 
-      LIMIT 1
-    `;
 
-    if (!memberRes.length) {
+export async function getMemberRoutinesWithStatus(_userId: number) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== "member" || session.gymId == null) {
       return [];
     }
 
+    const memberRes = await sql`
+      SELECT id, routine_id, trainer_id
+      FROM members
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+        AND trainer_id IS NOT NULL
+        AND routine_id IS NOT NULL
+      LIMIT 1
+    `;
+
+    if (!memberRes.length) return [];
     const member = memberRes[0];
 
-    // 2. Traemos la rutina asignada (sin r.description)
     const routines = await sql`
-  SELECT 
-    r.id,
-    r.title,
-    COALESCE(
-      (SELECT COUNT(*) FROM routine_exercises re WHERE re.routine_id = r.id), 0
-    ) as exercise_count
-  FROM routines r
-  WHERE r.id = ${member.routine_id}
-`;
+      SELECT
+        r.id,
+        r.title,
+        COALESCE(
+          (SELECT COUNT(*) FROM routine_exercises re WHERE re.routine_id = r.id), 0
+        ) as exercise_count
+      FROM routines r
+      JOIN trainers t ON t.id = r.trainer_id
+      WHERE r.id = ${member.routine_id}
+        AND t.id = ${member.trainer_id}
+        AND t.gym_id = ${session.gymId}
+        AND (r.is_archived IS FALSE OR r.is_archived IS NULL)
+      LIMIT 1
+    `;
 
     if (!routines.length) return [];
 
-    // 3. Verificamos si la completó hoy
     const todayLog = await sql`
-  SELECT id FROM workout_logs 
-  WHERE member_id = ${member.id} 
-    AND routine_id = ${member.routine_id}
-    AND completed_at >= CURRENT_DATE
-  LIMIT 1
-`;
+      SELECT id
+      FROM workout_logs
+      WHERE member_id = ${member.id}
+        AND routine_id = ${member.routine_id}
+        AND completed_at >= CURRENT_DATE
+      LIMIT 1
+    `;
 
     const completedToday = todayLog.length > 0;
 
@@ -1297,6 +1334,7 @@ export async function getMemberRoutinesWithStatus(userId: number) {
     return [];
   }
 }
+
 function formatWorkoutTime(dateStringOrObject: string | Date): string {
   if (!dateStringOrObject) return "";
   
@@ -1316,25 +1354,60 @@ function formatWorkoutTime(dateStringOrObject: string | Date): string {
 
 export async function getMemberRoutineData(routineId: number) {
   try {
-    // 1. Traemos la rutina
-    const routineRes = await sql`
-      SELECT id, title, notes FROM routines WHERE id = ${routineId} LIMIT 1
-    `;
+    const session = await getSession();
+    if (!session || session.gymId == null) return null;
+
+    let routineRes: any[] = [];
+
+    if (session.role === "member") {
+      routineRes = await sql`
+        SELECT r.id, r.title, r.notes
+        FROM routines r
+        JOIN trainers t ON t.id = r.trainer_id
+        JOIN members m ON m.user_id = ${session.id}
+          AND m.gym_id = ${session.gymId}
+        WHERE r.id = ${Number(routineId)}
+          AND t.gym_id = ${session.gymId}
+          AND (r.is_archived IS FALSE OR r.is_archived IS NULL)
+          AND (
+            m.routine_id = r.id
+            OR EXISTS (
+              SELECT 1
+              FROM member_routines mr
+              WHERE mr.member_id = m.id
+                AND mr.routine_id = r.id
+                AND (mr.is_active IS TRUE OR mr.is_active IS NULL)
+            )
+          )
+        LIMIT 1
+      `;
+    } else if (session.role === "trainer") {
+      routineRes = await sql`
+        SELECT r.id, r.title, r.notes
+        FROM routines r
+        JOIN trainers t ON t.id = r.trainer_id
+        WHERE r.id = ${Number(routineId)}
+          AND t.user_id = ${session.id}
+          AND t.gym_id = ${session.gymId}
+          AND (r.is_archived IS FALSE OR r.is_archived IS NULL)
+        LIMIT 1
+      `;
+    } else {
+      return null;
+    }
 
     if (!routineRes.length) return null;
     const routine = routineRes[0];
 
-    // 2. Traemos todos los ejercicios con sus imágenes de la DB
     const dbExercises = await sql`
-      SELECT name, image_url, muscle_group, equipment FROM exercises
+      SELECT name, image_url, muscle_group, equipment
+      FROM exercises
     `;
 
-    // Map para buscar rápido por nombre en minúsculas (ignora espacios/mayúsculas)
     const exerciseMap = new Map(
       dbExercises.map((e) => [e.name.toLowerCase().trim(), e])
     );
 
-    // 3. Parseamos los bloques/ejercicios guardados en notes
     let parsedBlocks = [];
     try {
       if (typeof routine.notes === "string" && routine.notes.trim().startsWith("[")) {
@@ -1342,18 +1415,16 @@ export async function getMemberRoutineData(routineId: number) {
       } else if (Array.isArray(routine.notes)) {
         parsedBlocks = routine.notes;
       }
-    } catch (e) {
+    } catch {
       parsedBlocks = [];
     }
 
-    // 4. Enriquecemos cada bloque con la imagen de la tabla 'exercises'
     const enrichedBlocks = parsedBlocks.map((block: any) => {
       const blockName = (block.nombre || block.name || "").toLowerCase().trim();
       const match = exerciseMap.get(blockName);
 
       return {
         ...block,
-        // Si hay coincidencia en la DB usa esa imagen, si no la que traía o una por defecto
         image_url: match?.image_url || block.image_url || block.imagen || "/placeholder-exercise.jpg",
         muscle_group: match?.muscle_group || block.muscle_group,
         equipment: match?.equipment || block.equipment,
@@ -1373,6 +1444,9 @@ export async function getMemberRoutineData(routineId: number) {
 
 // app/actions.ts
 
+export async function getExercisesList()
+// app/actions.ts
+
 export async function getExercisesList() {
   try {
     const exercises = await sql`
@@ -1389,29 +1463,61 @@ export async function getExercisesList() {
 
 export async function deleteRoutine(routineId: number) {
   try {
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { success: false, error: "No autorizado" };
+    }
+
     const id = Number(routineId);
 
-    // 1. Quitar la rutina activa a todos los alumnos que la tengan asignada
-    await sql`
-      UPDATE members 
-      SET routine_id = NULL 
-      WHERE routine_id = ${id}
+    const [trainer] = await sql`
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
-    // 2. Limpiar las asignaciones en la tabla pivote
-    await sql`
-      DELETE FROM member_routines 
-      WHERE routine_id = ${id}
-    `;
+    if (!trainer) {
+      return { success: false, error: "Entrenador no encontrado" };
+    }
 
-    // 3. Ocultar la rutina (Soft Delete para no romper historial de workout_logs viejos)
-    await sql`
-      UPDATE routines 
-      SET is_archived = TRUE 
+    const [routine] = await sql`
+      SELECT id
+      FROM routines
       WHERE id = ${id}
+        AND trainer_id = ${trainer.id}
+      LIMIT 1
     `;
 
-    // 4. Revalidar para actualizar el Dashboard del Profe y del Alumno al instante
+    if (!routine) {
+      return { success: false, error: "Rutina no encontrada o sin permisos" };
+    }
+
+    await sql`
+      UPDATE members
+      SET routine_id = NULL
+      WHERE routine_id = ${id}
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
+    `;
+
+    await sql`
+      DELETE FROM member_routines mr
+      USING members m
+      WHERE mr.member_id = m.id
+        AND mr.routine_id = ${id}
+        AND m.gym_id = ${session.gymId}
+        AND m.trainer_id = ${trainer.id}
+    `;
+
+    await sql`
+      UPDATE routines
+      SET is_archived = TRUE
+      WHERE id = ${id}
+        AND trainer_id = ${trainer.id}
+    `;
+
     revalidatePath("/trainer/rutinas");
     revalidatePath("/trainer/alumnos");
     revalidatePath("/trainer");
@@ -1426,12 +1532,71 @@ export async function deleteRoutine(routineId: number) {
 
 // app/actions.ts
 
+export async function resetTodayWorkout
+// app/actions.ts
+
 export async function resetTodayWorkout(memberId: number, routineId: number) {
   try {
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { success: false, error: "No autorizado" };
+    }
+
+    const [trainer] = await sql`
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
+    `;
+
+    if (!trainer) {
+      return { success: false, error: "Entrenador no encontrado" };
+    }
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
+      WHERE id = ${Number(memberId)}
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
+      LIMIT 1
+    `;
+
+    if (!member) {
+      return { success: false, error: "Alumno no encontrado o sin permisos" };
+    }
+
+    const [routine] = await sql`
+      SELECT r.id
+      FROM routines r
+      WHERE r.id = ${Number(routineId)}
+        AND r.trainer_id = ${trainer.id}
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM member_routines mr
+            WHERE mr.member_id = ${member.id}
+              AND mr.routine_id = r.id
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM members m
+            WHERE m.id = ${member.id}
+              AND m.routine_id = r.id
+          )
+        )
+      LIMIT 1
+    `;
+
+    if (!routine) {
+      return { success: false, error: "Rutina no asignada a este alumno" };
+    }
+
     await sql`
-      DELETE FROM workout_logs 
-      WHERE member_id = ${memberId} 
-        AND routine_id = ${routineId} 
+      DELETE FROM workout_logs
+      WHERE member_id = ${member.id}
+        AND routine_id = ${Number(routineId)}
         AND DATE(completed_at) = CURRENT_DATE
     `;
 
@@ -1445,13 +1610,38 @@ export async function resetTodayWorkout(memberId: number, routineId: number) {
   }
 }
 
+
 export async function removeMemberFromTrainer(memberId: number) {
   try {
-    await sql`
-      UPDATE members 
-      SET trainer_id = NULL, routine_id = NULL 
-      WHERE id = ${memberId}
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { error: "No autorizado" };
+    }
+
+    const [trainer] = await sql`
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
+
+    if (!trainer) {
+      return { error: "Entrenador no encontrado" };
+    }
+
+    const updated = await sql`
+      UPDATE members
+      SET trainer_id = NULL, routine_id = NULL
+      WHERE id = ${Number(memberId)}
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
+      RETURNING id
+    `;
+
+    if (updated.length === 0) {
+      return { error: "Alumno no encontrado o sin permisos" };
+    }
 
     revalidatePath("/trainer/alumnos");
     revalidatePath("/miembro");
@@ -1461,17 +1651,44 @@ export async function removeMemberFromTrainer(memberId: number) {
     return { error: "No se pudo desvincular al alumno." };
   }
 }
+
 export async function getMemberWorkoutHistory(memberId: number) {
   try {
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return [];
+    }
+
+    const [trainer] = await sql`
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
+    `;
+
+    if (!trainer) return [];
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
+      WHERE id = ${Number(memberId)}
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
+      LIMIT 1
+    `;
+
+    if (!member) return [];
+
     const history = await sql`
-      SELECT 
+      SELECT
         wl.id,
         wl.completed_at,
         wl.details,
         r.title as routine_title
       FROM workout_logs wl
       LEFT JOIN routines r ON r.id = wl.routine_id
-      WHERE wl.member_id = ${memberId}
+      WHERE wl.member_id = ${member.id}
       ORDER BY wl.completed_at DESC
     `;
 
@@ -1481,6 +1698,7 @@ export async function getMemberWorkoutHistory(memberId: number) {
     return [];
   }
 }
+
 
 export async function updateProfile(formData: FormData) {
   const session = await getSession();
