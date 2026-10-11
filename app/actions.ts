@@ -8,6 +8,7 @@ import { Member } from "./types/member";
 import { AttendanceStat } from "./types/attendance";
 import { TrainerMember } from "./types/trainer";
 import { MemberRoutine } from "@/app/types/routine";
+import { createSessionToken, sessionCookieOptions, verifySessionToken } from "@/lib/session";
 
 
 
@@ -141,22 +142,16 @@ export async function loginUser(formData: FormData) {
       return { error: "Credenciales inválidas" };
     }
 
-    // 2. Incluimos gymId dentro del objeto guardado en la cookie
     const sessionData = {
-      id: user.id,
-      email: user.email,
+      id: Number(user.id),
+      email: String(user.email),
       role: user.role,
-      gymId: user.gym_id, // <--- CAMBIO CLAVE
+      gymId: user.gym_id == null ? null : Number(user.gym_id),
     };
 
+    const token = await createSessionToken(sessionData);
     const cookieStore = await cookies();
-    cookieStore.set("session", JSON.stringify(sessionData), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    });
+    cookieStore.set("session", token, sessionCookieOptions);
 
     return {
       success: true,
@@ -175,22 +170,29 @@ export async function logoutUser() {
 }
 
 export async function getSession() {
-  const cookieStore = await cookies(); 
+  const cookieStore = await cookies();
   const session = cookieStore.get("session");
 
   if (!session) return null;
 
-  try {
-    return JSON.parse(session.value);
-  } catch {
-    return null;
+  return verifySessionToken(session.value);
+}
+
+async function requireTenantSession() {
+  const session = await getSession();
+
+  if (!session || session.gymId == null) {
+    throw new Error("Sesión inválida o sin gimnasio asociado.");
   }
+
+  return session;
 }
 
 // ==================== MEMBER ACTIONS ====================
 
 export async function getMembers(query: string = ""): Promise<Member[]> {
   try {
+    const session = await requireTenantSession();
     const searchTerm = `%${query.trim()}%`;
 
     const members = await sql`
@@ -204,11 +206,13 @@ export async function getMembers(query: string = ""): Promise<Member[]> {
         ON m.id = s.member_id AND s.status = 'active'
       LEFT JOIN membership_plans mp 
         ON s.plan_id = mp.id
-      WHERE 
-        ${query === ''} OR 
-        m.first_name ILIKE ${searchTerm} OR 
-        m.last_name ILIKE ${searchTerm} OR 
-        m.email ILIKE ${searchTerm}
+      WHERE m.gym_id = ${session.gymId}
+        AND (
+          ${query === ''} OR 
+          m.first_name ILIKE ${searchTerm} OR 
+          m.last_name ILIKE ${searchTerm} OR 
+          m.email ILIKE ${searchTerm}
+        )
       ORDER BY m.created_at DESC
     `;
 
@@ -221,6 +225,8 @@ export async function getMembers(query: string = ""): Promise<Member[]> {
 
 export async function getMemberById(id: number): Promise<Member | null> {
   try {
+    const session = await requireTenantSession();
+
     const members = await sql`
       SELECT 
         m.*,
@@ -234,6 +240,7 @@ export async function getMemberById(id: number): Promise<Member | null> {
       LEFT JOIN membership_plans mp 
         ON s.plan_id = mp.id
       WHERE m.id = ${id}
+        AND m.gym_id = ${session.gymId}
     `;
 
     return (members[0] as Member) ?? null;
@@ -251,7 +258,8 @@ export async function createMember(formData: FormData) {
   const emergencyContact = formData.get("emergencyContact") as string;
   const planIdRaw = formData.get("planId") as string;
 
-  const gymId = 1; // Tu gym_id actual o el id por defecto
+  const session = await requireTenantSession();
+  const gymId = session.gymId;
 
   // 1. Normalizar email (sin espacios y en minúsculas)
   const email = emailRaw ? emailRaw.trim().toLowerCase() : "";
@@ -315,7 +323,9 @@ export async function updateMember(id: number, formData: FormData) {
   }
 
   try {
-    // 2. Actualizar la ficha en 'members' y obtener el user_id asociado si existe
+    const session = await requireTenantSession();
+
+    // 2. Actualizar únicamente dentro del gimnasio autenticado
     const [updatedMember] = await sql`
       UPDATE members 
       SET first_name = ${firstName}, 
@@ -324,8 +334,13 @@ export async function updateMember(id: number, formData: FormData) {
           phone = ${phone || null},
           status = ${status || "active"}
       WHERE id = ${id}
+        AND gym_id = ${session.gymId}
       RETURNING user_id
     `;
+
+    if (!updatedMember) {
+      return { error: "Miembro no encontrado." };
+    }
 
     // 3. Sincronizar email en 'users' si el socio ya tiene credenciales creadas
     if (updatedMember?.user_id) {
@@ -333,6 +348,7 @@ export async function updateMember(id: number, formData: FormData) {
         UPDATE users 
         SET email = ${email}, updated_at = NOW()
         WHERE id = ${updatedMember.user_id}
+          AND gym_id = ${session.gymId}
       `;
     }
 
@@ -347,15 +363,31 @@ export async function updateMember(id: number, formData: FormData) {
 //Eliminar miembro
 export async function deleteMember(id: number) {
   try {
-    // 1. Obtener el user_id asociado antes de borrar el miembro
-    const [member] = await sql`SELECT user_id FROM members WHERE id = ${id}`;
+    const session = await requireTenantSession();
 
-    // 2. Eliminar la ficha del miembro
-    await sql`DELETE FROM members WHERE id = ${id}`;
+    const [member] = await sql`
+      SELECT user_id
+      FROM members
+      WHERE id = ${id}
+        AND gym_id = ${session.gymId}
+    `;
 
-    // 3. (Opcional) Eliminar credenciales de acceso en 'users' si existían
-    if (member?.user_id) {
-      await sql`DELETE FROM users WHERE id = ${member.user_id}`;
+    if (!member) {
+      return { error: "Miembro no encontrado." };
+    }
+
+    await sql`
+      DELETE FROM members
+      WHERE id = ${id}
+        AND gym_id = ${session.gymId}
+    `;
+
+    if (member.user_id) {
+      await sql`
+        DELETE FROM users
+        WHERE id = ${member.user_id}
+          AND gym_id = ${session.gymId}
+      `;
     }
 
     revalidateTag("members", "max");
@@ -370,9 +402,12 @@ export async function deleteMember(id: number) {
 
 export async function getMembershipPlans() {
   try {
+    const session = await requireTenantSession();
+
     const plans = await sql`
       SELECT * FROM membership_plans 
-      WHERE is_active = true 
+      WHERE is_active = true
+        AND gym_id = ${session.gymId}
       ORDER BY price ASC
     `;
     return plans;
@@ -384,7 +419,25 @@ export async function getMembershipPlans() {
 
 export async function createSubscription(memberId: number, planId: number) {
   try {
-    const plans = await sql`SELECT * FROM membership_plans WHERE id = ${planId}`;
+    const session = await requireTenantSession();
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+    `;
+
+    if (!member) return { error: "Miembro no encontrado" };
+
+    const plans = await sql`
+      SELECT *
+      FROM membership_plans
+      WHERE id = ${planId}
+        AND gym_id = ${session.gymId}
+        AND is_active = true
+    `;
+
     if (plans.length === 0) return { error: "Plan no encontrado" };
 
     const plan = plans[0];
@@ -392,10 +445,11 @@ export async function createSubscription(memberId: number, planId: number) {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + plan.duration_days);
 
-    // Deactivate existing subscriptions
     await sql`
-      UPDATE subscriptions SET status = 'cancelled' 
-      WHERE member_id = ${memberId} AND status = 'active'
+      UPDATE subscriptions
+      SET status = 'cancelled'
+      WHERE member_id = ${memberId}
+        AND status = 'active'
     `;
 
     await sql`
@@ -403,7 +457,6 @@ export async function createSubscription(memberId: number, planId: number) {
       VALUES (${memberId}, ${planId}, ${startDate.toISOString()}, ${endDate.toISOString()}, 'active')
     `;
 
-    // Record payment
     await sql`
       INSERT INTO payments (member_id, amount, payment_type, description)
       VALUES (${memberId}, ${plan.price}, 'subscription', ${`Membresia: ${plan.name}`})
@@ -422,13 +475,20 @@ export async function createSubscription(memberId: number, planId: number) {
 
 export async function getClasses() {
   try {
+    const session = await requireTenantSession();
+
     const classes = await sql`
-      SELECT c.*, t.first_name as trainer_first_name, t.last_name as trainer_last_name
+      SELECT
+        c.*,
+        t.first_name AS trainer_first_name,
+        t.last_name AS trainer_last_name
       FROM classes c
-      LEFT JOIN trainers t ON c.trainer_id = t.id
+      JOIN trainers t ON c.trainer_id = t.id
       WHERE c.is_active = true
+        AND t.gym_id = ${session.gymId}
       ORDER BY c.name
     `;
+
     return classes;
   } catch (error) {
     console.error("Error fetching classes:", error);
@@ -438,17 +498,31 @@ export async function getClasses() {
 
 export async function getClassSchedule() {
   try {
+    const session = await requireTenantSession();
+
     const schedule = await sql`
-      SELECT cs.*, c.name as class_name, c.description, c.duration_minutes,
-        t.first_name as trainer_first_name, t.last_name as trainer_last_name,
-        (SELECT COUNT(*) FROM class_bookings cb WHERE cb.schedule_id = cs.id AND cb.status = 'booked') as booked_count
+      SELECT
+        cs.*,
+        c.name AS class_name,
+        c.description,
+        c.duration_minutes,
+        t.first_name AS trainer_first_name,
+        t.last_name AS trainer_last_name,
+        (
+          SELECT COUNT(*)
+          FROM class_bookings cb
+          WHERE cb.schedule_id = cs.id
+            AND cb.status = 'booked'
+        ) AS booked_count
       FROM class_schedule cs
       JOIN classes c ON cs.class_id = c.id
-      LEFT JOIN trainers t ON cs.trainer_id = t.id
+      JOIN trainers t ON COALESCE(cs.trainer_id, c.trainer_id) = t.id
       WHERE cs.start_time >= NOW()
+        AND t.gym_id = ${session.gymId}
       ORDER BY cs.start_time ASC
       LIMIT 20
     `;
+
     return schedule;
   } catch (error) {
     console.error("Error fetching schedule:", error);
@@ -458,23 +532,51 @@ export async function getClassSchedule() {
 
 export async function bookClass(memberId: number, scheduleId: number) {
   try {
-    // Check if already booked
-    const existing = await sql`
-      SELECT id FROM class_bookings 
-      WHERE member_id = ${memberId} AND schedule_id = ${scheduleId} AND status = 'booked'
+    const session = await requireTenantSession();
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
+
+    if (!member) return { error: "Miembro no encontrado" };
+
+    const schedule = await sql`
+      SELECT
+        cs.id,
+        cs.max_capacity,
+        (
+          SELECT COUNT(*)
+          FROM class_bookings cb
+          WHERE cb.schedule_id = cs.id
+            AND cb.status = 'booked'
+        ) AS booked
+      FROM class_schedule cs
+      JOIN classes c ON cs.class_id = c.id
+      JOIN trainers t ON COALESCE(cs.trainer_id, c.trainer_id) = t.id
+      WHERE cs.id = ${scheduleId}
+        AND t.gym_id = ${session.gymId}
+      LIMIT 1
+    `;
+
+    if (schedule.length === 0) return { error: "Clase no encontrada" };
+
+    const existing = await sql`
+      SELECT id
+      FROM class_bookings
+      WHERE member_id = ${memberId}
+        AND schedule_id = ${scheduleId}
+        AND status = 'booked'
+    `;
+
     if (existing.length > 0) {
       return { error: "Ya tienes reserva para esta clase" };
     }
 
-    // Check capacity
-    const schedule = await sql`
-      SELECT cs.max_capacity, 
-        (SELECT COUNT(*) FROM class_bookings cb WHERE cb.schedule_id = cs.id AND cb.status = 'booked') as booked
-      FROM class_schedule cs WHERE id = ${scheduleId}
-    `;
-    if (schedule.length === 0) return { error: "Clase no encontrada" };
-    if (schedule[0].booked >= schedule[0].max_capacity) {
+    if (Number(schedule[0].booked) >= Number(schedule[0].max_capacity)) {
       return { error: "Clase llena" };
     }
 
@@ -495,17 +597,20 @@ export async function bookClass(memberId: number, scheduleId: number) {
 
 export async function getTrainers() {
   try {
+    const session = await requireTenantSession();
+
     const trainers = await sql`
-      SELECT 
-        t.id, 
-        t.first_name, 
-        t.last_name, 
-        u.email, 
-        t.specialization, 
-        t.bio, 
-        t.is_active 
+      SELECT
+        t.id,
+        t.first_name,
+        t.last_name,
+        u.email,
+        t.specialization,
+        t.bio,
+        t.is_active
       FROM trainers t
       JOIN users u ON t.user_id = u.id
+      WHERE t.gym_id = ${session.gymId}
       ORDER BY t.first_name ASC
     `;
 
@@ -516,14 +621,17 @@ export async function getTrainers() {
       email: trainer.email || "",
       specialization: trainer.specialization || undefined,
       bio: trainer.bio || undefined,
-      is_active: trainer.is_active === null || trainer.is_active === undefined ? true : Boolean(trainer.is_active),
+      is_active:
+        trainer.is_active === null || trainer.is_active === undefined
+          ? true
+          : Boolean(trainer.is_active),
     }));
-
   } catch (error) {
     console.error("Error fetching trainers:", error);
     return [];
   }
 }
+
 // ==================== TRAINER ↔ MEMBERS ====================
 
 export async function assignMemberToTrainer(email: string, sessionUserId: number | string) {
@@ -589,16 +697,17 @@ export async function createTrainer(formData: FormData) {
   const firstName = formData.get("first_name") as string;
   const lastName = formData.get("last_name") as string;
   const email = formData.get("email") as string;
-  const password = formData.get("password") as string || "123456"; 
+  const password = formData.get("password") as string;
   const specialization = formData.get("specialization") as string;
   const bio = formData.get("bio") as string;
-  const gymId = formData.get("gym_id") ? Number(formData.get("gym_id")) : null;
 
-  if (!firstName || !lastName || !email) {
-    return { error: "Nombre, apellido y correo son obligatorios." };
+  if (!firstName || !lastName || !email || !password) {
+    return { error: "Nombre, apellido, correo y contraseña son obligatorios." };
   }
 
   try {
+    const session = await requireTenantSession();
+    const gymId = session.gymId;
     // 1. Encriptamos la clave con bcryptjs
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -636,10 +745,22 @@ export async function createTrainer(formData: FormData) {
 
 export async function recordAttendance(memberId: number) {
   try {
+    const session = await requireTenantSession();
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+    `;
+
+    if (!member) return { error: "Miembro no encontrado" };
+
     await sql`
       INSERT INTO attendance (member_id, check_in)
       VALUES (${memberId}, NOW())
     `;
+
     revalidateTag("attendance", "max");
     return { success: true };
   } catch (error) {
@@ -650,16 +771,21 @@ export async function recordAttendance(memberId: number) {
 
 export async function getAttendanceStats(): Promise<AttendanceStat[]> {
   try {
+    const session = await requireTenantSession();
+
     const stats = await sql`
-      SELECT 
-        COUNT(*) as total_visits,
-        COUNT(DISTINCT member_id) as unique_members,
-        DATE(check_in) as date
-      FROM attendance
-      WHERE check_in >= NOW() - INTERVAL '30 days'
-      GROUP BY DATE(check_in)
+      SELECT
+        COUNT(*) AS total_visits,
+        COUNT(DISTINCT a.member_id) AS unique_members,
+        DATE(a.check_in) AS date
+      FROM attendance a
+      JOIN members m ON a.member_id = m.id
+      WHERE a.check_in >= NOW() - INTERVAL '30 days'
+        AND m.gym_id = ${session.gymId}
+      GROUP BY DATE(a.check_in)
       ORDER BY date DESC
     `;
+
     return stats as AttendanceStat[];
   } catch (error) {
     console.error("Error fetching attendance stats:", error);
@@ -671,12 +797,37 @@ export async function getAttendanceStats(): Promise<AttendanceStat[]> {
 
 export async function getDashboardStats() {
   try {
+    const session = await requireTenantSession();
+
     const [members, activeSubscriptions, todayAttendance, revenue] =
       await Promise.all([
-        sql`SELECT COUNT(*) as count FROM members WHERE status = 'active'`,
-        sql`SELECT COUNT(*) as count FROM subscriptions WHERE status = 'active'`,
-        sql`SELECT COUNT(*) as count FROM attendance WHERE DATE(check_in) = CURRENT_DATE`,
-        sql`SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE DATE(payment_date) >= DATE_TRUNC('month', CURRENT_DATE)`,
+        sql`
+          SELECT COUNT(*) AS count
+          FROM members
+          WHERE status = 'active'
+            AND gym_id = ${session.gymId}
+        `,
+        sql`
+          SELECT COUNT(*) AS count
+          FROM subscriptions s
+          JOIN members m ON s.member_id = m.id
+          WHERE s.status = 'active'
+            AND m.gym_id = ${session.gymId}
+        `,
+        sql`
+          SELECT COUNT(*) AS count
+          FROM attendance a
+          JOIN members m ON a.member_id = m.id
+          WHERE DATE(a.check_in) = CURRENT_DATE
+            AND m.gym_id = ${session.gymId}
+        `,
+        sql`
+          SELECT COALESCE(SUM(p.amount), 0) AS total
+          FROM payments p
+          JOIN members m ON p.member_id = m.id
+          WHERE DATE(p.payment_date) >= DATE_TRUNC('month', CURRENT_DATE)
+            AND m.gym_id = ${session.gymId}
+        `,
       ]);
 
     return {
@@ -749,11 +900,16 @@ export async function saveOrUpdateRoutine(
 }
 
 // 1. OBTENER RUTINAS
-export async function getTrainerRoutines(userId: number) {
+export async function getTrainerRoutines(_userId: number) {
   try {
-    // Buscamos primero el realTrainerId a partir del session.id
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) return [];
+
     const trainerResult = await sql`
-      SELECT id FROM trainers WHERE user_id = ${userId}
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
     `;
 
     if (trainerResult.length === 0) return [];
@@ -776,10 +932,17 @@ export async function getTrainerRoutines(userId: number) {
   }
 }
 
-export async function getTrainerMembers(userId: number) {
+export async function getTrainerMembers(_userId: number) {
   try {
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) return [];
+
     const trainerRes = await sql`
-      SELECT id FROM trainers WHERE user_id = ${userId} LIMIT 1
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
     if (!trainerRes.length) return [];
     const trainerId = trainerRes[0].id;
@@ -834,40 +997,81 @@ export async function assignRoutineToMember(
   routineId: number
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // 1. Obtener el ID real de la tabla 'members'
-    const memberRes = await sql`
-      SELECT id FROM members 
-      WHERE id = ${memberIdOrUserId} OR user_id = ${memberIdOrUserId}
-      LIMIT 1;
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { success: false, error: "No autorizado." };
+    }
+
+    const [trainer] = await sql`
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
-    if (!memberRes || memberRes.length === 0) {
-      return { success: false, error: "El alumno no existe en la base de datos." };
+    if (!trainer) {
+      return { success: false, error: "Perfil de entrenador no encontrado." };
+    }
+
+    const [routine] = await sql`
+      SELECT id
+      FROM routines
+      WHERE id = ${routineId}
+        AND trainer_id = ${trainer.id}
+        AND (is_archived IS FALSE OR is_archived IS NULL)
+      LIMIT 1
+    `;
+
+    if (!routine) {
+      return { success: false, error: "Rutina no encontrada." };
+    }
+
+    const memberRes = await sql`
+      SELECT id
+      FROM members
+      WHERE (id = ${memberIdOrUserId} OR user_id = ${memberIdOrUserId})
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
+      LIMIT 1
+    `;
+
+    if (!memberRes.length) {
+      return { success: false, error: "El alumno no existe o no está asignado a este entrenador." };
     }
 
     const realMemberId = Number(memberRes[0].id);
 
-    // 2. Insertar o activar en member_routines
     const existing = await sql`
-      SELECT id FROM member_routines 
-      WHERE member_id = ${realMemberId} AND routine_id = ${routineId}
-      LIMIT 1;
+      SELECT id
+      FROM member_routines
+      WHERE member_id = ${realMemberId}
+        AND routine_id = ${routineId}
+      LIMIT 1
     `;
 
     if (existing.length === 0) {
       await sql`
         INSERT INTO member_routines (member_id, routine_id, is_active)
-        VALUES (${realMemberId}, ${routineId}, true);
+        VALUES (${realMemberId}, ${routineId}, true)
       `;
     } else {
       await sql`
-        UPDATE member_routines 
-        SET is_active = true 
-        WHERE member_id = ${realMemberId} AND routine_id = ${routineId};
+        UPDATE member_routines
+        SET is_active = true
+        WHERE member_id = ${realMemberId}
+          AND routine_id = ${routineId}
       `;
     }
 
-    // 3. Revalidar las rutas afectadas
+    await sql`
+      UPDATE members
+      SET routine_id = ${routineId}, updated_at = NOW()
+      WHERE id = ${realMemberId}
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
+    `;
+
     revalidatePath("/trainer/alumnos");
     revalidatePath("/miembro");
     revalidatePath("/miembro/rutina");
@@ -875,9 +1079,9 @@ export async function assignRoutineToMember(
     return { success: true };
   } catch (error) {
     console.error("Error al asignar rutina:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Error al asignar rutina" 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al asignar rutina",
     };
   }
 }
@@ -936,11 +1140,19 @@ export async function getMemberRoutines(memberUserId: number) {
 
 // ==================== TRAINER STATS ====================
 
-export async function getTrainerStats(userId: number) {
+export async function getTrainerStats(_userId: number) {
   try {
-    // 1. Obtener el ID real de la tabla trainers
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { totalAlumnos: 0, totalRutinas: 0 };
+    }
+
     const trainerRes = await sql`
-      SELECT id FROM trainers WHERE user_id = ${userId} LIMIT 1
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
     if (!trainerRes || trainerRes.length === 0) {
@@ -986,7 +1198,7 @@ export async function logWorkout(routineId: number, details: any) {
   }
 
   // Extraer la ID de la sesión de manera segura
-  const currentUserId = session.id || session.userId || session.user?.id;
+  const currentUserId = session.id;
 
   try {
     // 1. Obtener el id de miembro correspondiente al usuario logueado
@@ -1272,7 +1484,7 @@ export async function getMemberWorkoutHistory(memberId: number) {
 
 export async function updateProfile(formData: FormData) {
   const session = await getSession();
-  const userId = session?.user?.id || session?.id || session?.userId;
+  const userId = session?.id;
   if (!userId) return { error: "No autorizado" };
 
   const firstName = formData.get("firstName") as string;
@@ -1302,7 +1514,7 @@ export async function updateProfile(formData: FormData) {
 
 export async function updateAvatar(imageUrl: string) {
   const session = await getSession();
-  const userId = session?.user?.id || session?.id || session?.userId;
+  const userId = session?.id;
   if (!userId) return { error: "No autorizado" };
 
   try {
@@ -1323,7 +1535,7 @@ export async function updatePassword(prevState: any, formData: FormData) {
   "use server";
 
   const session = await getSession();
-  const userId = session?.user?.id || session?.id || session?.userId;
+  const userId = session?.id;
   if (!userId) return { error: "No autorizado" };
 
   const currentPassword = formData.get("currentPassword") as string;
@@ -1379,11 +1591,19 @@ export async function updatePassword(prevState: any, formData: FormData) {
 
 // En app/actions.ts
 
-export async function getTrainerMembersAndRoutines(userId: number) {
+export async function getTrainerMembersAndRoutines(_userId: number) {
   try {
-    // 1. Obtener el ID del entrenador correspondiente al usuario
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { members: [], routines: [] };
+    }
+
     const trainerRes = await sql`
-      SELECT id FROM trainers WHERE user_id = ${userId} LIMIT 1
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
     if (!trainerRes || trainerRes.length === 0) {
@@ -1452,38 +1672,67 @@ export async function assignRoutineToMultipleMembersBulk(
   }
 
   try {
-    // 1. Obtener los IDs reales de la tabla 'members' para los IDs seleccionados
-    const realMembersRes = await sql`
-      SELECT id FROM members 
-      WHERE id = ANY(${memberIds}::int[]) OR user_id = ANY(${memberIds}::int[]);
+    const session = await getSession();
+    if (!session || session.role !== "trainer" || session.gymId == null) {
+      return { success: false, count: 0, error: "No autorizado" };
+    }
+
+    const [trainer] = await sql`
+      SELECT id
+      FROM trainers
+      WHERE user_id = ${session.id}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
-    const realMemberIds = Array.isArray(realMembersRes) 
-      ? realMembersRes.map((m: any) => Number(m.id)) 
-      : (realMembersRes as any).rows?.map((m: any) => Number(m.id)) || [];
+    if (!trainer) {
+      return { success: false, count: 0, error: "Entrenador no encontrado" };
+    }
+
+    const [routine] = await sql`
+      SELECT id
+      FROM routines
+      WHERE id = ${routineId}
+        AND trainer_id = ${trainer.id}
+        AND (is_archived IS FALSE OR is_archived IS NULL)
+      LIMIT 1
+    `;
+
+    if (!routine) {
+      return { success: false, count: 0, error: "Rutina no encontrada" };
+    }
+
+    const realMembersRes = await sql`
+      SELECT id
+      FROM members
+      WHERE (id = ANY(${memberIds}::int[]) OR user_id = ANY(${memberIds}::int[]))
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
+    `;
+
+    const realMemberIds = realMembersRes.map((m: any) => Number(m.id));
 
     if (realMemberIds.length === 0) {
       return { success: false, count: 0, error: "No se encontraron alumnos válidos." };
     }
 
-    // 2. Insertar en member_routines evitando duplicados (ON CONFLICT DO NOTHING)
     for (const mId of realMemberIds) {
       await sql`
         INSERT INTO member_routines (member_id, routine_id)
         VALUES (${mId}, ${routineId})
-        ON CONFLICT DO NOTHING;
+        ON CONFLICT DO NOTHING
       `;
     }
 
-    // 3. Actualizar la columna 'routine_id' direct en members
     await sql`
       UPDATE members
       SET routine_id = ${routineId},
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = ANY(${realMemberIds}::int[]);
+      WHERE id = ANY(${realMemberIds}::int[])
+        AND gym_id = ${session.gymId}
+        AND trainer_id = ${trainer.id}
     `;
 
-    // 4. Revalidar vistas
     revalidatePath("/trainer");
     revalidatePath("/trainer/alumnos");
     revalidatePath("/miembro");
@@ -1500,16 +1749,36 @@ export async function assignRoutineToMultipleMembersBulk(
 }
 
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001")
+  .replace(/\/api\/?$/, "")
+  .replace(/\/$/, "");
+
+function apiUrl(path: string) {
+  return `${API_URL}/api${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+async function getApiAuthHeaders() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("session")?.value;
+
+  if (!token) {
+    throw new Error("Sesión requerida para acceder a la API.");
+  }
+
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+}
 
 // app/actions.ts
 export async function getGymStatusAction(gymId: number | string) {
   if (!gymId) return null;
 
   try {
-    const res = await fetch(`http://localhost:3001/api/gyms/${gymId}`, {
+    const res = await fetch(apiUrl(`/gyms/${gymId}`), {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: await getApiAuthHeaders(),
       cache: "no-store",
     });
 
@@ -1533,9 +1802,9 @@ export async function createGymAction(formData: any): Promise<{
   error?: string;
 }> {
   try {
-    const response = await fetch("http://localhost:3001/api/gyms", {
+    const response = await fetch(apiUrl("/gyms"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await getApiAuthHeaders(),
       body: JSON.stringify(formData),
     });
 
@@ -1552,9 +1821,9 @@ export async function createGymAction(formData: any): Promise<{
 }
 export async function toggleGymStatusAction(gymId: number, newStatus: string) {
   try {
-    const res = await fetch(`http://localhost:3001/api/gyms/${gymId}/status`, {
+    const res = await fetch(apiUrl(`/gyms/${gymId}/status`), {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: await getApiAuthHeaders(),
       body: JSON.stringify({ status: newStatus }),
       cache: "no-store",
     });
@@ -1576,11 +1845,9 @@ export async function toggleGymStatusAction(gymId: number, newStatus: string) {
 
 export async function getGymsAction() {
   try {
-    const res = await fetch("http://localhost:3001/api/gyms", {
+    const res = await fetch(apiUrl("/gyms"), {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: await getApiAuthHeaders(),
       cache: "no-store", // Garantiza datos frescos de los gimnasios
     });
 
@@ -1598,17 +1865,17 @@ export async function getGymsAction() {
 
 export async function processCheckInAction(identifier: string) {
   const session = await getSession();
-  const gymId = session?.gymId || session?.gym_id;
+  const gymId = session?.gymId;
 
   if (!gymId) {
     return { success: false, message: "Sesión inválida o gimnasio no detectado" };
   }
 
   try {
-    const res = await fetch("http://localhost:3001/api/attendance/check-in", {
+    const res = await fetch(apiUrl("/attendance/check-in"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gymId, identifier }),
+      headers: await getApiAuthHeaders(),
+      body: JSON.stringify({ identifier }),
       cache: "no-store",
     });
 
@@ -1622,11 +1889,12 @@ export async function processCheckInAction(identifier: string) {
 //Gestionar planes 
 export async function getPlansAction() {
   const session = await getSession();
-  const gymId = session?.gymId || session?.gym_id;
+  const gymId = session?.gymId;
   if (!gymId) return [];
 
   try {
-    const res = await fetch(`http://localhost:3001/api/memberships/plans?gymId=${gymId}`, {
+    const res = await fetch(apiUrl("/memberships/plans"), {
+      headers: await getApiAuthHeaders(),
       cache: "no-store",
     });
     return await res.json();
@@ -1640,7 +1908,7 @@ export async function getPlansAction() {
 //Creacion de planes
 export async function createPlanAction(formData: FormData) {
   const session = await getSession();
-  const gymId = session?.gymId || session?.gym_id || 1; 
+  const gymId = session?.gymId; 
 
   const name = formData.get("name") as string;
   const price = formData.get("price");
@@ -1648,10 +1916,10 @@ export async function createPlanAction(formData: FormData) {
   const description = formData.get("description") as string;
 
   try {
-    const res = await fetch("http://localhost:3001/api/memberships/plans", {
+    const res = await fetch(apiUrl("/memberships/plans"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gymId, name, price, durationMonths, description }),
+      headers: await getApiAuthHeaders(),
+      body: JSON.stringify({ name, price, durationMonths, description }),
     });
 
     const text = await res.text();
@@ -1678,9 +1946,9 @@ export async function updatePlanAction(id: number, formData: FormData) {
   const isActive = formData.get("isActive") === "true";
 
   try {
-    const res = await fetch(`http://localhost:3001/api/memberships/plans/${id}`, {
+    const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: await getApiAuthHeaders(),
       body: JSON.stringify({ name, price, durationMonths, description, isActive }),
     });
     return await res.json();
@@ -1692,8 +1960,9 @@ export async function updatePlanAction(id: number, formData: FormData) {
 
 export async function deletePlanAction(id: number) {
   try {
-    const res = await fetch(`http://localhost:3001/api/memberships/plans/${id}`, {
+    const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "DELETE",
+      headers: await getApiAuthHeaders(),
     });
     return await res.json();
   } catch (error) {
@@ -1705,11 +1974,20 @@ export async function deletePlanAction(id: number) {
 // Actualizar estado del miembro (active, suspended, inactive)
 export async function updateMemberStatusAction(memberId: number, status: string) {
   try {
-    await sql`
+    const session = await requireTenantSession();
+
+    const result = await sql`
       UPDATE members 
       SET status = ${status}, updated_at = NOW() 
       WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+      RETURNING id
     `;
+
+    if (result.length === 0) {
+      return { error: "Miembro no encontrado" };
+    }
+
     revalidateTag("members", "max");
     return { success: true };
   } catch (error) {
@@ -1718,14 +1996,32 @@ export async function updateMemberStatusAction(memberId: number, status: string)
   }
 }
 
-// Eliminar miembro
 export async function deleteMemberAction(memberId: number) {
   try {
-    // Si tenés ON DELETE CASCADE en subscriptions se borra auto,
-    // de lo contrario eliminamos sus suscripciones primero:
-    await sql`DELETE FROM subscriptions WHERE member_id = ${memberId}`;
-    await sql`DELETE FROM members WHERE id = ${memberId}`;
-    
+    const session = await requireTenantSession();
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+    `;
+
+    if (!member) {
+      return { error: "Miembro no encontrado" };
+    }
+
+    await sql`
+      DELETE FROM subscriptions
+      WHERE member_id = ${memberId}
+    `;
+
+    await sql`
+      DELETE FROM members
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+    `;
+
     revalidateTag("members", "max");
     return { success: true };
   } catch (error) {
@@ -1735,18 +2031,19 @@ export async function deleteMemberAction(memberId: number) {
 }
 
 export async function updateMemberAction(
-  id: number, 
-  data: { 
-    first_name: string; 
-    last_name: string; 
-    email: string; 
+  id: number,
+  data: {
+    first_name: string;
+    last_name: string;
+    email: string;
     phone: string;
     plan_id?: number;
   }
 ) {
   try {
-    // 1. Actualizar datos en 'members'
-    await sql`
+    const session = await requireTenantSession();
+
+    const updated = await sql`
       UPDATE members
       SET 
         first_name = ${data.first_name},
@@ -1755,14 +2052,32 @@ export async function updateMemberAction(
         phone = ${data.phone},
         updated_at = NOW()
       WHERE id = ${id}
+        AND gym_id = ${session.gymId}
+      RETURNING id
     `;
 
-    // 2. Si se seleccionó un plan, cancelar anterior e insertar nuevo en 'subscriptions'
+    if (updated.length === 0) {
+      return { success: false, error: "Miembro no encontrado" };
+    }
+
     if (data.plan_id) {
+      const [plan] = await sql`
+        SELECT id
+        FROM membership_plans
+        WHERE id = ${data.plan_id}
+          AND gym_id = ${session.gymId}
+          AND is_active = true
+      `;
+
+      if (!plan) {
+        return { success: false, error: "Plan no encontrado" };
+      }
+
       await sql`
         UPDATE subscriptions 
         SET status = 'cancelled' 
-        WHERE member_id = ${id} AND status = 'active'
+        WHERE member_id = ${id}
+          AND status = 'active'
       `;
 
       await sql`
@@ -1777,9 +2092,7 @@ export async function updateMemberAction(
       `;
     }
 
-    // 3. Revalidar caché de la ruta
     revalidatePath("/admin/miembros");
-
     return { success: true };
   } catch (error) {
     console.error("Error updating member:", error);
@@ -1857,56 +2170,15 @@ if (existingMember.length > 0) {
   }
 }
 
-export async function assignMembershipAction(memberId: number, membershipId: number) {
-  try {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    
-    const res = await fetch(`${API_BASE_URL}/members/${memberId}/memberships`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ membership_id: membershipId }),
-    });
 
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      return { success: false, error: errorData.error || "Error al asignar la membresía" };
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Error de conexión" };
-  }
-}
-
-
-
-
-export async function createSuperAdminSeed() {
-  try {
-    const hashedPassword = await bcrypt.hash("123456", 10);
-    
-    // Eliminamos registros previos para evitar duplicados
-    await sql`DELETE FROM users WHERE LOWER(email) = 'diazjavier769@gmail.com'`;
-
-    // Insertamos el usuario con el hash generado por tu mismo entorno
-    await sql`
-      INSERT INTO users (email, password_hash, role)
-      VALUES ('diazjavier769@gmail.com', ${hashedPassword}, 'superadmin')
-    `;
-
-    return { success: true, message: "Usuario superadmin creado correctamente." };
-  } catch (error) {
-    console.error("Error al crear seed:", error);
-    return { error: "No se pudo crear el usuario." };
-  }
-}
 
 
 //Funcion para registrar asistencia de alumnos
 export async function registerAttendanceAction(memberIdentifier: string) {
   try {
     const session = await getSession();
-    const gymId = session?.gymId || 1;
+    const gymId = session?.gymId;
+    if (!gymId) return { success: false, error: "Sesión inválida o sin gimnasio asociado" };
     const cleanInput = memberIdentifier.trim();
     const isNumber = /^\d+$/.test(cleanInput);
     const searchTerm = `%${cleanInput.toLowerCase()}%`;
@@ -2016,88 +2288,256 @@ export async function registerAttendanceAction(memberIdentifier: string) {
 export async function createPayment(formData: FormData) {
   const memberId = Number(formData.get("memberId"));
   const planId = Number(formData.get("planId"));
-  const amount = Number(formData.get("amount"));
-  const paymentMethod = formData.get("paymentMethod") as string;
-  const transactionId = (formData.get("transactionId") as string) || null;
-  const notes = (formData.get("notes") as string) || null;
+  const paymentMethod = String(formData.get("paymentMethod") || "").trim();
+  const transactionId = String(formData.get("transactionId") || "").trim() || null;
+  const notes = String(formData.get("notes") || "").trim() || null;
 
   try {
-    // 1. Activar el estado del socio en la tabla 'members' (por si estaba suspendido o inactivo)
-    await sql`
-      UPDATE members
-      SET status = 'active'
+    const session = await requireTenantSession();
+
+    if (session.role !== "admin") {
+      return { success: false, error: "No tenés permisos para registrar pagos." };
+    }
+
+    if (
+      !Number.isFinite(memberId) ||
+      memberId <= 0 ||
+      !Number.isFinite(planId) ||
+      planId <= 0 ||
+      !paymentMethod
+    ) {
+      return { success: false, error: "Datos de pago inválidos." };
+    }
+
+    const [member] = await sql`
+      SELECT id
+      FROM members
       WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+      LIMIT 1
     `;
 
-    // 2. Buscar si el socio ya tiene una suscripción registrada
+    if (!member) {
+      return { success: false, error: "Miembro no encontrado." };
+    }
+
+    const [plan] = await sql`
+      SELECT id, price, duration_months
+      FROM membership_plans
+      WHERE id = ${planId}
+        AND gym_id = ${session.gymId}
+        AND is_active = true
+      LIMIT 1
+    `;
+
+    if (!plan) {
+      return { success: false, error: "Plan no encontrado." };
+    }
+
+    const amount = Number(plan.price);
+    const durationMonths = Math.max(1, Number(plan.duration_months) || 1);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { success: false, error: "El plan tiene un precio inválido." };
+    }
+
+    if (transactionId) {
+      const existingPayment = await sql`
+        SELECT p.id
+        FROM payments p
+        JOIN members m ON m.id = p.member_id
+        WHERE p.transaction_id = ${transactionId}
+          AND m.gym_id = ${session.gymId}
+        LIMIT 1
+      `;
+
+      if (existingPayment.length > 0) {
+        return { success: false, error: "La transacción ya fue registrada." };
+      }
+    }
+
     const existingSub = await sql`
-      SELECT id FROM subscriptions WHERE member_id = ${memberId} LIMIT 1
+      SELECT s.id
+      FROM subscriptions s
+      JOIN members m ON m.id = s.member_id
+      WHERE s.member_id = ${memberId}
+        AND m.gym_id = ${session.gymId}
+      ORDER BY s.id DESC
+      LIMIT 1
     `;
 
     let subscriptionId: number;
 
     if (existingSub.length > 0) {
-      // Actualizar la suscripción existente: plan, vigencia de 30 días y estado activo
-      subscriptionId = existingSub[0].id;
+      subscriptionId = Number(existingSub[0].id);
+
       await sql`
-        UPDATE subscriptions 
-        SET plan_id = ${planId},
-            start_date = NOW(),
-            end_date = NOW() + INTERVAL '30 days',
-            status = 'active'
+        UPDATE subscriptions
+        SET
+          plan_id = ${planId},
+          start_date = CURRENT_DATE,
+          end_date = CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
+          status = 'active',
+          payment_status = 'paid',
+          amount_paid = ${amount},
+          updated_at = NOW()
         WHERE id = ${subscriptionId}
+          AND member_id = ${memberId}
       `;
     } else {
-      // Crear nueva suscripción activa si no tenía ninguna
-      const newSub = await sql`
-        INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-        VALUES (${memberId}, ${planId}, NOW(), NOW() + INTERVAL '30 days', 'active')
+      const [newSub] = await sql`
+        INSERT INTO subscriptions (
+          member_id,
+          plan_id,
+          start_date,
+          end_date,
+          status,
+          payment_status,
+          amount_paid,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ${memberId},
+          ${planId},
+          CURRENT_DATE,
+          CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
+          'active',
+          'paid',
+          ${amount},
+          NOW(),
+          NOW()
+        )
         RETURNING id
       `;
-      subscriptionId = newSub[0].id;
+
+      subscriptionId = Number(newSub.id);
     }
 
-    // 3. Insertar el cobro en la tabla 'payments'
+    await sql`
+      UPDATE members
+      SET status = 'active', updated_at = NOW()
+      WHERE id = ${memberId}
+        AND gym_id = ${session.gymId}
+    `;
+
     await sql`
       INSERT INTO payments (
-        member_id, 
-        subscription_id, 
-        amount, 
-        payment_method, 
-        transaction_id, 
-        status, 
-        notes, 
+        member_id,
+        subscription_id,
+        amount,
+        payment_method,
+        transaction_id,
+        status,
+        notes,
         payment_date
       )
       VALUES (
-        ${memberId}, 
-        ${subscriptionId}, 
-        ${amount}, 
-        ${paymentMethod}, 
-        ${transactionId}, 
-        'completed', 
-        ${notes}, 
+        ${memberId},
+        ${subscriptionId},
+        ${amount},
+        ${paymentMethod},
+        ${transactionId},
+        'completed',
+        ${notes},
         NOW()
       )
     `;
 
-    // Revalidar las rutas necesarias para reflejar los cambios en la UI
     revalidatePath("/admin/pagos");
     revalidatePath("/admin/miembros");
     revalidatePath("/admin/reportes");
-    
+
     return { success: true };
   } catch (error) {
     console.error("Error exacto al registrar cobro:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Error de base de datos al registrar el pago." 
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error de base de datos al registrar el pago.",
+    };
+  }
+}
+
+
+export async function createMercadoPagoPreferenceAction(
+  memberId: number,
+  planId: number
+) {
+  try {
+    const session = await requireTenantSession();
+
+    if (!["admin", "member", "superadmin"].includes(session.role)) {
+      return {
+        success: false,
+        error: "No tenés permisos para generar este cobro.",
+      };
+    }
+
+    if (!Number.isFinite(planId) || planId <= 0) {
+      return { success: false, error: "Plan inválido." };
+    }
+
+    let effectiveMemberId = memberId;
+
+    if (session.role === "member") {
+      const [ownMember] = await sql`
+        SELECT id
+        FROM members
+        WHERE user_id = ${session.id}
+          AND gym_id = ${session.gymId}
+        LIMIT 1
+      `;
+
+      if (!ownMember) {
+        return {
+          success: false,
+          error: "No se encontró tu perfil de socio.",
+        };
+      }
+
+      effectiveMemberId = Number(ownMember.id);
+    } else if (!Number.isFinite(memberId) || memberId <= 0) {
+      return { success: false, error: "Miembro inválido." };
+    }
+
+    const response = await fetch(apiUrl("/payments/create-preference"), {
+      method: "POST",
+      headers: await getApiAuthHeaders(),
+      body: JSON.stringify({ memberId: effectiveMemberId, planId }),
+      cache: "no-store",
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || "No se pudo generar la preferencia de pago.",
+      };
+    }
+
+    return {
+      success: true,
+      id: data.id,
+      init_point: data.init_point,
+      sandbox_init_point: data.sandbox_init_point,
+    };
+  } catch (error) {
+    console.error("Error al generar preferencia de Mercado Pago:", error);
+    return {
+      success: false,
+      error: "Error al conectar con el servicio de pagos.",
     };
   }
 }
 
 export async function getPaymentsHistory() {
   try {
+    const session = await requireTenantSession();
+
     const payments = await sql`
       SELECT 
         p.id,
@@ -2115,6 +2555,7 @@ export async function getPaymentsHistory() {
       JOIN members m ON p.member_id = m.id
       LEFT JOIN subscriptions s ON p.subscription_id = s.id
       LEFT JOIN membership_plans mp ON s.plan_id = mp.id
+      WHERE m.gym_id = ${session.gymId}
       ORDER BY p.payment_date DESC
       LIMIT 100
     `;

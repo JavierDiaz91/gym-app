@@ -18,7 +18,6 @@ import {
   updateMemberStatusAction,
   deleteMemberAction,
   updateMemberAction,
-  assignMembershipAction,
 } from "@/app/actions";
 import type { Member } from "@/app/types/member";
 

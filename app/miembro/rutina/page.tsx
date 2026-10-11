@@ -15,10 +15,9 @@ interface PageProps {
 
 export default async function MiembroRutinaPage({ searchParams }: PageProps) {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session || session.role !== "member" || session.gymId == null) redirect("/login");
 
-  const userId = session.user?.id || session.id || session.userId;
-  const userEmail = session.user?.email || "";
+  const userId = session.id;
 
   const resolvedParams = await searchParams;
   const targetRoutineId = resolvedParams?.id ? Number(resolvedParams.id) : null;
@@ -45,7 +44,11 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
   try {
     // 1. Obtener ID del miembro con fallback flexible
     const memberRes = await sql`
-  SELECT id FROM members WHERE user_id = ${userId} LIMIT 1
+  SELECT id
+  FROM members
+  WHERE user_id = ${userId}
+    AND gym_id = ${session.gymId}
+  LIMIT 1
 `;
 
     const memberRows = Array.isArray(memberRes) ? memberRes : (memberRes as any).rows || [];

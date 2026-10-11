@@ -11,16 +11,9 @@ export default async function MemberLayout({
   const session = await getSession();
   if (!session || session.role !== "member") redirect("/login");
 
-  // Armamos los datos del usuario resolviendo cualquier variación en la sesión
   const userData = {
-    name:
-      session.user?.name ||
-      session.name ||
-      (session.user?.first_name
-        ? `${session.user.first_name} ${session.user.last_name || ""}`.trim()
-        : null) ||
-      "Javier Diaz",
-    email: session.user?.email || session.email || "",
+    name: session.email.split("@")[0] || "Alumno",
+    email: session.email,
   };
 
   return (

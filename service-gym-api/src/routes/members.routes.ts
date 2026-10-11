@@ -1,19 +1,31 @@
 import { Router } from "express";
 import * as controller from "../controllers/members.controller";
-import { createMemberRoutine, getMemberRoutine } from "../controllers/memberRoutines.controller";
+import {
+  createMemberRoutine,
+  getMemberRoutine,
+} from "../controllers/memberRoutines.controller";
+import { authenticate, requireRole } from "../middlewares/auth";
 import { checkTenantStatus } from "../middlewares/checkTenantStatus";
 
 const router = Router();
 
-// Middleware global para todas las rutas de miembros de este router
+router.use(authenticate);
 router.use(checkTenantStatus);
 
-router.get("/", controller.getMembers);
-router.get("/:id", controller.getMember);
-router.post("/", controller.createMember);
-router.put("/:id", controller.updateMember);
-router.delete("/:id", controller.deleteMember);
-router.post("/member-routines", createMemberRoutine);
-router.get("/:id/routine", getMemberRoutine);
+router.get("/", requireRole("admin", "trainer", "superadmin"), controller.getMembers);
+router.get("/:id", requireRole("admin", "trainer", "member", "superadmin"), controller.getMember);
+router.post("/", requireRole("admin", "superadmin"), controller.createMember);
+router.put("/:id", requireRole("admin", "superadmin"), controller.updateMember);
+router.delete("/:id", requireRole("admin", "superadmin"), controller.deleteMember);
+router.post(
+  "/member-routines",
+  requireRole("admin", "trainer", "superadmin"),
+  createMemberRoutine
+);
+router.get(
+  "/:id/routine",
+  requireRole("admin", "trainer", "member", "superadmin"),
+  getMemberRoutine
+);
 
 export default router;

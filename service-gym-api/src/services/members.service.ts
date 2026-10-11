@@ -1,77 +1,48 @@
 import { sql } from "../db/neon";
 import { Member } from "../types/member";
 
-// ==================== GET ALL ====================
-export async function getAllMembers(): Promise<Member[]> {
+export async function getAllMembers(gymId: number): Promise<Member[]> {
   const result = await sql`
-    SELECT 
-      id,
-      user_id,
-      first_name,
-      last_name,
-      phone,
-      status,
-      join_date
+    SELECT id, user_id, first_name, last_name, phone, status, join_date
     FROM members
+    WHERE gym_id = ${gymId}
     ORDER BY created_at DESC
   `;
-
   return result as unknown as Member[];
 }
 
-// ==================== GET BY ID ====================
-export async function getMemberById(id: number): Promise<Member | null> {
+export async function getMemberById(gymId: number, id: number): Promise<Member | null> {
   const result = await sql`
-    SELECT 
-      id,
-      user_id,
-      first_name,
-      last_name,
-      phone,
-      status,
-      join_date
+    SELECT id, user_id, first_name, last_name, phone, status, join_date
     FROM members
     WHERE id = ${id}
+      AND gym_id = ${gymId}
   `;
-
   return (result[0] as Member) ?? null;
 }
 
-// ==================== CREATE ====================
 export async function createMember(
+  gymId: number,
   data: Pick<Member, "user_id" | "first_name" | "last_name"> &
     Partial<Pick<Member, "phone" | "status">>
 ): Promise<Member> {
   const result = await sql`
-    INSERT INTO members (
-      user_id,
-      first_name,
-      last_name,
-      phone,
-      status
-    )
+    INSERT INTO members (gym_id, user_id, first_name, last_name, phone, status)
     VALUES (
+      ${gymId},
       ${data.user_id},
       ${data.first_name},
       ${data.last_name},
       ${data.phone ?? null},
       ${data.status ?? "active"}
     )
-    RETURNING
-      id,
-      user_id,
-      first_name,
-      last_name,
-      phone,
-      status,
-      join_date
+    RETURNING id, user_id, first_name, last_name, phone, status, join_date
   `;
-
   return result[0] as Member;
 }
 
-// ==================== UPDATE ====================
 export async function updateMember(
+  gymId: number,
   id: number,
   data: Partial<Pick<Member, "first_name" | "last_name" | "phone" | "status">>
 ): Promise<Member | null> {
@@ -83,24 +54,21 @@ export async function updateMember(
       phone      = COALESCE(${data.phone}, phone),
       status     = COALESCE(${data.status}, status)
     WHERE id = ${id}
-    RETURNING
-      id,
-      user_id,
-      first_name,
-      last_name,
-      phone,
-      status,
-      join_date
+      AND gym_id = ${gymId}
+    RETURNING id, user_id, first_name, last_name, phone, status, join_date
   `;
-
   return (result[0] as Member) ?? null;
 }
 
-// ==================== DELETE ====================
-export async function deleteMember(id: number): Promise<void> {
-  await sql`DELETE FROM members WHERE id = ${id}`;
+export async function deleteMember(gymId: number, id: number): Promise<boolean> {
+  const result = await sql`
+    DELETE FROM members
+    WHERE id = ${id}
+      AND gym_id = ${gymId}
+    RETURNING id
+  `;
+  return result.length > 0;
 }
-
 
 export async function createGymMember(data: {
   gymId: number;
@@ -111,15 +79,29 @@ export async function createGymMember(data: {
   emergencyContact?: string;
   planId?: number;
 }) {
-  // 1. Crear el miembro
   const [member] = await sql`
     INSERT INTO members (gym_id, first_name, last_name, email, phone, emergency_contact)
-    VALUES (${data.gymId}, ${data.firstName}, ${data.lastName}, ${data.email || null}, ${data.phone || null}, ${data.emergencyContact || null})
+    VALUES (
+      ${data.gymId},
+      ${data.firstName},
+      ${data.lastName},
+      ${data.email || null},
+      ${data.phone || null},
+      ${data.emergencyContact || null}
+    )
     RETURNING *
   `;
 
-  // 2. Si se seleccionó un plan, crear su suscripción inicial (30 días)
   if (data.planId) {
+    const [plan] = await sql`
+      SELECT id
+      FROM membership_plans
+      WHERE id = ${data.planId}
+        AND gym_id = ${data.gymId}
+    `;
+
+    if (!plan) throw new Error("Plan no encontrado para este gimnasio");
+
     const startDate = new Date();
     const endDate = new Date();
     endDate.setMonth(endDate.getMonth() + 1);
@@ -133,8 +115,7 @@ export async function createGymMember(data: {
   return member;
 }
 
-
-export async function getMemberProfile(memberId: number) {
+export async function getMemberProfile(gymId: number, memberId: number) {
   const result = await sql`
     SELECT 
       m.id,
@@ -150,14 +131,14 @@ export async function getMemberProfile(memberId: number) {
     LEFT JOIN subscriptions s ON s.member_id = m.id
     LEFT JOIN memberships mp ON s.membership_id = mp.id
     WHERE m.id = ${memberId}
+      AND m.gym_id = ${gymId}
     ORDER BY s.created_at DESC
-    LIMIT 1;
+    LIMIT 1
   `;
-
   return result[0];
 }
 
-export async function getMemberDashboard(memberId: number) {
+export async function getMemberDashboard(gymId: number, memberId: number) {
   const result = await sql`
     SELECT 
       m.id,
@@ -174,9 +155,9 @@ export async function getMemberDashboard(memberId: number) {
     LEFT JOIN subscriptions s ON s.member_id = m.id AND s.status = 'active'
     LEFT JOIN memberships mp ON s.membership_id = mp.id
     WHERE m.id = ${memberId}
+      AND m.gym_id = ${gymId}
     ORDER BY s.created_at DESC
-    LIMIT 1;
+    LIMIT 1
   `;
-
   return result[0];
 }
