@@ -47,34 +47,67 @@ function getWebhookSecrets(): string[] {
   return uniqueSecrets;
 }
 
-function verifyWebhookSignature(req: Request): boolean {
+function verifyWebhookSignature(req: Request): {
+  valid: boolean;
+  reason?: string;
+  queryDataId?: string;
+  bodyDataId?: string;
+  hasSignature: boolean;
+  hasRequestId: boolean;
+} {
   const xSignature = String(req.header("x-signature") || "").trim();
   const xRequestId = String(req.header("x-request-id") || "").trim();
   const rawDataId = req.query["data.id"];
-  const dataId = Array.isArray(rawDataId)
+  const queryDataId = Array.isArray(rawDataId)
     ? String(rawDataId[rawDataId.length - 1] || "")
     : String(rawDataId || "");
+  const bodyDataId = String(req.body?.data?.id || "");
 
-  if (!xSignature || !xRequestId) return false;
+  if (!xSignature || !xRequestId) {
+    return {
+      valid: false,
+      reason: !xSignature ? "MissingSignatureHeader" : "MissingRequestId",
+      queryDataId,
+      bodyDataId,
+      hasSignature: !!xSignature,
+      hasRequestId: !!xRequestId,
+    };
+  }
+
+  let lastReason = "SignatureMismatch";
 
   for (const secret of getWebhookSecrets()) {
     try {
       WebhookSignatureValidator.validate({
         xSignature,
         xRequestId,
-        dataId,
+        dataId: queryDataId,
         secret,
       });
-      return true;
+      return {
+        valid: true,
+        queryDataId,
+        bodyDataId,
+        hasSignature: true,
+        hasRequestId: true,
+      };
     } catch (error) {
       if (error instanceof InvalidWebhookSignatureError) {
+        lastReason = error.reason;
         continue;
       }
       throw error;
     }
   }
 
-  return false;
+  return {
+    valid: false,
+    reason: lastReason,
+    queryDataId,
+    bodyDataId,
+    hasSignature: true,
+    hasRequestId: true,
+  };
 }
 
 function getOAuthStateSecret() {
@@ -563,14 +596,16 @@ export const handlePaymentReturn = async (req: Request, res: Response) => {
 // 4. Webhook para recibir notificaciones de pago
 export const handleWebhook = async (req: Request, res: Response) => {
   try {
-    if (!verifyWebhookSignature(req)) {
+    const signatureCheck = verifyWebhookSignature(req);
+
+    if (!signatureCheck.valid) {
       const invalidBody = req.body || {};
       console.warn(
-        `[MP WEBHOOK] Firma inválida. paymentId=${String(
-          invalidBody?.data?.id || req.query["data.id"] || ""
-        )} action=${String(invalidBody?.action || "")} userId=${String(
-          invalidBody?.user_id || req.query.user_id || ""
-        )}`
+        `[MP WEBHOOK] Firma inválida. reason=${signatureCheck.reason || "unknown"} paymentId=${String(
+          invalidBody?.data?.id || signatureCheck.queryDataId || ""
+        )} queryDataId=${signatureCheck.queryDataId || ""} bodyDataId=${signatureCheck.bodyDataId || ""} hasSignature=${signatureCheck.hasSignature} hasRequestId=${signatureCheck.hasRequestId} action=${String(
+          invalidBody?.action || ""
+        )} userId=${String(invalidBody?.user_id || req.query.user_id || "")}`
       );
       return res.status(401).json({ error: "Firma de webhook inválida." });
     }
