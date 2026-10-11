@@ -1444,9 +1444,6 @@ export async function getMemberRoutineData(routineId: number) {
 
 // app/actions.ts
 
-export async function getExercisesList()
-// app/actions.ts
-
 export async function getExercisesList() {
   try {
     const exercises = await sql`
