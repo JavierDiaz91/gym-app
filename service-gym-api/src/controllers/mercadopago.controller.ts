@@ -489,7 +489,6 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       req.auth.role === "admin" || req.auth.role === "superadmin"
         ? "admin"
         : "member";
-    const webhookUrl = `${publicUrl}/api/payments/webhook`;
     const successUrl = `${publicUrl}/api/payments/return?status=success&target=${returnTarget}`;
     const failureUrl = `${publicUrl}/api/payments/return?status=failure&target=${returnTarget}`;
     const pendingUrl = `${publicUrl}/api/payments/return?status=pending&target=${returnTarget}`;
@@ -517,7 +516,6 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
             memberId: member.member_id,
             planId: plan.id,
           }),
-          notification_url: webhookUrl,
           back_urls: {
             success: successUrl,
             failure: failureUrl,
@@ -542,10 +540,8 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       id: preference.id,
       init_point: preference.init_point,
       sandbox_init_point: preference.sandbox_init_point,
-      checkout_url: useTestCredentials
-        ? preference.sandbox_init_point
-        : preference.init_point,
-      checkout_mode: useTestCredentials ? "sandbox" : "production",
+      checkout_url: preference.init_point,
+      checkout_mode: useTestCredentials ? "test-credentials" : "production",
     });
   } catch (error: any) {
     console.error("[MP PREFERENCE EXCEPTION]:", error);
