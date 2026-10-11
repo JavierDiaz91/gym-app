@@ -1532,9 +1532,6 @@ export async function deleteRoutine(routineId: number) {
 
 // app/actions.ts
 
-export async function resetTodayWorkout
-// app/actions.ts
-
 export async function resetTodayWorkout(memberId: number, routineId: number) {
   try {
     const session = await getSession();
