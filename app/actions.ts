@@ -2736,6 +2736,8 @@ export async function createMercadoPagoPreferenceAction(
       id: data.id,
       init_point: data.init_point,
       sandbox_init_point: data.sandbox_init_point,
+      checkout_url: data.checkout_url,
+      checkout_mode: data.checkout_mode,
     };
   } catch (error) {
     console.error("Error al generar preferencia de Mercado Pago:", error);
