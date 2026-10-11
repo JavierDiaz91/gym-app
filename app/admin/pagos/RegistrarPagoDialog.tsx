@@ -142,7 +142,8 @@ export function RegistrarPagoDialog({ members, plans }: Props) {
         const data = await createMercadoPagoPreferenceAction(memberId, planId);
 
         if (data.success) {
-          const checkoutUrl = data.init_point || data.sandbox_init_point;
+          const checkoutUrl =
+            data.checkout_url || data.sandbox_init_point || data.init_point;
 
           if (!checkoutUrl) {
             alert("Mercado Pago no devolvió un enlace de pago.");
