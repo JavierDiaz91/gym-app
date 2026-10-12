@@ -3109,6 +3109,25 @@ export async function assignGymSaaSPlanAction(
       return { success: false, error: "Solo podés asignar planes SaaS activos." };
     }
 
+    // No sobrescribir el período de una suscripción existente.
+    // Los cambios de plan se programarán para el siguiente ciclo mediante un flujo separado.
+    const [currentSubscription] = await sql`
+      SELECT id, plan_id, status, current_period_start, current_period_end
+      FROM gym_saas_subscriptions
+      WHERE gym_id = ${gymId}
+      LIMIT 1
+    `;
+
+    if (currentSubscription) {
+      if (Number(currentSubscription.plan_id) === planId) {
+        return { success: false, error: "Este gimnasio ya tiene asignado ese plan SaaS." };
+      }
+      return {
+        success: false,
+        error: "Este gimnasio ya tiene una suscripción. Para proteger el período vigente y las facturas emitidas, el cambio de plan debe programarse para el próximo ciclo.",
+      };
+    }
+
     const [subscription] = await sql`
       INSERT INTO gym_saas_subscriptions (
         gym_id,
