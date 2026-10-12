@@ -116,6 +116,10 @@ export default function AdminGymsClient({
   const handleStatusToggle = async (id: number, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "suspended" : "active";
 
+    const gym = gyms.find((item) => Number(item.id) === Number(id));
+    const confirmed = window.confirm(`¿Confirmás que querés ${newStatus === "suspended" ? "suspender" : "reactivar"} el gimnasio "${gym?.name || id}"? ${newStatus === "suspended" ? "Sus administradores perderán acceso mientras esté suspendido." : "Se restaurará el acceso de sus administradores."}`);
+    if (!confirmed) return;
+
     const res = (await toggleGymStatusAction(id, newStatus)) as {
       success: boolean;
       error?: string;
@@ -125,6 +129,7 @@ export default function AdminGymsClient({
       toast.success(
         `Gimnasio ${newStatus === "active" ? "activado" : "suspendido"}`
       );
+      setGyms((current) => current.map((item) => Number(item.id) === Number(id) ? { ...item, status: newStatus } : item));
       router.refresh();
     } else {
       toast.error(res?.error || "Error al cambiar estado");
@@ -284,7 +289,7 @@ export default function AdminGymsClient({
                         </select>
                         {subscription && (
                           <p className="mt-1 text-[10px] text-muted-foreground">
-                            Suscripción: {subscription.status}
+                            Suscripción: {({ active: "Activa", trial: "En prueba", past_due: "Vencida", cancelled: "Cancelada" } as Record<string, string>)[subscription.status] || subscription.status}
                           </p>
                         )}
                       </td>
