@@ -118,7 +118,7 @@ export default async function ClientesAdministradoresPage() {
                       </td>
                       <td className="py-4">{admin.plan_name || "Sin plan"}</td>
                       <td className="py-4"><Badge variant="outline">{subscriptionLabels[admin.subscription_status] || "Sin suscripción"}</Badge></td>
-                      <td className="py-4 text-muted-foreground">{admin.next_billing_date ? String(admin.next_billing_date).slice(0, 10).split("-").reverse().join("/") : "-"}</td>
+                      <td className="py-4 text-muted-foreground">{admin.next_billing_date ? new Date(admin.next_billing_date).toLocaleDateString("es-AR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" }) : "-"}</td>
                       <td className="py-4 text-muted-foreground">
                         {admin.created_at
                           ? new Date(admin.created_at).toLocaleDateString("es-AR")
