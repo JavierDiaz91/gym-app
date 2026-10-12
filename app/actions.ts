@@ -3370,3 +3370,40 @@ export async function markSaaSInvoicePaidAction(invoiceId: number) {
     return { success: false, error: "No se pudo actualizar la factura SaaS." };
   }
 }
+
+
+export async function getSaaSAuditLogAction(limit: number = 100) {
+  try {
+    await requireSuperAdminSession();
+
+    const safeLimit = Math.min(Math.max(Math.trunc(limit) || 100, 1), 250);
+
+    const events = await sql`
+      SELECT
+        l.id,
+        l.actor_user_id,
+        u.email AS actor_email,
+        l.action,
+        l.entity_type,
+        l.entity_id,
+        l.gym_id,
+        g.name AS gym_name,
+        l.details,
+        l.created_at
+      FROM saas_audit_log l
+      LEFT JOIN users u ON u.id = l.actor_user_id
+      LEFT JOIN gyms g ON g.id = l.gym_id
+      ORDER BY l.created_at DESC
+      LIMIT ${safeLimit}
+    `;
+
+    return { success: true, data: events };
+  } catch (error) {
+    console.error("Error al obtener actividad SaaS:", error);
+    return {
+      success: false,
+      data: [],
+      error: "No se pudo cargar el historial de actividad.",
+    };
+  }
+}
