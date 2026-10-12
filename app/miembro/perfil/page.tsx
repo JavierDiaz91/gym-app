@@ -7,9 +7,9 @@ import { ChangePasswordForm } from "@/components/member/change-password-form";
 
 export default async function ProfilePage() {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session || session.role !== "member" || session.gymId == null) redirect("/login");
 
-  const userId = session.user?.id || session.id || session.userId;
+  const userId = session.id;
 
   // Traer los datos reales del alumno
   let member: any = null;
@@ -24,7 +24,8 @@ export default async function ProfilePage() {
         u.email
       FROM members m
       JOIN users u ON u.id = m.user_id
-      WHERE m.user_id = ${userId} OR m.id = ${userId}
+      WHERE m.user_id = ${userId}
+        AND m.gym_id = ${session.gymId}
       LIMIT 1
     `;
     const rows = Array.isArray(result) ? result : (result as any).rows || [];

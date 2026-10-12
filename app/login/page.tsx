@@ -101,7 +101,6 @@ export default function LoginPage() {
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin text-zinc-950" />}
               Iniciar Sesión
             </Button>
-console.log("Resultado del login:", result);
             <p className="text-sm text-zinc-400 text-center">
               ¿No tenés cuenta?{" "}
               <Link href="/registro" className="text-cyan-400 hover:text-cyan-300 hover:underline font-medium transition-colors">

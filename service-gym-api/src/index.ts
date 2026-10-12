@@ -18,15 +18,27 @@ import mercadoPagoRoutes from "./routes/mercadopago.routes";
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin no permitido por CORS"));
+    },
+  })
+);
 app.use(express.json());
 
-// Verificación en consola al arrancar
-console.log("--- VARIABLES DE ENTORNO CARGADAS ---");
-console.log("MP_CLIENT_ID:", process.env.MP_CLIENT_ID);
-console.log("NEXT_PUBLIC_APP_URL:", process.env.NEXT_PUBLIC_APP_URL);
-console.log("MP_ACCESS_TOKEN:", process.env.MP_ACCESS_TOKEN ? "CARGADO CORRECTAMENTE" : "NO ENCONTRADO ❌");
-console.log("-------------------------------------");
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
 app.use("/api/memberships", membershipRoutes);
 app.use("/api/attendance", attendanceRoutes);
@@ -47,6 +59,8 @@ app.get("/miembro", (req, res) => {
   res.redirect(`${frontendUrl}/miembro?${queryParams}`);
 });
 
-app.listen(3001, () => {
-  console.log("API running on http://localhost:3001");
+const PORT = Number(process.env.PORT) || 3001;
+
+app.listen(PORT, () => {
+  console.log(`API running on port ${PORT}`);
 });

@@ -15,10 +15,9 @@ interface PageProps {
 
 export default async function MiembroRutinaPage({ searchParams }: PageProps) {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session || session.role !== "member" || session.gymId == null) redirect("/login");
 
-  const userId = session.user?.id || session.id || session.userId;
-  const userEmail = session.user?.email || "";
+  const userId = session.id;
 
   const resolvedParams = await searchParams;
   const targetRoutineId = resolvedParams?.id ? Number(resolvedParams.id) : null;
@@ -45,7 +44,11 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
   try {
     // 1. Obtener ID del miembro con fallback flexible
     const memberRes = await sql`
-  SELECT id FROM members WHERE user_id = ${userId} LIMIT 1
+  SELECT id
+  FROM members
+  WHERE user_id = ${userId}
+    AND gym_id = ${session.gymId}
+  LIMIT 1
 `;
 
     const memberRows = Array.isArray(memberRes) ? memberRes : (memberRes as any).rows || [];
@@ -59,10 +62,26 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
           COALESCE(r.title, 'Rutina de Entrenamiento') as title, 
           r.notes
         FROM routines r
-        LEFT JOIN member_routines mr ON mr.routine_id = r.id
-        LEFT JOIN members m ON m.routine_id = r.id
-        WHERE (mr.member_id = ${memberId} OR m.id = ${memberId} OR r.id = ${targetRoutineId || -1})
+        JOIN trainers t ON t.id = r.trainer_id
+        WHERE t.gym_id = ${session.gymId}
+          AND (r.is_archived IS FALSE OR r.is_archived IS NULL)
+          AND (
+            EXISTS (
+              SELECT 1
+              FROM member_routines mr
+              WHERE mr.member_id = ${memberId}
+                AND mr.routine_id = r.id
+                AND (mr.is_active IS TRUE OR mr.is_active IS NULL)
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM members m
+              WHERE m.id = ${memberId}
+                AND m.routine_id = r.id
+            )
+          )
           ${targetRoutineId ? sql`AND r.id = ${targetRoutineId}` : sql``}
+        ORDER BY r.id DESC
         LIMIT 1
       `;
 

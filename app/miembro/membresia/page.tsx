@@ -59,9 +59,9 @@ interface PaymentData {
 
 export default async function MembershipPage() {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session || session.role !== "member" || session.gymId == null) redirect("/login");
 
-  const userId = session.user?.id || session.id || session.userId;
+  const userId = session.id;
 
   let subscription: SubscriptionData | null = null;
   let payments: PaymentData[] = [];
@@ -83,7 +83,8 @@ const subResult = await sql`
   LEFT JOIN subscriptions s ON s.member_id = m.id AND s.status = 'active'
   LEFT JOIN membership_plans p_sub ON p_sub.id = s.plan_id
   LEFT JOIN membership_plans p_default ON p_default.is_active = true AND (p_default.gym_id = m.gym_id OR m.gym_id IS NULL)
-  WHERE m.user_id = ${userId} OR m.id = ${userId}
+  WHERE m.user_id = ${userId}
+    AND m.gym_id = ${session.gymId}
   ORDER BY s.end_date DESC NULLS LAST
   LIMIT 1
 `;
@@ -101,7 +102,8 @@ subscription = (subRows[0] as SubscriptionData) || null;
         p.status
       FROM payments p
       JOIN members m ON m.id = p.member_id
-      WHERE m.user_id = ${userId} OR m.id = ${userId}
+      WHERE m.user_id = ${userId}
+    AND m.gym_id = ${session.gymId}
       ORDER BY p.payment_date DESC
       LIMIT 10
     `;
@@ -181,11 +183,30 @@ subscription = (subRows[0] as SubscriptionData) || null;
             </div>
 
             {/* Componente botón de pago en el cliente */}
-            <PayButton 
+            <PayButton
               memberId={subscription?.member_id}
               planId={subscription?.plan_id}
-              planName={subscription?.plan_name || 'Plan Fitness'}
               price={subscription?.price || 0}
+            />
+          </div>
+        )}
+
+        {!isBlocked && subscription?.member_id && subscription?.plan_id && Number(subscription?.price || 0) > 0 && (
+          <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h4 className="font-bold text-foreground text-sm">
+                ¿Querés renovar tu cuota por adelantado?
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Podés generar un nuevo pago ahora y mantener tu membresía al día.
+              </p>
+            </div>
+
+            <PayButton
+              memberId={subscription.member_id}
+              planId={subscription.plan_id}
+              price={Number(subscription.price || 0)}
+              label="Renovar ahora"
             />
           </div>
         )}

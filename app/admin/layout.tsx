@@ -18,6 +18,7 @@ export default async function AdminLayout({
 
   // 2. Si es un Admin del Gimnasio, verificamos el estado real en la Base de Datos
   if (session.role === "admin") {
+    if (session.gymId == null) redirect("/login");
     const gym = await getGymStatusAction(session.gymId); 
 
     if (gym && gym.status === "suspended") {

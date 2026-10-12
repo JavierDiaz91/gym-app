@@ -12,9 +12,32 @@ import {
 import { getClasses, getClassSchedule } from "@/app/actions";
 import { Plus, Clock, Users } from "lucide-react";
 
+type ClassRow = {
+  id: number;
+  name: string;
+  description?: string;
+  duration_minutes: number;
+  max_capacity: number;
+  trainer_first_name?: string;
+  trainer_last_name?: string;
+  is_active: boolean;
+};
+
+type ScheduleRow = {
+  id: number;
+  class_name: string;
+  start_time: string;
+  duration_minutes: number;
+  trainer_first_name?: string;
+  trainer_last_name?: string;
+  booked_count: number;
+  max_capacity: number;
+};
+
+
 export default async function ClasesAdminPage() {
-  const classes = await getClasses();
-  const schedule = await getClassSchedule();
+  const classes = (await getClasses()) as ClassRow[];
+  const schedule = (await getClassSchedule()) as ScheduleRow[];
 
   return (
     <div className="space-y-8">
@@ -55,16 +78,7 @@ export default async function ClasesAdminPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {classes.map((cls: {
-                  id: number;
-                  name: string;
-                  description?: string;
-                  duration_minutes: number;
-                  max_capacity: number;
-                  trainer_first_name?: string;
-                  trainer_last_name?: string;
-                  is_active: boolean;
-                }) => (
+                {classes.map((cls) => (
                   <TableRow key={cls.id}>
                     <TableCell>
                       <div>
@@ -130,16 +144,7 @@ export default async function ClasesAdminPage() {
         <CardContent>
           {schedule.length > 0 ? (
             <div className="space-y-3">
-              {schedule.map((item: {
-                id: number;
-                class_name: string;
-                start_time: string;
-                duration_minutes: number;
-                trainer_first_name?: string;
-                trainer_last_name?: string;
-                booked_count: number;
-                max_capacity: number;
-              }) => (
+              {schedule.map((item) => (
                 <div 
                   key={item.id}
                   className="flex items-center justify-between p-4 rounded-lg border"

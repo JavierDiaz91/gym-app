@@ -14,8 +14,12 @@ import { getSession } from "@/app/actions";
 export const revalidate = 0; 
 
 export default async function TrainerDashboardPage() {
-  const session = await getSession(); 
-  const { totalAlumnos, totalRutinas } = await getTrainerStats(session?.id);
+  const session = await getSession();
+  if (!session || session.role !== "trainer") {
+    return null;
+  }
+
+  const { totalAlumnos, totalRutinas } = await getTrainerStats(session.id);
 
   const stats = [
     {
