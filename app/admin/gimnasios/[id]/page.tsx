@@ -40,7 +40,7 @@ export default async function GymDetailPage({ params }: { params: Promise<{ id: 
     sql`SELECT id, email, created_at FROM users WHERE gym_id = ${gymId} AND role = 'admin' ORDER BY created_at ASC`,
     sql`SELECT COUNT(*)::int AS total FROM members WHERE gym_id = ${gymId}`,
     sql`SELECT COUNT(*)::int AS total FROM trainers WHERE gym_id = ${gymId}`,
-    sql`SELECT gss.plan_id, gss.status, gss.current_period_start, gss.current_period_end, gss.next_billing_date, COALESCE(gss.price_override, sp.monthly_price) AS price, sp.name AS plan_name FROM gym_saas_subscriptions gss JOIN saas_plans sp ON sp.id = gss.plan_id WHERE gss.gym_id = ${gymId} LIMIT 1`,
+    sql`SELECT gss.plan_id, gss.pending_plan_id, gss.pending_plan_effective_date, gss.status, gss.current_period_start, gss.current_period_end, gss.next_billing_date, COALESCE(gss.price_override, sp.monthly_price) AS price, sp.name AS plan_name FROM gym_saas_subscriptions gss JOIN saas_plans sp ON sp.id = gss.plan_id WHERE gss.gym_id = ${gymId} LIMIT 1`,
     sql`SELECT id, period_start, period_end, amount, status, due_date, paid_at FROM saas_invoices WHERE gym_id = ${gymId} ORDER BY created_at DESC LIMIT 10`,
     sql`SELECT id, action, details, created_at FROM saas_audit_log WHERE gym_id = ${gymId} ORDER BY created_at DESC LIMIT 10`,
     getSaaSPlansAction()
@@ -54,7 +54,7 @@ export default async function GymDetailPage({ params }: { params: Promise<{ id: 
         <div><p className="text-xs font-semibold uppercase tracking-widest text-primary">Kivra SaaS · Ficha de cliente</p><h1 className="mt-2 text-3xl font-bold">{gym.name}</h1><p className="mt-1 text-sm text-muted-foreground">{gym.slug} · ID {gym.id}</p></div>
         <Badge variant="outline">{gymStates[gym.status] || gym.status}</Badge>
       </div>
-      <GymManagementActions gymId={gymId} gymName={gym.name} status={gym.status} planId={subscription?.plan_id ? Number(subscription.plan_id) : null} plans={plansResult.success ? plansResult.data.map((plan: any) => ({ id: Number(plan.id), name: String(plan.name), status: String(plan.status) })) : []} />
+      <GymManagementActions gymId={gymId} gymName={gym.name} status={gym.status} planId={subscription?.plan_id ? Number(subscription.plan_id) : null} pendingPlanId={subscription?.pending_plan_id ? Number(subscription.pending_plan_id) : null} pendingEffectiveDate={subscription?.pending_plan_effective_date ? dateOnly(subscription.pending_plan_effective_date) : null} plans={plansResult.success ? plansResult.data.map((plan: any) => ({ id: Number(plan.id), name: String(plan.name), status: String(plan.status) })) : []} />
       <div className="grid gap-4 sm:grid-cols-3">
         <Card><CardContent className="p-5"><Users className="h-5 w-5 text-primary"/><p className="mt-3 text-3xl font-bold">{membersCount[0]?.total ?? 0}</p><p className="text-sm text-muted-foreground">Alumnos</p></CardContent></Card>
         <Card><CardContent className="p-5"><Dumbbell className="h-5 w-5 text-primary"/><p className="mt-3 text-3xl font-bold">{trainersCount[0]?.total ?? 0}</p><p className="text-sm text-muted-foreground">Entrenadores</p></CardContent></Card>
