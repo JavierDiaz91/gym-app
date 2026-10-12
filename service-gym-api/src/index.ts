@@ -36,6 +36,10 @@ app.use(
 );
 app.use(express.json());
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 app.use("/api/memberships", membershipRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/members", membersRoutes);
@@ -55,6 +59,8 @@ app.get("/miembro", (req, res) => {
   res.redirect(`${frontendUrl}/miembro?${queryParams}`);
 });
 
-app.listen(3001, () => {
-  console.log("API running on http://localhost:3001");
+const PORT = Number(process.env.PORT) || 3001;
+
+app.listen(PORT, () => {
+  console.log(`API running on port ${PORT}`);
 });
