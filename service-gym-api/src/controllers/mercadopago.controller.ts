@@ -492,6 +492,7 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
     const successUrl = `${publicUrl}/api/payments/return?status=success&target=${returnTarget}`;
     const failureUrl = `${publicUrl}/api/payments/return?status=failure&target=${returnTarget}`;
     const pendingUrl = `${publicUrl}/api/payments/return?status=pending&target=${returnTarget}`;
+    const webhookUrl = `${publicUrl}/api/payments/webhook`;
 
     const mpResponse = await fetch(
       "https://api.mercadopago.com/checkout/preferences",
@@ -521,6 +522,7 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
             failure: failureUrl,
             pending: pendingUrl,
           },
+          notification_url: webhookUrl,
           auto_return: "approved",
         }),
       }
