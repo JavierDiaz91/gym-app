@@ -3278,7 +3278,7 @@ export async function generateSaaSInvoiceAction(subscriptionId: number) {
         ${subscription.current_period_end},
         ${amount},
         'pending',
-        COALESCE(${subscription.next_billing_date}, ${subscription.current_period_end}),
+        COALESCE(${subscription.next_billing_date}::date, ${subscription.current_period_end}::date),
         NOW()
       )
       RETURNING *
