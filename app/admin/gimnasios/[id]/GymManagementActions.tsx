@@ -5,16 +5,18 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Ban, CheckCircle2, CreditCard, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { assignGymSaaSPlanAction, toggleGymStatusAction } from "@/app/actions";
+import { assignGymSaaSPlanAction, scheduleGymSaaSPlanChangeAction, toggleGymStatusAction } from "@/app/actions";
 
 type Plan = { id: number; name: string; status: string };
 export default function GymManagementActions({
-  gymId, gymName, status, planId, plans,
+  gymId, gymName, status, planId, pendingPlanId, pendingEffectiveDate, plans,
 }: {
   gymId: number;
   gymName: string;
   status: string;
   planId: number | null;
+  pendingPlanId: number | null;
+  pendingEffectiveDate: string | null;
   plans: Plan[];
 }) {
   const router = useRouter();
@@ -40,12 +42,13 @@ export default function GymManagementActions({
     const id = Number(selectedPlan);
     if (!Number.isSafeInteger(id) || id <= 0 || id === planId) return;
     const plan = activePlans.find((p) => p.id === id);
+    if (pendingPlanId) { toast.error("Ya existe un cambio de plan programado."); return; }
     if (!plan || !window.confirm(`¿Asignar el plan "${plan.name}" a "${gymName}"? Esta operación puede modificar el período y el importe de futuras facturas.`)) return;
     setBusy(true);
     try {
-      const result = await assignGymSaaSPlanAction(gymId, id, "active");
+      const result = planId ? await scheduleGymSaaSPlanChangeAction(gymId, id) : await assignGymSaaSPlanAction(gymId, id, "active");
       if (!result.success) { toast.error(result.error || "No se pudo cambiar el plan."); return; }
-      toast.success("Plan SaaS actualizado");
+      toast.success(planId ? "Cambio de plan programado" : "Plan SaaS asignado");
       router.refresh();
     } catch { toast.error("Error al cambiar el plan."); }
     finally { setBusy(false); }
@@ -74,10 +77,11 @@ export default function GymManagementActions({
             {activePlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
           </select>
         </label>
-        <button onClick={changePlan} disabled={busy || !selectedPlan || Number(selectedPlan) === planId} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-          Guardar cambio de plan
+        <button onClick={changePlan} disabled={busy || !!pendingPlanId || !selectedPlan || Number(selectedPlan) === planId} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+          {planId ? "Programar cambio de plan" : "Asignar plan"}
         </button>
       </div>
+      {pendingPlanId && <p className="text-sm text-amber-500">Cambio pendiente: {activePlans.find((p) => p.id === pendingPlanId)?.name || `Plan #${pendingPlanId}`} · Vigencia prevista: {pendingEffectiveDate || "próximo período"}</p>}
       <p className="text-xs text-muted-foreground">Las operaciones requieren confirmación y utilizan las acciones protegidas del SuperAdmin.</p>
     </div>
   );
