@@ -1,7 +1,19 @@
-import { getGymsAction } from "@/app/actions";
+import { getGymsAction, getSession } from "@/app/actions";
+import { redirect } from "next/navigation";
 import AdminGymsClient from "./AdminGymsClient";
 
 export default async function AdminGymsPage() {
+  const session = await getSession();
+
+  if (!session) {
+    redirect("/login");
+  }
+
+  // Esta pantalla es exclusiva del superadmin global de Kivra.
+  if (session.role !== "superadmin") {
+    redirect("/admin");
+  }
+
   const res = await getGymsAction();
   const gyms = res.success ? res.data : [];
 
