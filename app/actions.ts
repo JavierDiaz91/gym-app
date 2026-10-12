@@ -2779,3 +2779,225 @@ export async function getPaymentsHistory() {
     return [];
   }
 }
+
+// ==================== KIVRA SAAS / SUPERADMIN ====================
+
+async function requireSuperAdminSession() {
+  const session = await getSession();
+
+  if (!session || session.role !== "superadmin") {
+    throw new Error("No autorizado.");
+  }
+
+  return session;
+}
+
+export async function getSaaSPlansAction() {
+  try {
+    await requireSuperAdminSession();
+
+    const plans = await sql`
+      SELECT
+        id,
+        name,
+        description,
+        monthly_price,
+        max_members,
+        max_trainers,
+        status,
+        created_at,
+        updated_at
+      FROM saas_plans
+      ORDER BY id ASC
+    `;
+
+    return { success: true, data: plans };
+  } catch (error) {
+    console.error("Error al obtener planes SaaS:", error);
+    return { success: false, data: [], error: "No se pudieron cargar los planes SaaS." };
+  }
+}
+
+export async function createSaaSPlanAction(input: {
+  name: string;
+  description?: string;
+  monthlyPrice?: number | null;
+  maxMembers?: number | null;
+  maxTrainers?: number | null;
+  status?: "draft" | "active" | "archived";
+}) {
+  try {
+    const session = await requireSuperAdminSession();
+
+    const name = input.name?.trim();
+    if (!name) {
+      return { success: false, error: "El nombre del plan es obligatorio." };
+    }
+
+    const status = input.status || "draft";
+    if (!["draft", "active", "archived"].includes(status)) {
+      return { success: false, error: "Estado de plan inválido." };
+    }
+
+    const monthlyPrice =
+      input.monthlyPrice == null || Number.isNaN(Number(input.monthlyPrice))
+        ? null
+        : Number(input.monthlyPrice);
+
+    const maxMembers =
+      input.maxMembers == null || Number.isNaN(Number(input.maxMembers))
+        ? null
+        : Math.max(0, Math.trunc(Number(input.maxMembers)));
+
+    const maxTrainers =
+      input.maxTrainers == null || Number.isNaN(Number(input.maxTrainers))
+        ? null
+        : Math.max(0, Math.trunc(Number(input.maxTrainers)));
+
+    const [plan] = await sql`
+      INSERT INTO saas_plans (
+        name,
+        description,
+        monthly_price,
+        max_members,
+        max_trainers,
+        status,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${name},
+        ${input.description?.trim() || null},
+        ${monthlyPrice},
+        ${maxMembers},
+        ${maxTrainers},
+        ${status},
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+    `;
+
+    await sql`
+      INSERT INTO saas_audit_log (
+        actor_user_id,
+        action,
+        entity_type,
+        entity_id,
+        details
+      )
+      VALUES (
+        ${session.id},
+        'saas_plan_created',
+        'saas_plan',
+        ${String(plan.id)},
+        ${JSON.stringify({ name: plan.name, status: plan.status })}::jsonb
+      )
+    `;
+
+    revalidatePath("/admin/planes-saas");
+    revalidatePath("/admin/actividad");
+
+    return { success: true, data: plan };
+  } catch (error: any) {
+    console.error("Error al crear plan SaaS:", error);
+
+    if (error?.code === "23505") {
+      return { success: false, error: "Ya existe un plan SaaS con ese nombre." };
+    }
+
+    return { success: false, error: "No se pudo crear el plan SaaS." };
+  }
+}
+
+export async function updateSaaSPlanAction(
+  id: number,
+  input: {
+    name: string;
+    description?: string;
+    monthlyPrice?: number | null;
+    maxMembers?: number | null;
+    maxTrainers?: number | null;
+    status: "draft" | "active" | "archived";
+  }
+) {
+  try {
+    const session = await requireSuperAdminSession();
+
+    if (!Number.isFinite(id) || id <= 0) {
+      return { success: false, error: "Plan inválido." };
+    }
+
+    const name = input.name?.trim();
+    if (!name) {
+      return { success: false, error: "El nombre del plan es obligatorio." };
+    }
+
+    if (!["draft", "active", "archived"].includes(input.status)) {
+      return { success: false, error: "Estado de plan inválido." };
+    }
+
+    const monthlyPrice =
+      input.monthlyPrice == null || Number.isNaN(Number(input.monthlyPrice))
+        ? null
+        : Number(input.monthlyPrice);
+
+    const maxMembers =
+      input.maxMembers == null || Number.isNaN(Number(input.maxMembers))
+        ? null
+        : Math.max(0, Math.trunc(Number(input.maxMembers)));
+
+    const maxTrainers =
+      input.maxTrainers == null || Number.isNaN(Number(input.maxTrainers))
+        ? null
+        : Math.max(0, Math.trunc(Number(input.maxTrainers)));
+
+    const [plan] = await sql`
+      UPDATE saas_plans
+      SET
+        name = ${name},
+        description = ${input.description?.trim() || null},
+        monthly_price = ${monthlyPrice},
+        max_members = ${maxMembers},
+        max_trainers = ${maxTrainers},
+        status = ${input.status},
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    if (!plan) {
+      return { success: false, error: "Plan SaaS no encontrado." };
+    }
+
+    await sql`
+      INSERT INTO saas_audit_log (
+        actor_user_id,
+        action,
+        entity_type,
+        entity_id,
+        details
+      )
+      VALUES (
+        ${session.id},
+        'saas_plan_updated',
+        'saas_plan',
+        ${String(id)},
+        ${JSON.stringify({ name: plan.name, status: plan.status })}::jsonb
+      )
+    `;
+
+    revalidatePath("/admin/planes-saas");
+    revalidatePath("/admin/actividad");
+
+    return { success: true, data: plan };
+  } catch (error: any) {
+    console.error("Error al actualizar plan SaaS:", error);
+
+    if (error?.code === "23505") {
+      return { success: false, error: "Ya existe otro plan SaaS con ese nombre." };
+    }
+
+    return { success: false, error: "No se pudo actualizar el plan SaaS." };
+  }
+}
