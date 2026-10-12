@@ -62,7 +62,7 @@ export default function GymManagementActions({
         <Link href="/admin/facturacion" className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm hover:bg-secondary">
           <CreditCard className="h-4 w-4" /> Ir a facturación
         </Link>
-        <Link href="/admin/clientes" className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm hover:bg-secondary">
+        <Link href={`/admin/clientes?gym_id=${gymId}`} className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm hover:bg-secondary">
           <CheckCircle2 className="h-4 w-4" /> Ver administradores
         </Link>
       </div>
