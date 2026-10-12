@@ -18,7 +18,7 @@ export default async function ClientesAdministradoresPage({ searchParams }: { se
   if (session.role !== "superadmin") redirect("/admin");
 
   const { gym_id } = await searchParams;
-  const selectedGymId = gym_id && /^\\d+$/.test(gym_id) ? Number(gym_id) : null;
+  const selectedGymId = gym_id && /^\d+$/.test(gym_id) ? Number(gym_id) : null;
   const gymFilter = selectedGymId && Number.isSafeInteger(selectedGymId) && selectedGymId > 0 ? selectedGymId : null;
   const admins = await sql`
     SELECT
