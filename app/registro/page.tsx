@@ -1,15 +1,40 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Activity, Loader2, CheckCircle2, QrCode } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  CreditCard,
+  Dumbbell,
+  Loader2,
+  QrCode,
+  Sparkles,
+} from "lucide-react";
 import { registerUser } from "@/app/actions";
+
+const benefits = [
+  {
+    icon: CheckCircle2,
+    title: "Membresía siempre visible",
+    description: "Consultá tu estado y vigencia desde tu cuenta.",
+  },
+  {
+    icon: CreditCard,
+    title: "Pagos e historial",
+    description: "Revisá tus movimientos de forma simple.",
+  },
+  {
+    icon: Dumbbell,
+    title: "Rutinas y clases",
+    description: "Accedé a tu entrenamiento y actividades asignadas.",
+  },
+];
 
 function RegisterForm() {
   const [error, setError] = useState("");
@@ -17,7 +42,7 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Obtiene el ID del gimnasio desde la URL del QR (/registro?gym=ID)
+  // El QR de cada gimnasio abre /registro?gym=ID.
   const gymId = searchParams.get("gym");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -26,7 +51,6 @@ function RegisterForm() {
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirmPassword") as string;
 
@@ -52,211 +76,214 @@ function RegisterForm() {
     }
   }
 
-  const benefits = [
-    "Acceso a instalaciones completas",
-    "Planes adaptados a tu ritmo",
-    "Seguimiento personalizado",
-    "Reserva y consulta de clases",
-  ];
-
   return (
-    <div className="min-h-screen flex bg-[#0d0f12] text-gray-100">
-      {/* Left Side - Hero Panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#12151a] p-12 flex-col justify-between relative overflow-hidden border-r border-gray-800/60">
-        <div className="absolute inset-0 z-0 opacity-20">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#00aeef] rounded-full blur-[120px]" />
-        </div>
+    <main className="min-h-screen bg-[#090b10] text-white">
+      <div className="grid min-h-screen lg:grid-cols-[1.05fr_.95fr]">
+        <section className="relative hidden overflow-hidden border-r border-white/[0.06] p-10 lg:flex lg:flex-col xl:p-14">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute left-10 top-20 h-80 w-80 rounded-full bg-violet-600/20 blur-[120px]" />
+            <div className="absolute bottom-12 right-4 h-72 w-72 rounded-full bg-cyan-500/10 blur-[120px]" />
+          </div>
 
-        <div className="relative z-10">
-          <Link href="/" className="inline-flex items-center gap-3">
-            <div className="w-12 h-12 bg-[#00aeef]/10 border border-[#00aeef]/30 rounded-xl flex items-center justify-center shadow-lg shadow-[#00aeef]/10">
-              <Activity className="w-6 h-6 text-[#00aeef]" />
+          <Link href="/" className="relative inline-flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05]">
+              <Sparkles className="h-5 w-5 text-violet-200" />
             </div>
-            <span 
-              className="text-2xl font-extrabold text-white tracking-tight"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Pulse<span className="text-[#00aeef]">Fit</span>
-            </span>
+            <div>
+              <span className="block text-xl font-semibold tracking-[-0.04em]">Kivra</span>
+              <span className="mt-1 block text-[10px] uppercase tracking-[0.16em] text-zinc-600">
+                Gym Management
+              </span>
+            </div>
           </Link>
-        </div>
 
-        <div className="relative z-10 max-w-lg my-auto py-12">
-          <span className="text-[#00aeef] font-bold uppercase tracking-wider text-xs bg-[#00aeef]/10 border border-[#00aeef]/20 px-3.5 py-1.5 rounded-full inline-block mb-6">
-            Comenzá Hoy
-          </span>
+          <div className="relative my-auto max-w-xl py-14">
+            <p className="text-sm font-medium text-violet-200">Tu gimnasio ya usa Kivra.</p>
+            <h1 className="mt-5 text-5xl font-semibold leading-[1.03] tracking-[-0.055em] xl:text-6xl">
+              Tu experiencia,
+              <span className="block text-zinc-500">también conectada.</span>
+            </h1>
+            <p className="mt-6 max-w-lg text-lg leading-8 text-zinc-500">
+              Registrate desde el QR de tu gimnasio y accedé a la información de tu membresía desde un solo lugar.
+            </p>
 
-          <h1 
-            className="text-4xl sm:text-5xl font-black text-white mb-6 leading-tight tracking-tight"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            Tu Cambio Empieza <br />
-            <span className="text-[#00aeef]">Con Un Clic.</span>
-          </h1>
-
-          <p className="text-lg text-gray-400 mb-8 leading-relaxed">
-            Sumate a la comunidad y empezá a entrenar con las mejores herramientas y acompañamiento.
-          </p>
-
-          <ul className="space-y-4">
-            {benefits.map((benefit) => (
-              <li key={benefit} className="flex items-center gap-3 text-gray-300">
-                <div className="w-6 h-6 rounded-full bg-[#00aeef]/10 border border-[#00aeef]/30 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle2 className="w-4 h-4 text-[#00aeef]" />
+            <div className="mt-10 grid gap-4">
+              {benefits.map(({ icon: Icon, title, description }) => (
+                <div key={title} className="flex gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-400/15 bg-violet-400/[0.06]">
+                    <Icon className="h-4 w-4 text-violet-200" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-zinc-200">{title}</p>
+                    <p className="mt-1 text-sm leading-6 text-zinc-600">{description}</p>
+                  </div>
                 </div>
-                <span className="text-base font-medium">{benefit}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="relative z-10 text-xs text-gray-600">
-          &copy; {new Date().getFullYear()} Kivra. Todos los derechos reservados.
-        </div>
-      </div>
-
-      {/* Right Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-[#0a0c0e]">
-        <Card className="w-full max-w-md border border-gray-800/80 shadow-2xl rounded-2xl bg-[#14171d] text-gray-100 p-2">
-          <CardHeader className="text-center pb-6">
-            <div className="flex items-center justify-center gap-2 mb-3">
-              <div className="w-12 h-12 bg-[#00aeef]/10 border border-[#00aeef]/30 rounded-xl flex items-center justify-center">
-                <Activity className="w-6 h-6 text-[#00aeef]" />
-              </div>
+              ))}
             </div>
-            <CardTitle 
-              className="text-2xl font-extrabold text-white" 
-              style={{ fontFamily: "var(--font-heading)" }}
+          </div>
+
+          <p className="relative text-xs text-zinc-700">&copy; {new Date().getFullYear()} Kivra</p>
+        </section>
+
+        <section className="flex items-center justify-center px-5 py-10 sm:px-10">
+          <div className="w-full max-w-md">
+            <div className="mb-10 flex items-center justify-between lg:hidden">
+              <Link href="/" className="flex items-center gap-2 text-lg font-semibold">
+                <Sparkles className="h-5 w-5 text-violet-300" />
+                Kivra
+              </Link>
+            </div>
+
+            <Link
+              href="/"
+              className="mb-10 flex w-fit items-center gap-2 text-sm text-zinc-600 transition-colors hover:text-zinc-300"
             >
-              Crear Cuenta
-            </CardTitle>
-            <CardDescription className="text-gray-400 text-sm">
-              Ingresá tus datos para acceder a <span className="text-[#00aeef] font-medium">Kivra</span>
-            </CardDescription>
-          </CardHeader>
+              <ArrowLeft className="h-4 w-4" />
+              Volver al inicio
+            </Link>
 
-          {/* Validación de QR de Gimnasio */}
-          {!gymId ? (
-            <CardContent className="space-y-4 text-center py-6">
-              <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
-                <QrCode className="w-8 h-8" />
-              </div>
-              <h3 className="text-lg font-bold text-white">Escaneá el código QR de tu gimnasio</h3>
-              <p className="text-sm text-gray-400">
-                Para vincular tu cuenta correctamente, necesitás registrarte escaneando el código QR presente en las instalaciones de tu gimnasio.
-              </p>
-            </CardContent>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              {/* Se pasa el id del gym capturado directamente desde la URL del QR */}
-              <input type="hidden" name="gym_id" value={gymId} />
+            {!gymId ? (
+              <div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-400/15 bg-amber-400/[0.06]">
+                  <QrCode className="h-5 w-5 text-amber-200" />
+                </div>
+                <p className="mt-7 text-sm font-medium text-violet-200">Registro de miembros</p>
+                <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">
+                  Necesitás el QR de tu gimnasio
+                </h2>
+                <p className="mt-4 text-sm leading-6 text-zinc-500">
+                  Cada gimnasio tiene su propio código QR. Escanealo desde las instalaciones para abrir el registro correcto y vincular tu cuenta automáticamente.
+                </p>
 
-              <CardContent className="space-y-4">
-                {error && (
-                  <Alert variant="destructive" className="rounded-xl bg-red-500/10 border-red-500/30 text-red-400">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="name" className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                    Nombre Completo
-                  </Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    type="text"
-                    placeholder="Juan Pérez"
-                    className="rounded-xl bg-[#0d0f12] border-gray-800 text-white placeholder:text-gray-600 focus-visible:ring-[#00aeef] focus-visible:border-[#00aeef] h-11"
-                    required
-                  />
+                <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5">
+                  <p className="text-sm font-medium text-zinc-300">¿Por qué usamos un QR?</p>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600">
+                    El enlace incluye el identificador del gimnasio y evita que tu cuenta quede asociada a otra sucursal o empresa.
+                  </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="email" className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                    Correo electrónico
-                  </Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    className="rounded-xl bg-[#0d0f12] border-gray-800 text-white placeholder:text-gray-600 focus-visible:ring-[#00aeef] focus-visible:border-[#00aeef] h-11"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="phone" className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                    Teléfono (opcional)
-                  </Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    placeholder="(3492) 12-3456"
-                    className="rounded-xl bg-[#0d0f12] border-gray-800 text-white placeholder:text-gray-600 focus-visible:ring-[#00aeef] focus-visible:border-[#00aeef] h-11"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="password" className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                      Contraseña
-                    </Label>
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      placeholder="******"
-                      className="rounded-xl bg-[#0d0f12] border-gray-800 text-white placeholder:text-gray-600 focus-visible:ring-[#00aeef] focus-visible:border-[#00aeef] h-11"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="confirmPassword" className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                      Confirmar
-                    </Label>
-                    <Input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type="password"
-                      placeholder="******"
-                      className="rounded-xl bg-[#0d0f12] border-gray-800 text-white placeholder:text-gray-600 focus-visible:ring-[#00aeef] focus-visible:border-[#00aeef] h-11"
-                      required
-                    />
-                  </div>
-                </div>
-              </CardContent>
-
-              <CardFooter className="flex flex-col gap-4 pt-4">
-                <Button 
-                  type="submit" 
-                  className="w-full bg-[#00aeef] hover:bg-[#0098d4] text-black font-bold h-12 rounded-xl shadow-lg shadow-[#00aeef]/20 text-base transition-all" 
-                  disabled={loading}
-                >
-                  {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin text-black" />}
-                  Crear Cuenta
+                <Button asChild className="mt-6 h-12 w-full rounded-xl bg-white font-semibold text-zinc-950 hover:bg-zinc-200">
+                  <Link href="/login">Ya tengo una cuenta</Link>
                 </Button>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm font-medium text-violet-200">Registro de miembro</p>
+                <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Creá tu cuenta en Kivra</h2>
+                <p className="mt-3 text-sm leading-6 text-zinc-500">
+                  Tus datos quedarán vinculados al gimnasio desde el que escaneaste el QR.
+                </p>
 
-                <p className="text-sm text-gray-400 text-center">
+                <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                  <input type="hidden" name="gym_id" value={gymId} />
+
+                  {error && (
+                    <Alert
+                      variant="destructive"
+                      className="rounded-xl border-rose-500/20 bg-rose-500/[0.08] text-rose-300"
+                    >
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm text-zinc-300">
+                      Nombre completo
+                    </Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      type="text"
+                      placeholder="Juan Pérez"
+                      required
+                      className="h-12 rounded-xl border-white/[0.08] bg-white/[0.035] text-white placeholder:text-zinc-700 focus-visible:border-violet-400/40 focus-visible:ring-violet-400/20"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm text-zinc-300">
+                      Correo electrónico
+                    </Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="nombre@correo.com"
+                      required
+                      className="h-12 rounded-xl border-white/[0.08] bg-white/[0.035] text-white placeholder:text-zinc-700 focus-visible:border-violet-400/40 focus-visible:ring-violet-400/20"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-sm text-zinc-300">
+                      Teléfono <span className="text-zinc-600">(opcional)</span>
+                    </Label>
+                    <Input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      placeholder="3492 123456"
+                      className="h-12 rounded-xl border-white/[0.08] bg-white/[0.035] text-white placeholder:text-zinc-700 focus-visible:border-violet-400/40 focus-visible:ring-violet-400/20"
+                    />
+                  </div>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-sm text-zinc-300">
+                        Contraseña
+                      </Label>
+                      <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                        placeholder="Mínimo 6 caracteres"
+                        required
+                        className="h-12 rounded-xl border-white/[0.08] bg-white/[0.035] text-white placeholder:text-zinc-700 focus-visible:border-violet-400/40 focus-visible:ring-violet-400/20"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword" className="text-sm text-zinc-300">
+                        Confirmar
+                      </Label>
+                      <Input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type="password"
+                        placeholder="Repetí la contraseña"
+                        required
+                        className="h-12 rounded-xl border-white/[0.08] bg-white/[0.035] text-white placeholder:text-zinc-700 focus-visible:border-violet-400/40 focus-visible:ring-violet-400/20"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="h-12 w-full rounded-xl bg-white font-semibold text-zinc-950 hover:bg-zinc-200"
+                    disabled={loading}
+                  >
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Crear cuenta
+                  </Button>
+                </form>
+
+                <p className="mt-7 text-center text-sm text-zinc-600">
                   ¿Ya tenés cuenta?{" "}
-                  <Link href="/login" className="text-[#00aeef] hover:underline font-semibold">
+                  <Link href="/login" className="font-medium text-violet-200 hover:text-violet-100">
                     Iniciá sesión
                   </Link>
                 </p>
-              </CardFooter>
-            </form>
-          )}
-        </Card>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
 
 export default function RegistroPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0d0f12]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#090b10]" />}>
       <RegisterForm />
     </Suspense>
   );
