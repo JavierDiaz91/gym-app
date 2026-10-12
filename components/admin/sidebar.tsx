@@ -64,7 +64,7 @@ export function AdminSidebar({ userRole = "admin" }: AdminSidebarProps) {
                 className="font-bold text-lg leading-tight block tracking-wide text-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
-                FitZone
+                Kivra
               </span>
               <span className="text-[11px] font-medium text-primary uppercase tracking-widest block">
                 {userRole === "superadmin" ? "SuperAdmin SaaS" : "Panel Admin"}

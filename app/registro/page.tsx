@@ -111,7 +111,7 @@ function RegisterForm() {
         </div>
 
         <div className="relative z-10 text-xs text-gray-600">
-          &copy; {new Date().getFullYear()} PulseFit. Todos los derechos reservados.
+          &copy; {new Date().getFullYear()} Kivra. Todos los derechos reservados.
         </div>
       </div>
 
@@ -131,7 +131,7 @@ function RegisterForm() {
               Crear Cuenta
             </CardTitle>
             <CardDescription className="text-gray-400 text-sm">
-              Ingresá tus datos para acceder a <span className="text-[#00aeef] font-medium">PulseFit</span>
+              Ingresá tus datos para acceder a <span className="text-[#00aeef] font-medium">Kivra</span>
             </CardDescription>
           </CardHeader>
 

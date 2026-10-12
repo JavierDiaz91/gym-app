@@ -1,6 +1,6 @@
 {
-  "name": "FitZone - Trainer Hub",
-  "short_name": "FitZone",
+  "name": "Kivra - Trainer Hub",
+  "short_name": "Kivra",
   "description": "Plataforma de entrenamiento y gestión de rutinas",
   "start_url": "/miembro/rutina",
   "display": "standalone",

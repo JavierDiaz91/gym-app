@@ -69,27 +69,27 @@ export function CreateTrainerModal({ buttonText = "Nuevo Entrenador", variant = 
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="last_name">Apellido</Label>
-              <Input id="last_name" name="last_name" required placeholder="Gómez" />
+              <Input id="last_name" name="last_name" required placeholder="GÃ³mez" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="email">Correo electrónico</Label>
-            <Input id="email" name="email" type="email" required placeholder="lucas@fitzone.com" />
+            <Label htmlFor="email">Correo electrÃ³nico</Label>
+            <Input id="email" name="email" type="email" required placeholder="entrenador@correo.com" />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="password">Contraseña inicial</Label>
+            <Label htmlFor="password">ContraseÃ±a inicial</Label>
             <Input id="password" name="password" type="password" required defaultValue="123456" />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="specialization">Especialización</Label>
-            <Input id="specialization" name="specialization" placeholder="Musculación / Hipertrofia" />
+            <Label htmlFor="specialization">EspecializaciÃ³n</Label>
+            <Input id="specialization" name="specialization" placeholder="MusculaciÃ³n / Hipertrofia" />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="bio">Biografía / Notas</Label>
+            <Label htmlFor="bio">BiografÃ­a / Notas</Label>
             <Textarea id="bio" name="bio" rows={2} placeholder="Experiencia..." className="resize-none" />
           </div>
 

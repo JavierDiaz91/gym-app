@@ -176,7 +176,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
           ¡Hola, {memberData?.first_name || "Atleta"}! 👋
         </h1>
         <p className="text-muted-foreground mt-1">
-          Bienvenido a tu panel general de FitZone.
+          Bienvenido a tu panel general de Kivra.
         </p>
       </div>
 
