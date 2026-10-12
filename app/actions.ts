@@ -2033,6 +2033,18 @@ export async function createGymAction(formData: any): Promise<{
 }
 export async function toggleGymStatusAction(gymId: number, newStatus: string) {
   try {
+    const session = await requireSuperAdminSession();
+
+    if (!Number.isSafeInteger(gymId) || gymId <= 0 || !["active", "suspended"].includes(newStatus)) {
+      return { success: false, error: "Datos de gimnasio o estado inválidos." };
+    }
+
+    const [gym] = await sql`
+      SELECT id, name, status FROM gyms WHERE id = ${gymId} LIMIT 1
+    `;
+    if (!gym) return { success: false, error: "Gimnasio no encontrado." };
+    if (gym.status === newStatus) return { success: true };
+
     const res = await fetch(apiUrl(`/gyms/${gymId}/status`), {
       method: "PATCH",
       headers: await getApiAuthHeaders(),
@@ -2040,19 +2052,38 @@ export async function toggleGymStatusAction(gymId: number, newStatus: string) {
       cache: "no-store",
     });
 
-    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: "No se pudo actualizar el estado del gimnasio." };
+    }
 
+    const data = await res.json();
     if (data.success) {
-      // Invalida la caché del Server Component para esta ruta
+      try {
+        await sql`
+          INSERT INTO saas_audit_log (actor_user_id, action, entity_type, entity_id, gym_id, details)
+          VALUES (
+            ${session.id},
+            'gym_status_changed',
+            'gym',
+            ${String(gymId)},
+            ${gymId},
+            ${JSON.stringify({ gymName: gym.name, previousStatus: gym.status, newStatus })}::jsonb
+          )
+        `;
+      } catch (auditError) {
+        console.error("El gimnasio cambió de estado, pero falló el registro de auditoría:", auditError);
+      }
       revalidatePath("/admin/gimnasios");
+      revalidatePath("/admin/clientes");
+      revalidatePath("/admin/actividad");
     }
 
     return data;
   } catch (error) {
+    console.error("Error al actualizar estado del gimnasio:", error);
     return { success: false, error: "Error al actualizar estado" };
   }
 }
-
 
 
 export async function getGymsAction() {
