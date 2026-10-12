@@ -5,6 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Mail, ShieldCheck, UsersRound } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
+const subscriptionLabels: Record<string, string> = {
+  active: "Activa", trial: "En prueba", past_due: "Vencida", cancelled: "Cancelada",
+};
+
 export default async function ClientesAdministradoresPage() {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -18,9 +24,14 @@ export default async function ClientesAdministradoresPage() {
       u.updated_at,
       u.gym_id,
       g.name AS gym_name,
-      g.status AS gym_status
+      g.status AS gym_status,
+      sp.name AS plan_name,
+      gss.status AS subscription_status,
+      gss.next_billing_date
     FROM users u
     LEFT JOIN gyms g ON g.id = u.gym_id
+    LEFT JOIN gym_saas_subscriptions gss ON gss.gym_id = g.id
+    LEFT JOIN saas_plans sp ON sp.id = gss.plan_id
     WHERE u.role = 'admin'
     ORDER BY u.created_at DESC
   `;
@@ -80,6 +91,9 @@ export default async function ClientesAdministradoresPage() {
                     <th className="pb-3">Administrador</th>
                     <th className="pb-3">Gimnasio</th>
                     <th className="pb-3">Estado</th>
+                    <th className="pb-3">Plan SaaS</th>
+                    <th className="pb-3">Suscripción</th>
+                    <th className="pb-3">Próximo cobro</th>
                     <th className="pb-3">Alta</th>
                   </tr>
                 </thead>
@@ -102,6 +116,9 @@ export default async function ClientesAdministradoresPage() {
                             : "Sin tenant"}
                         </Badge>
                       </td>
+                      <td className="py-4">{admin.plan_name || "Sin plan"}</td>
+                      <td className="py-4"><Badge variant="outline">{subscriptionLabels[admin.subscription_status] || "Sin suscripción"}</Badge></td>
+                      <td className="py-4 text-muted-foreground">{admin.next_billing_date ? String(admin.next_billing_date).slice(0, 10).split("-").reverse().join("/") : "-"}</td>
                       <td className="py-4 text-muted-foreground">
                         {admin.created_at
                           ? new Date(admin.created_at).toLocaleDateString("es-AR")
