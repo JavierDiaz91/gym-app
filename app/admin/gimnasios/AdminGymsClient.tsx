@@ -1,24 +1,77 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Plus, Search, ShieldCheck, Ban, Users, Dumbbell } from "lucide-react";
+import {
+  Ban,
+  Building2,
+  Dumbbell,
+  Plus,
+  Search,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
-import { createGymAction, toggleGymStatusAction } from "@/app/actions";
+import {
+  assignGymSaaSPlanAction,
+  createGymAction,
+  toggleGymStatusAction,
+} from "@/app/actions";
 
-export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] }) {
+type SaaSPlan = {
+  id: number;
+  name: string;
+  status: string;
+  monthly_price: number | string | null;
+};
+
+type SaaSSubscription = {
+  gym_id: number;
+  plan_id: number;
+  plan_name: string;
+  status: string;
+  next_billing_date: string | null;
+};
+
+export default function AdminGymsClient({
+  initialGyms,
+  initialPlans,
+  initialSubscriptions,
+}: {
+  initialGyms: any[];
+  initialPlans: SaaSPlan[];
+  initialSubscriptions: SaaSSubscription[];
+}) {
   const router = useRouter();
 
-  // Estado local derivado de props
-  const [gyms, setGyms] = useState<any[]>(Array.isArray(initialGyms) ? initialGyms : []);
+  const [gyms, setGyms] = useState<any[]>(
+    Array.isArray(initialGyms) ? initialGyms : []
+  );
+  const [subscriptions, setSubscriptions] = useState<SaaSSubscription[]>(
+    Array.isArray(initialSubscriptions) ? initialSubscriptions : []
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [savingGymId, setSavingGymId] = useState<number | null>(null);
 
-  // Sincronizar el estado cliente cuando initialGyms cambia en el servidor
   useEffect(() => {
     setGyms(Array.isArray(initialGyms) ? initialGyms : []);
   }, [initialGyms]);
+
+  useEffect(() => {
+    setSubscriptions(
+      Array.isArray(initialSubscriptions) ? initialSubscriptions : []
+    );
+  }, [initialSubscriptions]);
+
+  const activePlans = useMemo(
+    () =>
+      (Array.isArray(initialPlans) ? initialPlans : []).filter(
+        (plan) => plan.status === "active"
+      ),
+    [initialPlans]
+  );
 
   const [form, setForm] = useState({
     name: "",
@@ -43,12 +96,17 @@ export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] })
     if (res?.success) {
       toast.success("¡Gimnasio creado con éxito!", { id: toastId });
       setIsModalOpen(false);
-      setForm({ name: "", slug: "", adminEmail: "", adminPasswordHash: "" });
-      
-      // Actualización optimista + Refresh del servidor
+      setForm({
+        name: "",
+        slug: "",
+        adminEmail: "",
+        adminPasswordHash: "",
+      });
+
       if (res.data?.gym) {
         setGyms((prev) => [res.data.gym, ...prev]);
       }
+
       router.refresh();
     } else {
       toast.error(res?.error || "Error al registrar gimnasio", { id: toastId });
@@ -56,20 +114,58 @@ export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] })
   };
 
   const handleStatusToggle = async (id: number, currentStatus: string) => {
-  const newStatus = currentStatus === "active" ? "suspended" : "active";
+    const newStatus = currentStatus === "active" ? "suspended" : "active";
 
-  const res = (await toggleGymStatusAction(id, newStatus)) as {
-    success: boolean;
-    error?: string;
+    const res = (await toggleGymStatusAction(id, newStatus)) as {
+      success: boolean;
+      error?: string;
+    };
+
+    if (res?.success) {
+      toast.success(
+        `Gimnasio ${newStatus === "active" ? "activado" : "suspendido"}`
+      );
+      router.refresh();
+    } else {
+      toast.error(res?.error || "Error al cambiar estado");
+    }
   };
 
-  if (res?.success) {
-    toast.success(`Gimnasio ${newStatus === "active" ? "activado" : "suspendido"}`);
-    // Le pedimos a Next.js que re-ejecute el GET en el servidor
-    router.refresh(); 
-  } else {
-    toast.error(res?.error || "Error al cambiar estado");
-  }
+  const handlePlanChange = async (gymId: number, planIdRaw: string) => {
+    const planId = Number(planIdRaw);
+    if (!Number.isFinite(planId) || planId <= 0) return;
+
+    setSavingGymId(gymId);
+
+    const result = await assignGymSaaSPlanAction(gymId, planId, "active");
+
+    setSavingGymId(null);
+
+    if (!result.success) {
+      toast.error(result.error || "No se pudo asignar el plan.");
+      return;
+    }
+
+    const selectedPlan = activePlans.find((plan) => plan.id === planId);
+
+    setSubscriptions((current) => {
+      const existing = current.find((item) => item.gym_id === gymId);
+
+      const updated: SaaSSubscription = {
+        gym_id: gymId,
+        plan_id: planId,
+        plan_name: selectedPlan?.name || "Plan",
+        status: "active",
+        next_billing_date: null,
+      };
+
+      return existing
+        ? current.map((item) => (item.gym_id === gymId ? updated : item))
+        : [...current, updated];
+    });
+
+    toast.success("Plan SaaS asignado al gimnasio.");
+    router.refresh();
   };
 
   const filteredGyms = (Array.isArray(gyms) ? gyms : []).filter(
@@ -78,9 +174,12 @@ export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] })
       g?.slug?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const subscriptionByGym = new Map(
+    subscriptions.map((subscription) => [subscription.gym_id, subscription])
+  );
+
   return (
     <div className="space-y-4">
-      {/* Barra de Búsqueda y Acción */}
       <div className="flex items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -101,7 +200,13 @@ export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] })
         </button>
       </div>
 
-      {/* Tabla de Gimnasios */}
+      {activePlans.length === 0 && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-300">
+          No hay planes SaaS activos. Activá al menos uno desde Planes SaaS antes
+          de asignarlo a un gimnasio.
+        </div>
+      )}
+
       <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -111,6 +216,7 @@ export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] })
                 <th className="p-4">Slug / Identificador</th>
                 <th className="p-4 text-center">Alumnos</th>
                 <th className="p-4 text-center">Entrenadores</th>
+                <th className="p-4">Plan SaaS</th>
                 <th className="p-4 text-center">Estado</th>
                 <th className="p-4 text-right">Acciones</th>
               </tr>
@@ -118,72 +224,124 @@ export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] })
             <tbody className="divide-y divide-border">
               {filteredGyms.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground italic">
+                  <td
+                    colSpan={7}
+                    className="p-8 text-center text-muted-foreground italic"
+                  >
                     No se encontraron gimnasios registrados.
                   </td>
                 </tr>
               ) : (
-                filteredGyms.map((gym) => (
-                  <tr key={gym.id} className="hover:bg-secondary/30 transition-colors">
-                    <td className="p-4 font-bold text-foreground flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-[#00aeef]/10 text-[#00aeef] border border-[#00aeef]/20 flex items-center justify-center font-bold">
-                        <Building2 className="w-4 h-4" />
-                      </div>
-                      {gym.name}
-                    </td>
-                    <td className="p-4 font-mono text-muted-foreground">{gym.slug}</td>
-                    <td className="p-4 text-center">
-                      <span className="inline-flex items-center gap-1 font-semibold text-foreground bg-secondary px-2 py-0.5 rounded-md border border-border">
-                        <Users className="w-3 h-3 text-[#00aeef]" />
-                        {gym.total_members || 0}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className="inline-flex items-center gap-1 font-semibold text-foreground bg-secondary px-2 py-0.5 rounded-md border border-border">
-                        <Dumbbell className="w-3 h-3 text-amber-500" />
-                        {gym.total_trainers || 0}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          gym.status === "active"
-                            ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                            : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                        }`}
-                      >
-                        {gym.status === "active" ? "Activo" : "Suspendido"}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <button
-                        onClick={() => handleStatusToggle(gym.id, gym.status)}
-                        className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                          gym.status === "active"
-                            ? "text-rose-500 border-rose-500/20 hover:bg-rose-500/10"
-                            : "text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/10"
-                        }`}
-                        title={gym.status === "active" ? "Suspender Gimnasio" : "Activar Gimnasio"}
-                      >
-                        {gym.status === "active" ? <Ban className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                filteredGyms.map((gym) => {
+                  const subscription = subscriptionByGym.get(Number(gym.id));
+
+                  return (
+                    <tr
+                      key={gym.id}
+                      className="hover:bg-secondary/30 transition-colors"
+                    >
+                      <td className="p-4 font-bold text-foreground">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-[#00aeef]/10 text-[#00aeef] border border-[#00aeef]/20 flex items-center justify-center font-bold">
+                            <Building2 className="w-4 h-4" />
+                          </div>
+                          {gym.name}
+                        </div>
+                      </td>
+                      <td className="p-4 font-mono text-muted-foreground">
+                        {gym.slug}
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className="inline-flex items-center gap-1 font-semibold text-foreground bg-secondary px-2 py-0.5 rounded-md border border-border">
+                          <Users className="w-3 h-3 text-[#00aeef]" />
+                          {gym.total_members || 0}
+                        </span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className="inline-flex items-center gap-1 font-semibold text-foreground bg-secondary px-2 py-0.5 rounded-md border border-border">
+                          <Dumbbell className="w-3 h-3 text-amber-500" />
+                          {gym.total_trainers || 0}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <select
+                          value={subscription?.plan_id || ""}
+                          disabled={
+                            savingGymId === Number(gym.id) ||
+                            activePlans.length === 0
+                          }
+                          onChange={(e) =>
+                            handlePlanChange(Number(gym.id), e.target.value)
+                          }
+                          className="min-w-40 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-foreground"
+                        >
+                          <option value="">Sin plan</option>
+                          {activePlans.map((plan) => (
+                            <option key={plan.id} value={plan.id}>
+                              {plan.name}
+                            </option>
+                          ))}
+                        </select>
+                        {subscription && (
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            Suscripción: {subscription.status}
+                          </p>
+                        )}
+                      </td>
+                      <td className="p-4 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            gym.status === "active"
+                              ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                              : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                          }`}
+                        >
+                          {gym.status === "active" ? "Activo" : "Suspendido"}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <button
+                          onClick={() =>
+                            handleStatusToggle(gym.id, gym.status)
+                          }
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                            gym.status === "active"
+                              ? "text-rose-500 border-rose-500/20 hover:bg-rose-500/10"
+                              : "text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/10"
+                          }`}
+                          title={
+                            gym.status === "active"
+                              ? "Suspender Gimnasio"
+                              : "Activar Gimnasio"
+                          }
+                        >
+                          {gym.status === "active" ? (
+                            <Ban className="w-4 h-4" />
+                          ) : (
+                            <ShieldCheck className="w-4 h-4" />
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal de Alta */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-card border border-border rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
-            <h2 className="text-lg font-bold text-foreground">Alta de Nuevo Gimnasio</h2>
+            <h2 className="text-lg font-bold text-foreground">
+              Alta de Nuevo Gimnasio
+            </h2>
             <form onSubmit={handleCreate} className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">Nombre del Gimnasio</label>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Nombre del Gimnasio
+                </label>
                 <input
                   type="text"
                   required
@@ -195,7 +353,9 @@ export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] })
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">Slug (URL)</label>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Slug (URL)
+                </label>
                 <input
                   type="text"
                   required
@@ -206,24 +366,32 @@ export default function AdminGymsClient({ initialGyms }: { initialGyms: any[] })
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">Email del Dueño (Admin Local)</label>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Email del Dueño (Admin Local)
+                </label>
                 <input
                   type="email"
                   required
                   value={form.adminEmail}
-                  onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, adminEmail: e.target.value })
+                  }
                   placeholder="admin@powergym.com"
                   className="w-full mt-1 p-2 bg-secondary rounded-lg border border-border text-xs focus:outline-none focus:border-[#00aeef]"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">Contraseña Inicial</label>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Contraseña Inicial
+                </label>
                 <input
                   type="password"
                   required
                   value={form.adminPasswordHash}
-                  onChange={(e) => setForm({ ...form, adminPasswordHash: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, adminPasswordHash: e.target.value })
+                  }
                   placeholder="••••••••"
                   className="w-full mt-1 p-2 bg-secondary rounded-lg border border-border text-xs focus:outline-none focus:border-[#00aeef]"
                 />
