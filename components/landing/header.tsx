@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/sheet";
 import { Menu, Activity } from "lucide-react";
 import { useState } from "react";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 const navLinks = [
   { href: "#inicio", label: "Inicio" },
@@ -82,11 +81,8 @@ export function Header() {
             </SheetTrigger>
 
             <SheetContent side="right" className="w-[300px] bg-[#14171d] border-gray-800 text-white">
-              {/* ✅ FIX ACCESIBILIDAD */}
               <SheetHeader>
-                <VisuallyHidden>
-                  <SheetTitle>Menú de navegación</SheetTitle>
-                </VisuallyHidden>
+                <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
               </SheetHeader>
 
               <nav className="flex flex-col gap-4 mt-8">
