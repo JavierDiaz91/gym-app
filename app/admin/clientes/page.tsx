@@ -1,6 +1,7 @@
 import { getSession } from "@/app/actions";
 import { sql } from "@/lib/db";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Mail, ShieldCheck, UsersRound } from "lucide-react";
@@ -11,11 +12,14 @@ const subscriptionLabels: Record<string, string> = {
   active: "Activa", trial: "En prueba", past_due: "Vencida", cancelled: "Cancelada",
 };
 
-export default async function ClientesAdministradoresPage() {
+export default async function ClientesAdministradoresPage({ searchParams }: { searchParams: Promise<{ gym_id?: string }> }) {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role !== "superadmin") redirect("/admin");
 
+  const { gym_id } = await searchParams;
+  const selectedGymId = gym_id && /^\\d+$/.test(gym_id) ? Number(gym_id) : null;
+  const gymFilter = selectedGymId && Number.isSafeInteger(selectedGymId) && selectedGymId > 0 ? selectedGymId : null;
   const admins = await sql`
     SELECT
       u.id,
@@ -33,6 +37,7 @@ export default async function ClientesAdministradoresPage() {
     LEFT JOIN gym_saas_subscriptions gss ON gss.gym_id = g.id
     LEFT JOIN saas_plans sp ON sp.id = gss.plan_id
     WHERE u.role = 'admin'
+      AND (${gymFilter}::integer IS NULL OR u.gym_id = ${gymFilter}::integer)
     ORDER BY u.created_at DESC
   `;
 
@@ -42,10 +47,11 @@ export default async function ClientesAdministradoresPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Kivra SaaS</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Clientes / Administradores</h1>
         <p className="mt-1 text-muted-foreground">
-          Cuentas administradoras asociadas a cada gimnasio de la plataforma.
+          {gymFilter ? `Cuentas administradoras del gimnasio #${gymFilter}.` : "Cuentas administradoras asociadas a cada gimnasio de la plataforma."}
         </p>
       </div>
 
+      {gymFilter && <Link href="/admin/clientes" className="inline-block text-sm text-primary hover:underline">← Ver todos los administradores</Link>}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="p-5">
@@ -106,7 +112,7 @@ export default async function ClientesAdministradoresPage() {
                           <span className="font-medium">{admin.email}</span>
                         </div>
                       </td>
-                      <td className="py-4">{admin.gym_name || "Sin gimnasio asociado"}</td>
+                      <td className="py-4">{admin.gym_id ? <Link className="text-primary hover:underline" href={`/admin/gimnasios/${admin.gym_id}`}>{admin.gym_name || "Gimnasio"}</Link> : "Sin gimnasio asociado"}</td>
                       <td className="py-4">
                         <Badge variant="outline">
                           {admin.gym_status === "active"
