@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Ban,
   Building2,
   Dumbbell,
+  ExternalLink,
   Plus,
   Search,
   ShieldCheck,
@@ -305,6 +307,8 @@ export default function AdminGymsClient({
                         </span>
                       </td>
                       <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                        <Link href={`/admin/gimnasios/${gym.id}`} title="Ver ficha del gimnasio" aria-label={`Ver detalle de ${gym.name}`} className="rounded-lg border border-border p-1.5 text-primary hover:bg-primary/10"><ExternalLink className="h-4 w-4" /></Link>
                         <button
                           onClick={() =>
                             handleStatusToggle(gym.id, gym.status)
@@ -326,6 +330,7 @@ export default function AdminGymsClient({
                             <ShieldCheck className="w-4 h-4" />
                           )}
                         </button>
+                        </div>
                       </td>
                     </tr>
                   );
