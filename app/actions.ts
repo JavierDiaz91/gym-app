@@ -3145,3 +3145,228 @@ export async function assignGymSaaSPlanAction(
     return { success: false, error: "No se pudo asignar el plan SaaS." };
   }
 }
+
+
+export async function getSaaSBillingOverviewAction() {
+  try {
+    await requireSuperAdminSession();
+
+    const [subscriptions, invoices] = await Promise.all([
+      sql`
+        SELECT
+          gss.id,
+          gss.gym_id,
+          g.name AS gym_name,
+          g.slug AS gym_slug,
+          gss.plan_id,
+          sp.name AS plan_name,
+          COALESCE(gss.price_override, sp.monthly_price) AS effective_price,
+          gss.status,
+          gss.current_period_start,
+          gss.current_period_end,
+          gss.next_billing_date
+        FROM gym_saas_subscriptions gss
+        JOIN gyms g ON g.id = gss.gym_id
+        JOIN saas_plans sp ON sp.id = gss.plan_id
+        ORDER BY g.name ASC
+      `,
+      sql`
+        SELECT
+          i.id,
+          i.gym_id,
+          g.name AS gym_name,
+          i.subscription_id,
+          sp.name AS plan_name,
+          i.period_start,
+          i.period_end,
+          i.amount,
+          i.status,
+          i.due_date,
+          i.paid_at,
+          i.external_reference,
+          i.created_at
+        FROM saas_invoices i
+        JOIN gyms g ON g.id = i.gym_id
+        LEFT JOIN gym_saas_subscriptions gss ON gss.id = i.subscription_id
+        LEFT JOIN saas_plans sp ON sp.id = gss.plan_id
+        ORDER BY i.created_at DESC
+      `,
+    ]);
+
+    return { success: true, subscriptions, invoices };
+  } catch (error) {
+    console.error("Error al cargar facturación SaaS:", error);
+    return {
+      success: false,
+      subscriptions: [],
+      invoices: [],
+      error: "No se pudo cargar la facturación SaaS.",
+    };
+  }
+}
+
+export async function generateSaaSInvoiceAction(subscriptionId: number) {
+  try {
+    const session = await requireSuperAdminSession();
+
+    if (!Number.isFinite(subscriptionId) || subscriptionId <= 0) {
+      return { success: false, error: "Suscripción inválida." };
+    }
+
+    const [subscription] = await sql`
+      SELECT
+        gss.id,
+        gss.gym_id,
+        g.name AS gym_name,
+        gss.current_period_start,
+        gss.current_period_end,
+        gss.next_billing_date,
+        COALESCE(gss.price_override, sp.monthly_price) AS effective_price,
+        sp.name AS plan_name
+      FROM gym_saas_subscriptions gss
+      JOIN gyms g ON g.id = gss.gym_id
+      JOIN saas_plans sp ON sp.id = gss.plan_id
+      WHERE gss.id = ${subscriptionId}
+      LIMIT 1
+    `;
+
+    if (!subscription) {
+      return { success: false, error: "Suscripción SaaS no encontrada." };
+    }
+
+    const amount = Number(subscription.effective_price);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return {
+        success: false,
+        error: "El plan no tiene un precio mensual válido para facturar.",
+      };
+    }
+
+    const existing = await sql`
+      SELECT id
+      FROM saas_invoices
+      WHERE subscription_id = ${subscriptionId}
+        AND period_start = ${subscription.current_period_start}
+        AND period_end = ${subscription.current_period_end}
+        AND status <> 'cancelled'
+      LIMIT 1
+    `;
+
+    if (existing.length > 0) {
+      return {
+        success: false,
+        error: "Ya existe una factura para el período actual.",
+      };
+    }
+
+    const [invoice] = await sql`
+      INSERT INTO saas_invoices (
+        gym_id,
+        subscription_id,
+        period_start,
+        period_end,
+        amount,
+        status,
+        due_date,
+        created_at
+      )
+      VALUES (
+        ${subscription.gym_id},
+        ${subscriptionId},
+        ${subscription.current_period_start},
+        ${subscription.current_period_end},
+        ${amount},
+        'pending',
+        COALESCE(${subscription.next_billing_date}, ${subscription.current_period_end}),
+        NOW()
+      )
+      RETURNING *
+    `;
+
+    await sql`
+      INSERT INTO saas_audit_log (
+        actor_user_id,
+        action,
+        entity_type,
+        entity_id,
+        gym_id,
+        details
+      )
+      VALUES (
+        ${session.id},
+        'saas_invoice_generated',
+        'saas_invoice',
+        ${String(invoice.id)},
+        ${subscription.gym_id},
+        ${JSON.stringify({
+          gymName: subscription.gym_name,
+          planName: subscription.plan_name,
+          amount,
+        })}::jsonb
+      )
+    `;
+
+    revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/actividad");
+
+    return { success: true, data: invoice };
+  } catch (error) {
+    console.error("Error al generar factura SaaS:", error);
+    return { success: false, error: "No se pudo generar la factura SaaS." };
+  }
+}
+
+export async function markSaaSInvoicePaidAction(invoiceId: number) {
+  try {
+    const session = await requireSuperAdminSession();
+
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+      return { success: false, error: "Factura inválida." };
+    }
+
+    const [invoice] = await sql`
+      UPDATE saas_invoices
+      SET
+        status = 'paid',
+        paid_at = NOW()
+      WHERE id = ${invoiceId}
+        AND status IN ('pending', 'overdue')
+      RETURNING id, gym_id, amount
+    `;
+
+    if (!invoice) {
+      return {
+        success: false,
+        error: "La factura no existe o ya no está pendiente.",
+      };
+    }
+
+    await sql`
+      INSERT INTO saas_audit_log (
+        actor_user_id,
+        action,
+        entity_type,
+        entity_id,
+        gym_id,
+        details
+      )
+      VALUES (
+        ${session.id},
+        'saas_invoice_paid',
+        'saas_invoice',
+        ${String(invoice.id)},
+        ${invoice.gym_id},
+        ${JSON.stringify({ amount: Number(invoice.amount) })}::jsonb
+      )
+    `;
+
+    revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/actividad");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error al marcar factura SaaS como pagada:", error);
+    return { success: false, error: "No se pudo actualizar la factura SaaS." };
+  }
+}
