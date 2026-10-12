@@ -3197,6 +3197,72 @@ export async function assignGymSaaSPlanAction(
 }
 
 
+
+export async function scheduleGymSaaSPlanChangeAction(gymId: number, newPlanId: number) {
+  try {
+    const session = await requireSuperAdminSession();
+    if (!Number.isSafeInteger(gymId) || gymId <= 0 || !Number.isSafeInteger(newPlanId) || newPlanId <= 0) {
+      return { success: false, error: "Gimnasio o plan inválido." };
+    }
+
+    const [plan] = await sql`
+      SELECT id, name, monthly_price FROM saas_plans
+      WHERE id = ${newPlanId} AND status = 'active' LIMIT 1
+    `;
+    if (!plan || plan.monthly_price == null || Number(plan.monthly_price) <= 0) {
+      return { success: false, error: "El nuevo plan debe estar activo y tener un precio válido." };
+    }
+
+    // Actualización condicional atómica: nunca cambia plan_id ni las fechas del ciclo actual.
+    const [scheduled] = await sql`
+      UPDATE gym_saas_subscriptions
+      SET pending_plan_id = ${newPlanId},
+          pending_plan_effective_date = current_period_end,
+          updated_at = NOW()
+      WHERE gym_id = ${gymId}
+        AND plan_id <> ${newPlanId}
+        AND status = 'active'
+        AND current_period_end > CURRENT_DATE
+        AND pending_plan_id IS NULL
+      RETURNING id, gym_id, plan_id, current_period_end, pending_plan_effective_date
+    `;
+
+    if (!scheduled) {
+      return {
+        success: false,
+        error: "No se pudo programar el cambio: verificá que exista una suscripción activa, sin otro cambio pendiente, y con período vigente.",
+      };
+    }
+
+    try {
+      await sql`
+        INSERT INTO saas_audit_log (actor_user_id, action, entity_type, entity_id, gym_id, details)
+        VALUES (
+          ${session.id}, 'gym_saas_plan_change_scheduled', 'gym_saas_subscription',
+          ${String(scheduled.id)}, ${gymId},
+          ${JSON.stringify({
+            previousPlanId: Number(scheduled.plan_id),
+            newPlanId,
+            newPlanName: plan.name,
+            effectiveDate: scheduled.pending_plan_effective_date,
+          })}::jsonb
+        )
+      `;
+    } catch (auditError) {
+      console.error("Cambio de plan programado, pero falló su auditoría:", auditError);
+    }
+
+    revalidatePath("/admin/gimnasios");
+    revalidatePath(`/admin/gimnasios/${gymId}`);
+    revalidatePath("/admin/actividad");
+    return { success: true, data: scheduled };
+  } catch (error) {
+    console.error("Error al programar cambio de plan SaaS:", error);
+    return { success: false, error: "No se pudo programar el cambio. Verificá que la migración de Neon esté aplicada." };
+  }
+}
+
+
 export async function getSaaSBillingOverviewAction() {
   try {
     await requireSuperAdminSession();
