@@ -15,6 +15,11 @@ import {
   Building2,
   DollarSign,
   CheckSquare,
+  UsersRound,
+  Boxes,
+  Receipt,
+  Activity,
+  Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,7 +31,14 @@ interface AdminSidebarProps {
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, roles: ["superadmin", "admin"] },
+
+  // Gestión global SaaS de Kivra.
   { href: "/admin/gimnasios", label: "Gimnasios", icon: Building2, roles: ["superadmin"] },
+  { href: "/admin/clientes", label: "Clientes / Administradores", icon: UsersRound, roles: ["superadmin"] },
+  { href: "/admin/planes-saas", label: "Planes SaaS", icon: Boxes, roles: ["superadmin"] },
+  { href: "/admin/facturacion", label: "Facturación", icon: Receipt, roles: ["superadmin"] },
+  { href: "/admin/actividad", label: "Actividad", icon: Activity, roles: ["superadmin"] },
+  { href: "/admin/configuracion-kivra", label: "Configuración Kivra", icon: Settings2, roles: ["superadmin"] },
 
   // Funciones operativas de un gimnasio: requieren tenant (gym_id).
   { href: "/admin/miembros", label: "Miembros", icon: Users, roles: ["admin"] },
