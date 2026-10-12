@@ -3001,3 +3001,147 @@ export async function updateSaaSPlanAction(
     return { success: false, error: "No se pudo actualizar el plan SaaS." };
   }
 }
+
+
+export async function getGymSaaSSubscriptionsAction() {
+  try {
+    await requireSuperAdminSession();
+
+    const subscriptions = await sql`
+      SELECT
+        gss.id,
+        gss.gym_id,
+        gss.plan_id,
+        gss.status,
+        gss.started_at,
+        gss.current_period_start,
+        gss.current_period_end,
+        gss.next_billing_date,
+        gss.price_override,
+        sp.name AS plan_name,
+        sp.monthly_price
+      FROM gym_saas_subscriptions gss
+      JOIN saas_plans sp ON sp.id = gss.plan_id
+      ORDER BY gss.gym_id ASC
+    `;
+
+    return { success: true, data: subscriptions };
+  } catch (error) {
+    console.error("Error al obtener suscripciones SaaS:", error);
+    return {
+      success: false,
+      data: [],
+      error: "No se pudieron cargar las suscripciones SaaS.",
+    };
+  }
+}
+
+export async function assignGymSaaSPlanAction(
+  gymId: number,
+  planId: number,
+  status: "trial" | "active" | "past_due" | "cancelled" = "active"
+) {
+  try {
+    const session = await requireSuperAdminSession();
+
+    if (!Number.isFinite(gymId) || gymId <= 0 || !Number.isFinite(planId) || planId <= 0) {
+      return { success: false, error: "Gimnasio o plan inválido." };
+    }
+
+    if (!["trial", "active", "past_due", "cancelled"].includes(status)) {
+      return { success: false, error: "Estado de suscripción inválido." };
+    }
+
+    const [gym] = await sql`
+      SELECT id, name
+      FROM gyms
+      WHERE id = ${gymId}
+      LIMIT 1
+    `;
+
+    if (!gym) {
+      return { success: false, error: "Gimnasio no encontrado." };
+    }
+
+    const [plan] = await sql`
+      SELECT id, name, monthly_price, status
+      FROM saas_plans
+      WHERE id = ${planId}
+      LIMIT 1
+    `;
+
+    if (!plan) {
+      return { success: false, error: "Plan SaaS no encontrado." };
+    }
+
+    if (plan.status !== "active") {
+      return { success: false, error: "Solo podés asignar planes SaaS activos." };
+    }
+
+    const [subscription] = await sql`
+      INSERT INTO gym_saas_subscriptions (
+        gym_id,
+        plan_id,
+        status,
+        started_at,
+        current_period_start,
+        current_period_end,
+        next_billing_date,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${gymId},
+        ${planId},
+        ${status},
+        NOW(),
+        CURRENT_DATE,
+        CURRENT_DATE + INTERVAL '1 month',
+        CURRENT_DATE + INTERVAL '1 month',
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (gym_id)
+      DO UPDATE SET
+        plan_id = EXCLUDED.plan_id,
+        status = EXCLUDED.status,
+        current_period_start = CURRENT_DATE,
+        current_period_end = CURRENT_DATE + INTERVAL '1 month',
+        next_billing_date = CURRENT_DATE + INTERVAL '1 month',
+        updated_at = NOW()
+      RETURNING *
+    `;
+
+    await sql`
+      INSERT INTO saas_audit_log (
+        actor_user_id,
+        action,
+        entity_type,
+        entity_id,
+        gym_id,
+        details
+      )
+      VALUES (
+        ${session.id},
+        'gym_saas_plan_assigned',
+        'gym_saas_subscription',
+        ${String(subscription.id)},
+        ${gymId},
+        ${JSON.stringify({
+          gymName: gym.name,
+          planName: plan.name,
+          status,
+        })}::jsonb
+      )
+    `;
+
+    revalidatePath("/admin/gimnasios");
+    revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/actividad");
+
+    return { success: true, data: subscription };
+  } catch (error) {
+    console.error("Error al asignar plan SaaS al gimnasio:", error);
+    return { success: false, error: "No se pudo asignar el plan SaaS." };
+  }
+}
