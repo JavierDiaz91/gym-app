@@ -14,7 +14,7 @@ export function Hero() {
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-[10%] top-16 h-96 w-96 rounded-full bg-violet-600/20 blur-[130px]" />
         <div className="absolute right-[8%] top-28 h-80 w-80 rounded-full bg-cyan-500/10 blur-[120px]" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:44px_44px] [mask-image:linear-gradient(to_bottom,black,transparent_80%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:44px_44px]" />
       </div>
 
       <div className="container relative mx-auto grid min-h-[760px] items-center gap-14 px-4 py-24 lg:grid-cols-[1.02fr_.98fr] lg:py-28">
@@ -32,16 +32,12 @@ export function Hero() {
           </h1>
 
           <p className="mt-7 max-w-2xl text-lg leading-8 text-zinc-400 md:text-xl">
-            Kivra centraliza miembros, cobros, asistencia, clases, entrenadores y rutinas
-            en una sola plataforma para que tu equipo gestione mejor y tus socios vivan una experiencia más simple.
+            Kivra centraliza miembros, cobros, asistencia, clases, entrenadores y rutinas en una sola plataforma.
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <Button size="lg" className="h-12 rounded-xl bg-white px-6 font-semibold text-zinc-950 hover:bg-zinc-200" asChild>
-              <Link href="/login">
-                Iniciar sesión
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+              <Link href="/login">Iniciar sesión<ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
             <Button size="lg" variant="outline" className="h-12 rounded-xl border-white/10 bg-white/[0.03] px-6 text-white hover:bg-white/[0.07]" asChild>
               <Link href="#modulos">Explorar la plataforma</Link>
@@ -50,25 +46,17 @@ export function Hero() {
 
           <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-zinc-500">
             {["Multi-gimnasio", "Roles y permisos", "Pagos integrados"].map((item) => (
-              <span key={item} className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-violet-300" />
-                {item}
-              </span>
+              <span key={item} className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-300" />{item}</span>
             ))}
           </div>
         </div>
 
         <div className="relative mx-auto w-full max-w-2xl">
           <div className="absolute -inset-6 rounded-[36px] bg-gradient-to-br from-violet-500/20 to-cyan-400/5 blur-3xl" />
-          <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#0f1219]/95 p-4 shadow-2xl shadow-black/50 backdrop-blur">
+          <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#0f1219]/95 p-4 shadow-2xl shadow-black/50">
             <div className="mb-4 flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.025] px-4 py-3">
-              <div>
-                <p className="text-xs text-zinc-500">Panel general</p>
-                <p className="mt-1 text-sm font-medium text-zinc-200">Resumen del gimnasio</p>
-              </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-400/10">
-                <Dumbbell className="h-4 w-4 text-violet-300" />
-              </div>
+              <div><p className="text-xs text-zinc-500">Panel general</p><p className="mt-1 text-sm font-medium text-zinc-200">Resumen del gimnasio</p></div>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-400/10"><Dumbbell className="h-4 w-4 text-violet-300" /></div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
@@ -81,36 +69,15 @@ export function Hero() {
               ))}
             </div>
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-[1.2fr_.8fr]">
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5">
-                <div className="mb-5 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-zinc-200">Actividad semanal</p>
-                    <p className="text-xs text-zinc-500">Asistencias registradas</p>
-                  </div>
-                  <span className="rounded-lg bg-emerald-400/10 px-2 py-1 text-xs text-emerald-300">+12%</span>
-                </div>
-                <div className="flex h-32 items-end gap-2">
-                  {[42, 68, 54, 82, 72, 96, 64].map((height, index) => (
-                    <div key={index} className="flex-1 rounded-t-lg bg-gradient-to-t from-violet-600/40 to-violet-300/80" style={{ height: `${height}%` }} />
-                  ))}
-                </div>
+            <div className="mt-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5">
+              <div className="mb-5 flex items-center justify-between">
+                <div><p className="text-sm font-medium text-zinc-200">Actividad semanal</p><p className="text-xs text-zinc-500">Asistencias registradas</p></div>
+                <span className="rounded-lg bg-emerald-400/10 px-2 py-1 text-xs text-emerald-300">+12%</span>
               </div>
-
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5">
-                <p className="text-sm font-medium text-zinc-200">Operación del día</p>
-                <div className="mt-5 space-y-4">
-                  {[
-                    ["Pagos confirmados", "18", "text-emerald-300"],
-                    ["Clases programadas", "7", "text-cyan-300"],
-                    ["Rutinas activas", "42", "text-violet-300"],
-                  ].map(([label, value, color]) => (
-                    <div key={label} className="flex items-center justify-between border-b border-white/[0.06] pb-3 last:border-0 last:pb-0">
-                      <span className="text-xs text-zinc-500">{label}</span>
-                      <span className={`text-sm font-semibold ${color}`}>{value}</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="flex h-36 items-end gap-2">
+                {[42, 68, 54, 82, 72, 96, 64].map((height, index) => (
+                  <div key={index} className="flex-1 rounded-t-lg bg-gradient-to-t from-violet-600/40 to-violet-300/80" style={{ height: `${height}%` }} />
+                ))}
               </div>
             </div>
           </div>
