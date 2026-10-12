@@ -31,7 +31,6 @@ function getWebhookSecrets(): string[] {
   const candidates = [
     process.env.MP_WEBHOOK_SECRET_TEST,
     process.env.MP_WEBHOOK_SECRET_PROD,
-    process.env.MP_WEBHOOK_SECRET,
   ]
     .map((value) => String(value || "").trim())
     .filter(Boolean);
@@ -40,7 +39,7 @@ function getWebhookSecrets(): string[] {
 
   if (uniqueSecrets.length === 0) {
     throw new Error(
-      "Debe configurarse MP_WEBHOOK_SECRET_TEST, MP_WEBHOOK_SECRET_PROD o MP_WEBHOOK_SECRET."
+      "Debe configurarse MP_WEBHOOK_SECRET_TEST o MP_WEBHOOK_SECRET_PROD."
     );
   }
 
@@ -50,10 +49,6 @@ function getWebhookSecrets(): string[] {
 function verifyWebhookSignature(req: Request): {
   valid: boolean;
   reason?: string;
-  queryDataId?: string;
-  bodyDataId?: string;
-  hasSignature: boolean;
-  hasRequestId: boolean;
 } {
   const xSignature = String(req.header("x-signature") || "").trim();
   const xRequestId = String(req.header("x-request-id") || "").trim();
@@ -61,16 +56,10 @@ function verifyWebhookSignature(req: Request): {
   const queryDataId = Array.isArray(rawDataId)
     ? String(rawDataId[rawDataId.length - 1] || "")
     : String(rawDataId || "");
-  const bodyDataId = String(req.body?.data?.id || "");
-
   if (!xSignature || !xRequestId) {
     return {
       valid: false,
       reason: !xSignature ? "MissingSignatureHeader" : "MissingRequestId",
-      queryDataId,
-      bodyDataId,
-      hasSignature: !!xSignature,
-      hasRequestId: !!xRequestId,
     };
   }
 
@@ -84,13 +73,7 @@ function verifyWebhookSignature(req: Request): {
         dataId: queryDataId,
         secret,
       });
-      return {
-        valid: true,
-        queryDataId,
-        bodyDataId,
-        hasSignature: true,
-        hasRequestId: true,
-      };
+      return { valid: true };
     } catch (error) {
       if (error instanceof InvalidWebhookSignatureError) {
         lastReason = error.reason;
@@ -103,10 +86,6 @@ function verifyWebhookSignature(req: Request): {
   return {
     valid: false,
     reason: lastReason,
-    queryDataId,
-    bodyDataId,
-    hasSignature: true,
-    hasRequestId: true,
   };
 }
 
@@ -601,14 +580,14 @@ export const handleWebhook = async (req: Request, res: Response) => {
     const signatureCheck = verifyWebhookSignature(req);
 
     if (!signatureCheck.valid) {
-      const invalidBody = req.body || {};
+      const paymentId = String(req.body?.data?.id || req.query["data.id"] || "").trim();
+
       console.warn(
-        `[MP WEBHOOK] Firma inválida. reason=${signatureCheck.reason || "unknown"} paymentId=${String(
-          invalidBody?.data?.id || signatureCheck.queryDataId || ""
-        )} queryDataId=${signatureCheck.queryDataId || ""} bodyDataId=${signatureCheck.bodyDataId || ""} hasSignature=${signatureCheck.hasSignature} hasRequestId=${signatureCheck.hasRequestId} action=${String(
-          invalidBody?.action || ""
-        )} userId=${String(invalidBody?.user_id || req.query.user_id || "")}`
+        paymentId
+          ? `[MP WEBHOOK] Firma inválida para pago ${paymentId}; solicitud rechazada.`
+          : "[MP WEBHOOK] Solicitud con firma inválida rechazada."
       );
+
       return res.status(401).json({ error: "Firma de webhook inválida." });
     }
 
