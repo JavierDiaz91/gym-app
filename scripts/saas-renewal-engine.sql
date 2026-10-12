@@ -16,7 +16,8 @@ CREATE OR REPLACE FUNCTION public.renew_due_saas_subscriptions(
 )
 RETURNS TABLE(subscription_id integer, gym_id integer, invoice_id integer, new_plan_id integer)
 LANGUAGE plpgsql
-AS $$
+#variable_conflict use_column
+AS $
 DECLARE
   r RECORD;
   v_plan_id integer;
