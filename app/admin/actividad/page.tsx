@@ -23,6 +23,8 @@ function eventMeta(action: string) {
         label: "Plan SaaS actualizado",
         icon: Layers3,
       };
+    case "gym_status_changed":
+      return { label: "Estado de gimnasio actualizado", icon: Building2 };
     case "gym_saas_plan_assigned":
       return {
         label: "Plan asignado a gimnasio",
@@ -53,6 +55,11 @@ function detailText(event: any) {
     return details.name
       ? `${details.name} · ${details.status || "sin estado"}`
       : "Plan SaaS";
+  }
+
+  if (event.action === "gym_status_changed") {
+    const states: Record<string, string> = { active: "Activo", suspended: "Suspendido" };
+    return [details.gymName || event.gym_name, states[details.previousStatus] || details.previousStatus, "→", states[details.newStatus] || details.newStatus].filter(Boolean).join(" ");
   }
 
   if (event.action === "gym_saas_plan_assigned") {
@@ -99,7 +106,7 @@ export default async function ActividadSaaSPage() {
   const events = result.success && Array.isArray(result.data) ? result.data : [];
 
   const planEvents = events.filter((event: any) =>
-    ["saas_plan_created", "saas_plan_updated", "gym_saas_plan_assigned"].includes(
+    ["saas_plan_created", "saas_plan_updated", "gym_saas_plan_assigned", "gym_status_changed"].includes(
       event.action
     )
   ).length;
