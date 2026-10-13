@@ -23,6 +23,44 @@ interface RoutineExercise {
 
 // ==================== AUTH ACTIONS ====================
 
+
+// Validación centralizada de cupos SaaS. El plan vigente es plan_id;
+// pending_plan_id no se aplica hasta la renovación efectiva.
+async function checkSaaSCapacity(gymId: number, resource: "members" | "trainers") {
+  const [gym] = await sql`
+    SELECT status FROM gyms WHERE id = ${gymId}
+  `;
+  if (!gym || gym.status !== "active") {
+    return "El gimnasio no está activo. Contactá al administrador de Kivra.";
+  }
+
+  const [subscription] = await sql`
+    SELECT s.status, s.current_period_end, p.max_members, p.max_trainers
+    FROM gym_saas_subscriptions s
+    JOIN saas_plans p ON p.id = s.plan_id
+    WHERE s.gym_id = ${gymId}
+    ORDER BY s.id DESC
+    LIMIT 1
+  `;
+  if (!subscription || subscription.status !== "active") {
+    return "El gimnasio no tiene una suscripción SaaS activa.";
+  }
+  if (subscription.current_period_end &&
+      String(subscription.current_period_end).slice(0, 10) < new Date().toISOString().slice(0, 10)) {
+    return "El período SaaS está vencido. Contactá al administrador de Kivra.";
+  }
+
+  const limit = resource === "members" ? subscription.max_members : subscription.max_trainers;
+  if (limit == null) return null; // Sin límite configurado
+  const [usage] = resource === "members"
+    ? await sql`SELECT COUNT(*)::int AS total FROM members WHERE gym_id = ${gymId}`
+    : await sql`SELECT COUNT(*)::int AS total FROM trainers WHERE gym_id = ${gymId}`;
+  if (Number(usage.total) >= Number(limit)) {
+    return `Alcanzaste el límite de ${limit} ${resource === "members" ? "alumnos" : "entrenadores"} de tu plan SaaS.`;
+  }
+  return null;
+}
+
 export async function registerUser(formData: FormData) {
   try {
     const emailRaw = formData.get("email") as string;
@@ -58,6 +96,14 @@ export async function registerUser(formData: FormData) {
 
     // 3️⃣ Hash de contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    const [preexistingMember] = await sql`
+      SELECT id FROM members WHERE LOWER(TRIM(email)) = ${email} AND gym_id = ${gymId}
+    `;
+    const capacityError = preexistingMember
+      ? null
+      : await checkSaaSCapacity(gymId, "members");
+    if (capacityError) return { error: capacityError };
 
     // 4️⃣ Crear usuario en la tabla 'users'
     const userResult = await sql`
@@ -278,6 +324,9 @@ export async function createMember(formData: FormData) {
     if (existingMember.length > 0) {
       return { error: "Ya existe un socio registrado con este correo electrónico." };
     }
+
+    const capacityError = await checkSaaSCapacity(gymId, "members");
+    if (capacityError) return { error: capacityError };
 
     // 3. Insertar el miembro con el email sanitizado
     const [member] = await sql`
@@ -708,6 +757,9 @@ export async function createTrainer(formData: FormData) {
   try {
     const session = await requireTenantSession();
     const gymId = session.gymId;
+    const capacityError = await checkSaaSCapacity(gymId, "trainers");
+    if (capacityError) return { error: capacityError };
+
     // 1. Encriptamos la clave con bcryptjs
     const hashedPassword = await bcrypt.hash(password, 10);
 
