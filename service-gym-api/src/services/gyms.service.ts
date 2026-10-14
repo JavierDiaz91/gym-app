@@ -51,27 +51,51 @@ export async function getGymById(id: number) {
 }
 
 export async function createGymWithAdmin(data: CreateGymInput) {
-  // Si la clave no arranca con $2b$, sabemos que es texto plano y la encriptamos
-  const isAlreadyHashed = data.adminPasswordHash.startsWith("$2b$") || data.adminPasswordHash.startsWith("$2a$");
-  const hashedPassword = isAlreadyHashed 
-    ? data.adminPasswordHash 
-    : await bcrypt.hash(data.adminPasswordHash, 10);
+  const name = data.name?.trim();
+  const slug = data.slug?.trim().toLowerCase();
+  const email = data.adminEmail?.trim().toLowerCase();
+  const password = data.adminPasswordHash;
 
-  const gymResult = await sql`
-    INSERT INTO gyms (name, slug)
-    VALUES (${data.name}, ${data.slug})
-    RETURNING id, name, slug, status, created_at
+  if (!name || !slug || !email || typeof password !== "string") {
+    throw new Error("Faltan datos obligatorios para crear el gimnasio.");
+  }
+  if (name.length > 150 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 100) {
+    throw new Error("Nombre o identificador del gimnasio invalido.");
+  }
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) {
+    throw new Error("Correo del administrador invalido.");
+  }
+  if (password.length < 8 || password.length > 128) {
+    throw new Error("La contrasena debe tener entre 8 y 128 caracteres.");
+  }
+
+  // Never accept password hashes from the client: always hash the supplied password.
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  // Both inserts run inside ONE SQL statement. PostgreSQL rolls back the gym
+  // insertion if the administrator insertion fails (e.g. duplicate email).
+  const rows = await sql`
+    WITH new_gym AS (
+      INSERT INTO gyms (name, slug)
+      VALUES (${name}, ${slug})
+      RETURNING id, name, slug, status, created_at
+    ),
+    new_admin AS (
+      INSERT INTO users (email, password_hash, role, gym_id)
+      SELECT ${email}, ${hashedPassword}, 'admin', id
+      FROM new_gym
+      RETURNING id, email, role, gym_id
+    )
+    SELECT
+      row_to_json(new_gym) AS gym,
+      row_to_json(new_admin) AS admin_user
+    FROM new_gym
+    JOIN new_admin ON new_admin.gym_id = new_gym.id
   `;
-  const gym = gymResult[0];
 
-  const userResult = await sql`
-    INSERT INTO users (email, password_hash, role, gym_id)
-    VALUES (${data.adminEmail}, ${hashedPassword}, 'admin', ${gym.id})
-    RETURNING id, email, role, gym_id
-  `;
-  const user = userResult[0];
-
-  return { gym, adminUser: user };
+  const created = rows[0];
+  if (!created) throw new Error("No se pudo crear el gimnasio y su administrador.");
+  return { gym: created.gym, adminUser: created.admin_user };
 }
 
 export async function toggleGymStatus(gymId: number, status: string) {
