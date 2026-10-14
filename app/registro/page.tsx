@@ -60,8 +60,8 @@ function RegisterForm() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres");
+    if (password.length < 8) {
+      setError("La contraseña debe tener al menos 8 caracteres");
       setLoading(false);
       return;
     }
@@ -72,7 +72,7 @@ function RegisterForm() {
       setError(result.error);
       setLoading(false);
     } else if (result?.success) {
-      router.push("/miembro");
+      router.push("/login");
     }
   }
 
@@ -236,7 +236,7 @@ function RegisterForm() {
                         id="password"
                         name="password"
                         type="password"
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder="Mínimo 8 caracteres"
                         required
                         className="h-12 rounded-xl border-white/[0.08] bg-white/[0.035] text-white placeholder:text-zinc-700 focus-visible:border-violet-400/40 focus-visible:ring-violet-400/20"
                       />
