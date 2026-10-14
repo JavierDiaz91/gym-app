@@ -85,77 +85,25 @@ export async function registerUser(formData: FormData) {
       return { error: "Gimnasio inválido. Escaneá nuevamente el QR." };
     }
     const gymId = Number(gymIdRaw);
-    const [gym] = await sql`SELECT id FROM gyms WHERE id = ${gymId} AND status = 'active'`;
-    if (!gym) return { error: "El gimnasio no está disponible para registros." };
-
-    const [existingUser] = await sql`
-      SELECT id FROM users WHERE LOWER(TRIM(email)) = ${email} LIMIT 1
-    `;
-    if (existingUser) return { error: "El email ya está registrado. Por favor iniciá sesión." };
-
-    const [existingMember] = await sql`
-      SELECT id, user_id FROM members
-      WHERE gym_id = ${gymId} AND LOWER(TRIM(email)) = ${email}
-      LIMIT 1
-    `;
-    if (existingMember?.user_id != null) {
-      return { error: "Este alumno ya tiene una cuenta vinculada. Iniciá sesión o contactá al gimnasio." };
-    }
-
-    // Existing admin-created records do not consume an additional member slot.
-    // New members must comply with the gym's SaaS capacity.
-    const capacityError = existingMember
-      ? null
-      : await checkSaaSCapacity(gymId, "members");
-    if (capacityError) return { error: capacityError };
-
     const parts = name.split(/\s+/);
     const firstName = parts[0];
     const lastName = parts.slice(1).join(" ");
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // One PostgreSQL statement: the user and member link/creation succeed together.
-    // A failed insert or update rolls back all effects of the statement.
-    const [result] = await sql`
-      WITH new_user AS (
-        INSERT INTO users (email, password_hash, role, gym_id)
-        VALUES (${email}, ${hashedPassword}, 'member', ${gymId})
-        RETURNING id
-      ),
-      linked_member AS (
-        UPDATE members
-        SET user_id = (SELECT id FROM new_user),
-            phone = COALESCE(NULLIF(${phone}, ''), phone)
-        WHERE gym_id = ${gymId}
-          AND LOWER(TRIM(email)) = ${email}
-          AND user_id IS NULL
-        RETURNING id
-      ),
-      new_member AS (
-        INSERT INTO members (
-          user_id, gym_id, first_name, last_name, email, phone, status, join_date
-        )
-        SELECT new_user.id, ${gymId}, ${firstName}, ${lastName},
-               ${email}, NULLIF(${phone}, ''), 'active', NOW()
-        FROM new_user
-        WHERE NOT EXISTS (
-          SELECT 1 FROM members
-          WHERE gym_id = ${gymId} AND LOWER(TRIM(email)) = ${email}
-        )
-        RETURNING id
+    // La función PostgreSQL ejecuta todo en una transacción implícita.
+    // Si falla la creación o vinculación del socio, revierte también el usuario.
+    // Requiere aplicar database/migrations/20261013_register_gym_member.sql.
+    await sql`
+      SELECT user_id, member_id
+      FROM public.register_gym_member(
+        ${gymId},
+        ${email},
+        ${hashedPassword},
+        ${firstName},
+        ${lastName},
+        ${phone}
       )
-      SELECT new_user.id AS user_id,
-             (SELECT id FROM linked_member LIMIT 1) AS linked_member_id,
-             (SELECT id FROM new_member LIMIT 1) AS created_member_id
-      FROM new_user
     `;
-
-    if (!result?.linked_member_id && !result?.created_member_id) {
-      // This should only occur with concurrent registration or inconsistent records.
-      // Prevent claiming registration succeeded without a member profile.
-      // Database uniqueness constraints are still needed for complete race protection.
-      return { error: "No se pudo vincular la ficha. Contactá al gimnasio antes de reintentar." };
-    }
     return { success: true };
   } catch (error: any) {
     if (error?.code === "23505") {
