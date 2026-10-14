@@ -236,7 +236,7 @@ async function requireTenantSession() {
     throw new Error("Sesión inválida o sin gimnasio asociado.");
   }
 
-  return session;
+  return { ...session, gymId: session.gymId };
 }
 
 // ==================== MEMBER ACTIONS ====================
