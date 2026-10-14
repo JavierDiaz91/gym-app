@@ -63,99 +63,104 @@ async function checkSaaSCapacity(gymId: number, resource: "members" | "trainers"
 
 export async function registerUser(formData: FormData) {
   try {
-    const emailRaw = formData.get("email") as string;
-    const password = formData.get("password") as string;
-    const name = formData.get("name") as string;
-    const phone = formData.get("phone") as string | null;
-    const gymIdRaw = formData.get("gym_id") as string | null;
+    const emailRaw = formData.get("email");
+    const password = formData.get("password");
+    const nameRaw = formData.get("name");
+    const phoneRaw = formData.get("phone");
+    const gymIdRaw = formData.get("gym_id");
 
-    if (!emailRaw || !password || !name) {
+    if (typeof emailRaw !== "string" || typeof password !== "string" ||
+        typeof nameRaw !== "string" || typeof gymIdRaw !== "string") {
       return { error: "Todos los campos son requeridos" };
     }
 
-    if (!gymIdRaw) {
-      return { error: "No se especificó un gimnasio válido. Por favor escaneá el QR del gimnasio." };
-    }
-
-    // 1️⃣ Normalizar email
     const email = emailRaw.trim().toLowerCase();
-    const gymId = parseInt(gymIdRaw, 10);
+    const name = nameRaw.trim();
+    const phone = typeof phoneRaw === "string" ? phoneRaw.trim() : "";
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254 ||
+        !name || name.length > 150 || password.length < 8 || password.length > 128) {
+      return { error: "Revisá el nombre, correo y contraseña (mínimo 8 caracteres)." };
+    }
+    if (!/^[1-9]\\d*$/.test(gymIdRaw) || !Number.isSafeInteger(Number(gymIdRaw))) {
+      return { error: "Gimnasio inválido. Escaneá nuevamente el QR." };
+    }
+    const gymId = Number(gymIdRaw);
+    const [gym] = await sql`SELECT id FROM gyms WHERE id = ${gymId} AND status = 'active'`;
+    if (!gym) return { error: "El gimnasio no está disponible para registros." };
 
-    // 2️⃣ Verificar si YA TIENE CREDENCIALES (en la tabla users)
-    const existingUser = await sql`
-      SELECT id FROM users WHERE LOWER(TRIM(email)) = ${email}
+    const [existingUser] = await sql`
+      SELECT id FROM users WHERE LOWER(TRIM(email)) = ${email} LIMIT 1
     `;
-    if (existingUser.length > 0) {
-      return { error: "El email ya está registrado. Por favor iniciá sesión." };
+    if (existingUser) return { error: "El email ya está registrado. Por favor iniciá sesión." };
+
+    const [existingMember] = await sql`
+      SELECT id, user_id FROM members
+      WHERE gym_id = ${gymId} AND LOWER(TRIM(email)) = ${email}
+      LIMIT 1
+    `;
+    if (existingMember?.user_id != null) {
+      return { error: "Este alumno ya tiene una cuenta vinculada. Iniciá sesión o contactá al gimnasio." };
     }
 
-    // Parsear Nombre y Apellido
-    const nameParts = name.trim().split(/\s+/);
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(" ") || "";
-
-    // 3️⃣ Hash de contraseña
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const [preexistingMember] = await sql`
-      SELECT id FROM members WHERE LOWER(TRIM(email)) = ${email} AND gym_id = ${gymId}
-    `;
-    const capacityError = preexistingMember
+    // Existing admin-created records do not consume an additional member slot.
+    // New members must comply with the gym's SaaS capacity.
+    const capacityError = existingMember
       ? null
       : await checkSaaSCapacity(gymId, "members");
     if (capacityError) return { error: capacityError };
 
-    // 4️⃣ Crear usuario en la tabla 'users'
-    const userResult = await sql`
-      INSERT INTO users (email, password_hash, role, gym_id)
-      VALUES (${email}, ${hashedPassword}, 'member', ${gymId})
-      RETURNING id
-    `;
-    const userId = userResult[0].id;
+    const parts = name.split(/\\s+/);
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(" ");
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    // 5️⃣ REVISAR SI EL ADMIN YA LE HABÍA CREADO LA FICHA EN 'members'
-    const existingMember = await sql`
-      SELECT id FROM members 
-      WHERE LOWER(TRIM(email)) = ${email} AND gym_id = ${gymId}
-    `;
-
-    if (existingMember.length > 0) {
-      // VINCULAR CON EL LEGAJO EXISTENTE DEL ADMIN
-      await sql`
-        UPDATE members 
-        SET 
-          user_id = ${userId},
-          phone = COALESCE(NULLIF(${phone}, ''), phone)
-        WHERE id = ${existingMember[0].id}
-      `;
-    } else {
-      // CREAR FICHA NUEVA SI NO EXISTÍA
-      await sql`
+    // One PostgreSQL statement: the user and member link/creation succeed together.
+    // A failed insert or update rolls back all effects of the statement.
+    const [result] = await sql`
+      WITH new_user AS (
+        INSERT INTO users (email, password_hash, role, gym_id)
+        VALUES (${email}, ${hashedPassword}, 'member', ${gymId})
+        RETURNING id
+      ),
+      linked_member AS (
+        UPDATE members
+        SET user_id = (SELECT id FROM new_user),
+            phone = COALESCE(NULLIF(${phone}, ''), phone)
+        WHERE gym_id = ${gymId}
+          AND LOWER(TRIM(email)) = ${email}
+          AND user_id IS NULL
+        RETURNING id
+      ),
+      new_member AS (
         INSERT INTO members (
-          user_id,
-          gym_id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          status,
-          join_date
+          user_id, gym_id, first_name, last_name, email, phone, status, join_date
         )
-        VALUES (
-          ${userId},
-          ${gymId},
-          ${firstName},
-          ${lastName},
-          ${email},
-          ${phone || null},
-          'active',
-          NOW()
+        SELECT new_user.id, ${gymId}, ${firstName}, ${lastName},
+               ${email}, NULLIF(${phone}, ''), 'active', NOW()
+        FROM new_user
+        WHERE NOT EXISTS (
+          SELECT 1 FROM members
+          WHERE gym_id = ${gymId} AND LOWER(TRIM(email)) = ${email}
         )
-      `;
-    }
+        RETURNING id
+      )
+      SELECT new_user.id AS user_id,
+             (SELECT id FROM linked_member LIMIT 1) AS linked_member_id,
+             (SELECT id FROM new_member LIMIT 1) AS created_member_id
+      FROM new_user
+    `;
 
+    if (!result?.linked_member_id && !result?.created_member_id) {
+      // This should only occur with concurrent registration or inconsistent records.
+      // Prevent claiming registration succeeded without a member profile.
+      // Database uniqueness constraints are still needed for complete race protection.
+      return { error: "No se pudo vincular la ficha. Contactá al gimnasio antes de reintentar." };
+    }
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === "23505") {
+      return { error: "El correo o la ficha ya están registrados. Iniciá sesión o contactá al gimnasio." };
+    }
     console.error("Registration error:", error);
     return { error: "Error al registrar usuario" };
   }
