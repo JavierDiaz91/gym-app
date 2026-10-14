@@ -106,6 +106,25 @@ export async function registerUser(formData: FormData) {
     `;
     return { success: true };
   } catch (error: any) {
+    if (error?.code === "P0001") {
+      const message = String(error?.message || "");
+      if (message.includes("correo ya tiene una cuenta")) {
+        return { error: "Este correo ya está registrado. Iniciá sesión o contactá al gimnasio." };
+      }
+      if (message.includes("ficha ya está vinculada")) {
+        return { error: "Este alumno ya tiene una cuenta vinculada. Iniciá sesión o contactá al gimnasio." };
+      }
+      if (message.includes("límite de alumnos")) {
+        return { error: "El gimnasio alcanzó el límite de alumnos de su plan SaaS." };
+      }
+      if (message.includes("suscripción SaaS vigente")) {
+        return { error: "El gimnasio no tiene una suscripción SaaS vigente." };
+      }
+      if (message.includes("gimnasio no está disponible")) {
+        return { error: "El gimnasio no está disponible para registros." };
+      }
+      return { error: "No se pudo completar el registro. Contactá al gimnasio." };
+    }
     if (error?.code === "23505") {
       return { error: "El correo o la ficha ya están registrados. Iniciá sesión o contactá al gimnasio." };
     }
