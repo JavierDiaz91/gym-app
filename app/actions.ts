@@ -239,6 +239,14 @@ async function requireTenantSession() {
   return { ...session, gymId: session.gymId };
 }
 
+async function requireGymAdminSession() {
+  const session = await requireTenantSession();
+  if (session.role !== "admin") {
+    throw new Error("No tenés permisos de administrador para esta operación.");
+  }
+  return session;
+}
+
 // ==================== MEMBER ACTIONS ====================
 
 export async function getMembers(query: string = ""): Promise<Member[]> {
@@ -309,7 +317,7 @@ export async function createMember(formData: FormData) {
   const emergencyContact = formData.get("emergencyContact") as string;
   const planIdRaw = formData.get("planId") as string;
 
-  const session = await requireTenantSession();
+  const session = await requireGymAdminSession();
   const gymId = session.gymId;
 
   // 1. Normalizar email (sin espacios y en minúsculas)
@@ -377,7 +385,7 @@ export async function updateMember(id: number, formData: FormData) {
   }
 
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
 
     // 2. Actualizar únicamente dentro del gimnasio autenticado
     const [updatedMember] = await sql`
@@ -417,7 +425,7 @@ export async function updateMember(id: number, formData: FormData) {
 //Eliminar miembro
 export async function deleteMember(id: number) {
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
 
     const [member] = await sql`
       SELECT user_id
@@ -760,7 +768,7 @@ export async function createTrainer(formData: FormData) {
   }
 
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
     const gymId = session.gymId;
     const capacityError = await checkSaaSCapacity(gymId, "trainers");
     if (capacityError) return { error: capacityError };
