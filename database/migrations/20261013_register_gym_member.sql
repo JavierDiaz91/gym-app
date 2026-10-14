@@ -42,13 +42,13 @@ BEGIN
     RAISE EXCEPTION 'El gimnasio no tiene una suscripción SaaS vigente.';
   END IF;
 
-  IF EXISTS (SELECT 1 FROM public.users WHERE lower(btrim(email)) = p_email) THEN
+  IF EXISTS (SELECT 1 FROM public.users AS u WHERE lower(btrim(u.email)) = lower(btrim(p_email))) THEN
     RAISE EXCEPTION 'El correo ya tiene una cuenta registrada.';
   END IF;
 
-  SELECT id, members.user_id INTO v_member_id, v_member_user_id
-  FROM public.members
-  WHERE gym_id = p_gym_id AND lower(btrim(email)) = p_email
+  SELECT m.id, m.user_id INTO v_member_id, v_member_user_id
+  FROM public.members AS m
+  WHERE m.gym_id = p_gym_id AND lower(btrim(m.email)) = lower(btrim(p_email))
   FOR UPDATE;
 
   IF v_member_user_id IS NOT NULL THEN
@@ -56,7 +56,7 @@ BEGIN
   END IF;
 
   IF v_member_id IS NULL AND v_max_members IS NOT NULL THEN
-    SELECT count(*) INTO v_count FROM public.members WHERE gym_id = p_gym_id;
+    SELECT count(*) INTO v_count FROM public.members AS m WHERE m.gym_id = p_gym_id;
     IF v_count >= v_max_members THEN
       RAISE EXCEPTION 'Se alcanzó el límite de alumnos del plan SaaS.';
     END IF;
@@ -67,11 +67,11 @@ BEGIN
   RETURNING id INTO v_user_id;
 
   IF v_member_id IS NOT NULL THEN
-    UPDATE public.members
+    UPDATE public.members AS m
     SET user_id = v_user_id,
-        phone = coalesce(nullif(p_phone, ''), phone)
-    WHERE id = v_member_id AND gym_id = p_gym_id AND user_id IS NULL
-    RETURNING id INTO v_member_id;
+        phone = coalesce(nullif(p_phone, ''), m.phone)
+    WHERE m.id = v_member_id AND m.gym_id = p_gym_id AND m.user_id IS NULL
+    RETURNING m.id INTO v_member_id;
     IF v_member_id IS NULL THEN
       RAISE EXCEPTION 'No se pudo vincular la ficha existente.';
     END IF;
