@@ -1,9 +1,5 @@
 import { Router } from "express";
 import * as controller from "../controllers/members.controller";
-import {
-  createMemberRoutine,
-  getMemberRoutine,
-} from "../controllers/memberRoutines.controller";
 import { authenticate, requireRole } from "../middlewares/auth";
 import { checkTenantStatus } from "../middlewares/checkTenantStatus";
 
@@ -17,15 +13,25 @@ router.get("/:id", requireRole("admin", "trainer", "member", "superadmin"), cont
 router.post("/", requireRole("admin", "superadmin"), controller.createMember);
 router.put("/:id", requireRole("admin", "superadmin"), controller.updateMember);
 router.delete("/:id", requireRole("admin", "superadmin"), controller.deleteMember);
-router.post(
+
+// Legacy routine handlers are not tenant-scoped. Disable until secured.
+router.all(
   "/member-routines",
   requireRole("admin", "trainer", "superadmin"),
-  createMemberRoutine
+  (_req, res) => res.status(503).json({
+    success: false,
+    code: "ROUTINES_MAINTENANCE",
+    error: "La asignacion de rutinas esta temporalmente en mantenimiento.",
+  })
 );
-router.get(
+router.all(
   "/:id/routine",
   requireRole("admin", "trainer", "member", "superadmin"),
-  getMemberRoutine
+  (_req, res) => res.status(503).json({
+    success: false,
+    code: "ROUTINES_MAINTENANCE",
+    error: "La consulta de rutinas esta temporalmente en mantenimiento.",
+  })
 );
 
 export default router;
