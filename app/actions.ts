@@ -77,11 +77,11 @@ export async function registerUser(formData: FormData) {
     const email = emailRaw.trim().toLowerCase();
     const name = nameRaw.trim();
     const phone = typeof phoneRaw === "string" ? phoneRaw.trim() : "";
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254 ||
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
         !name || name.length > 150 || password.length < 8 || password.length > 128) {
       return { error: "Revisá el nombre, correo y contraseña (mínimo 8 caracteres)." };
     }
-    if (!/^[1-9]\\d*$/.test(gymIdRaw) || !Number.isSafeInteger(Number(gymIdRaw))) {
+    if (!/^[1-9]\d*$/.test(gymIdRaw) || !Number.isSafeInteger(Number(gymIdRaw))) {
       return { error: "Gimnasio inválido. Escaneá nuevamente el QR." };
     }
     const gymId = Number(gymIdRaw);
@@ -109,7 +109,7 @@ export async function registerUser(formData: FormData) {
       : await checkSaaSCapacity(gymId, "members");
     if (capacityError) return { error: capacityError };
 
-    const parts = name.split(/\\s+/);
+    const parts = name.split(/\s+/);
     const firstName = parts[0];
     const lastName = parts.slice(1).join(" ");
     const hashedPassword = await bcrypt.hash(password, 12);
