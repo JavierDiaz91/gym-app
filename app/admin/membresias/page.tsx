@@ -54,17 +54,24 @@ export default function MembresiasAdminPage() {
     const formData = new FormData(e.currentTarget);
 
     startTransition(async () => {
-      let res;
-      if (editingPlan) {
-        res = await updatePlanAction(editingPlan.id, formData);
-      } else {
-        res = await createPlanAction(formData);
-      }
+      try {
+        const res = editingPlan
+          ? await updatePlanAction(editingPlan.id, formData)
+          : await createPlanAction(formData);
 
-      if (res?.success) {
+        if (!res?.success) {
+          const message = res?.error || "No se pudo guardar el plan.";
+          console.error("Error al guardar el plan:", message);
+          alert(message);
+          return;
+        }
+
         setShowModal(false);
         setEditingPlan(null);
-        loadData();
+        await loadData();
+      } catch (error) {
+        console.error("Error inesperado al guardar el plan:", error);
+        alert("Error inesperado al guardar el plan.");
       }
     });
   };
