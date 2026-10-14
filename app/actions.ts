@@ -286,7 +286,7 @@ export async function createMember(formData: FormData) {
   const emergencyContact = String(formData.get("emergencyContact") ?? "").trim();
   const planIdRaw = String(formData.get("planId") ?? "").trim();
 
-  if (!firstName || !lastName || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (!firstName || !lastName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "Completá nombre, apellido y un correo válido." };
   }
   if (planIdRaw && (!/^[1-9]\\d*$/.test(planIdRaw) || !Number.isSafeInteger(Number(planIdRaw)))) {
