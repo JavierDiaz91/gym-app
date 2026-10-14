@@ -277,62 +277,52 @@ export async function getMemberById(id: number): Promise<Member | null> {
 }
 
 export async function createMember(formData: FormData) {
-  const firstName = formData.get("firstName") as string;
-  const lastName = formData.get("lastName") as string;
-  const emailRaw = formData.get("email") as string;
-  const phone = formData.get("phone") as string;
-  const emergencyContact = formData.get("emergencyContact") as string;
-  const planIdRaw = formData.get("planId") as string;
-
   const session = await requireGymAdminSession();
   const gymId = session.gymId;
+  const firstName = String(formData.get("firstName") ?? "").trim();
+  const lastName = String(formData.get("lastName") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const emergencyContact = String(formData.get("emergencyContact") ?? "").trim();
+  const planIdRaw = String(formData.get("planId") ?? "").trim();
 
-  // 1. Normalizar email (sin espacios y en minúsculas)
-  const email = emailRaw ? emailRaw.trim().toLowerCase() : "";
-
-  if (!email) {
-    return { error: "El email es obligatorio" };
+  if (!firstName || !lastName || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    return { error: "Completá nombre, apellido y un correo válido." };
+  }
+  if (planIdRaw && (!/^[1-9]\\d*$/.test(planIdRaw) || !Number.isSafeInteger(Number(planIdRaw)))) {
+    return { error: "El plan de membresía no es válido." };
   }
 
   try {
-    // 2. Validar que no exista ya un miembro con ese correo
-    const existingMember = await sql`
-      SELECT id FROM members 
-      WHERE LOWER(TRIM(email)) = ${email} AND gym_id = ${gymId}
+    // Misma fila de gimnasio bloqueada que register_gym_member: evita exceder cupos
+    // ante altas administrativas y QR concurrentes, y revierte todo ante fallos.
+    await sql`
+      SELECT public.create_gym_member_admin(
+        ${gymId}, ${firstName}, ${lastName}, ${email},
+        ${phone}, ${emergencyContact},
+        ${planIdRaw ? Number(planIdRaw) : null}
+      ) AS member_id
     `;
-
-    if (existingMember.length > 0) {
-      return { error: "Ya existe un socio registrado con este correo electrónico." };
-    }
-
-    const capacityError = await checkSaaSCapacity(gymId, "members");
-    if (capacityError) return { error: capacityError };
-
-    // 3. Insertar el miembro con el email sanitizado
-    const [member] = await sql`
-      INSERT INTO members (gym_id, first_name, last_name, email, phone, emergency_contact, status)
-      VALUES (${gymId}, ${firstName}, ${lastName}, ${email}, ${phone || null}, ${emergencyContact || null}, 'active')
-      RETURNING id
-    `;
-
-    // 4. Si seleccionó un plan, crear la suscripción inicial
-    if (planIdRaw && planIdRaw !== "") {
-      const planId = Number(planIdRaw);
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 1);
-
-      await sql`
-        INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-        VALUES (${member.id}, ${planId}, ${startDate.toISOString()}, ${endDate.toISOString()}, 'active')
-      `;
-    }
-
     revalidateTag("members", "max");
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === "P0001" || error?.code === "23505") {
+      const message = String(error?.message ?? "");
+      if (message.includes("límite de alumnos")) {
+        return { error: "Alcanzaste el límite de alumnos de tu plan SaaS." };
+      }
+      if (message.includes("Ya existe un socio") || error?.code === "23505") {
+        return { error: "Ya existe un socio registrado con este correo electrónico." };
+      }
+      if (message.includes("plan de membresía")) {
+        return { error: "El plan seleccionado no pertenece a tu gimnasio." };
+      }
+      if (message.includes("suscripción SaaS vigente")) {
+        return { error: "El gimnasio no tiene una suscripción SaaS vigente." };
+      }
+    }
     console.error("Error creating member:", error);
-    return { error: "Error al crear miembro" };
+    return { error: "Error al crear miembro." };
   }
 }
 
