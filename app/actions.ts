@@ -229,7 +229,11 @@ export async function getMembers(query: string = ""): Promise<Member[]> {
         s.end_date AS subscription_end
       FROM members m
       LEFT JOIN subscriptions s 
-        ON m.id = s.member_id AND s.status = 'active'
+        ON m.id = s.member_id
+               AND s.status IN ('active', 'scheduled')
+               AND s.payment_status = 'paid'
+               AND s.start_date <= CURRENT_DATE
+               AND s.end_date > CURRENT_DATE
       LEFT JOIN membership_plans mp 
         ON s.plan_id = mp.id
       WHERE m.gym_id = ${session.gymId}
@@ -262,7 +266,11 @@ export async function getMemberById(id: number): Promise<Member | null> {
         s.end_date AS subscription_end
       FROM members m
       LEFT JOIN subscriptions s 
-        ON m.id = s.member_id AND s.status = 'active'
+        ON m.id = s.member_id
+               AND s.status IN ('active', 'scheduled')
+               AND s.payment_status = 'paid'
+               AND s.start_date <= CURRENT_DATE
+               AND s.end_date > CURRENT_DATE
       LEFT JOIN membership_plans mp 
         ON s.plan_id = mp.id
       WHERE m.id = ${id}
@@ -449,36 +457,11 @@ export async function createSubscription(memberId: number, planId: number) {
 
     if (!member) return { error: "Miembro no encontrado" };
 
-    const plans = await sql`
-      SELECT *
-      FROM membership_plans
-      WHERE id = ${planId}
-        AND gym_id = ${session.gymId}
-        AND is_active = true
-    `;
-
-    if (plans.length === 0) return { error: "Plan no encontrado" };
-
-    const plan = plans[0];
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + plan.duration_days);
-
+    // Scheduling is atomic in PostgreSQL and preserves membership history.
     await sql`
-      UPDATE subscriptions
-      SET status = 'cancelled'
-      WHERE member_id = ${memberId}
-        AND status = 'active'
-    `;
-
-    await sql`
-      INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-      VALUES (${memberId}, ${planId}, ${startDate.toISOString()}, ${endDate.toISOString()}, 'active')
-    `;
-
-    await sql`
-      INSERT INTO payments (member_id, amount, payment_type, description)
-      VALUES (${memberId}, ${plan.price}, 'subscription', ${`Membresia: ${plan.name}`})
+      SELECT * FROM public.renew_gym_membership(
+        ${session.gymId}, ${memberId}, ${planId}, 'pending', 0
+      )
     `;
 
     revalidateTag("members", "max");
@@ -2461,7 +2444,11 @@ export async function registerAttendanceAction(memberIdentifier: string) {
             s.status AS subscription_status
           FROM members m
           LEFT JOIN subscriptions s 
-            ON m.id = s.member_id AND s.status = 'active'
+            ON m.id = s.member_id
+               AND s.status IN ('active', 'scheduled')
+               AND s.payment_status = 'paid'
+               AND s.start_date <= CURRENT_DATE
+               AND s.end_date > CURRENT_DATE
           LEFT JOIN membership_plans mp 
             ON s.plan_id = mp.id
           WHERE m.gym_id = ${gymId}
@@ -2479,7 +2466,11 @@ export async function registerAttendanceAction(memberIdentifier: string) {
             s.status AS subscription_status
           FROM members m
           LEFT JOIN subscriptions s 
-            ON m.id = s.member_id AND s.status = 'active'
+            ON m.id = s.member_id
+               AND s.status IN ('active', 'scheduled')
+               AND s.payment_status = 'paid'
+               AND s.start_date <= CURRENT_DATE
+               AND s.end_date > CURRENT_DATE
           LEFT JOIN membership_plans mp 
             ON s.plan_id = mp.id
           WHERE m.gym_id = ${gymId}
@@ -2498,8 +2489,7 @@ export async function registerAttendanceAction(memberIdentifier: string) {
     }
 
     const member = members[0];
-    const now = new Date();
-    const isSubscriptionValid = member.subscription_end && new Date(member.subscription_end) >= now;
+    const isSubscriptionValid = Boolean(member.subscription_end);
 
     // 2. Determinar estado de acceso
     let accessGranted = false;
