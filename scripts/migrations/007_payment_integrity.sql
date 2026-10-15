@@ -9,7 +9,7 @@ BEGIN
    WHERE NULLIF(BTRIM(transaction_id),'') IS NOT NULL
    GROUP BY transaction_id HAVING COUNT(*) > 1
  ) THEN
-   RAISE EXCEPTION 'Duplicate transaction_id values: resolve before adding unique index';
+   RAISE EXCEPTION 'Duplicate transaction_id values: resolve before applying payment migration';
  END IF;
 END $$;
 -- The existing unique index already prevents reuse of non-null transaction IDs.
