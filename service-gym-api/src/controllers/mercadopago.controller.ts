@@ -426,27 +426,15 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       });
     }
 
-    // Bind checkout to the exact unpaid membership period, if one exists.
-    const pendingSubscriptions = await sql`
-      SELECT id FROM subscriptions
-      WHERE member_id = ${member.member_id}
-        AND plan_id = ${plan.id}
-        AND payment_status = 'pending'
-        AND status IN ('active', 'scheduled')
-        AND end_date > CURRENT_DATE
-      ORDER BY start_date ASC
-      LIMIT 2
+    // The DB function serializes checkout preparation for this member.
+    const [preparedCheckout] = await sql`
+      SELECT public.prepare_gym_membership_checkout(
+        ${Number(member.gym_id)}, ${Number(member.member_id)}, ${Number(plan.id)}
+      ) AS subscription_id
     `;
-    if (pendingSubscriptions.length > 1) {
-      return res.status(409).json({
-        error: "Hay varias membresías pendientes para este plan. Requiere revisión administrativa.",
-      });
-    }
-    const checkoutSubscriptionId = pendingSubscriptions[0]?.id ?? null;
-    if (checkoutSubscriptionId === null) {
-      return res.status(409).json({
-        error: "No hay una membresía pendiente para cobrar. Primero se debe generar la renovación pendiente.",
-      });
+    const checkoutSubscriptionId = Number(preparedCheckout?.subscription_id);
+    if (!Number.isSafeInteger(checkoutSubscriptionId) || checkoutSubscriptionId <= 0) {
+      return res.status(500).json({ error: "No se pudo preparar la membresía pendiente." });
     }
 
     const unitPrice = Number(plan.price);
