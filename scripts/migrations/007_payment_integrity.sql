@@ -39,6 +39,7 @@ DECLARE
  v_existing_plan integer;
  v_existing_method text;
  v_existing_amount numeric;
+ v_pending_count integer;
 BEGIN
  IF NULLIF(BTRIM(p_payment_method),'') IS NULL OR p_amount IS NULL OR p_amount <= 0 THEN
    RAISE EXCEPTION 'Invalid payment method or amount';
@@ -66,11 +67,25 @@ BEGIN
  WHERE id=p_plan_id AND gym_id=p_gym_id;
  IF NOT FOUND THEN RAISE EXCEPTION 'Plan not found in gym'; END IF;
  -- Existing pending period may be settled even if the plan has been deactivated.
+ -- Reject ambiguous unpaid periods instead of arbitrarily assigning a payment.
+ SELECT COUNT(*) INTO v_pending_count FROM public.subscriptions
+ WHERE member_id=p_member_id AND plan_id=p_plan_id
+   AND payment_status='pending' AND status IN ('active','scheduled')
+   AND end_date>CURRENT_DATE;
+ IF v_pending_count > 1 THEN
+   RAISE EXCEPTION 'Multiple pending memberships: manual reconciliation required';
+ END IF;
  SELECT * INTO v_sub FROM public.subscriptions
  WHERE member_id=p_member_id AND plan_id=p_plan_id
  AND payment_status='pending' AND status IN ('active','scheduled')
  AND end_date>CURRENT_DATE
  ORDER BY start_date ASC LIMIT 1 FOR UPDATE;
+ IF FOUND AND EXISTS (
+   SELECT 1 FROM public.payments p
+   WHERE p.subscription_id=v_sub.id AND p.status='completed'
+ ) THEN
+   RAISE EXCEPTION 'Pending membership already has a completed payment: manual reconciliation required';
+ END IF;
  IF NOT FOUND THEN
    IF NOT v_plan.is_active THEN RAISE EXCEPTION 'Cannot renew inactive plan'; END IF;
    SELECT * INTO v_sub FROM public.renew_gym_membership(
