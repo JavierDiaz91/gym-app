@@ -2309,33 +2309,9 @@ export async function updateMemberAction(
     }
 
     if (data.plan_id) {
-      const [plan] = await sql`
-        SELECT id
-        FROM membership_plans
-        WHERE id = ${data.plan_id}
-          AND gym_id = ${session.gymId}
-          AND is_active = true
-      `;
-
-      if (!plan) {
-        return { success: false, error: "Plan no encontrado" };
-      }
-
       await sql`
-        UPDATE subscriptions 
-        SET status = 'cancelled' 
-        WHERE member_id = ${id}
-          AND status = 'active'
-      `;
-
-      await sql`
-        INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-        VALUES (
-          ${id},
-          ${data.plan_id},
-          NOW(),
-          NOW() + INTERVAL '30 days',
-          'active'
+        SELECT * FROM public.renew_gym_membership(
+          ${session.gymId}, ${id}, ${data.plan_id}, 'pending', 0
         )
       `;
     }
@@ -2564,139 +2540,13 @@ export async function createPayment(formData: FormData) {
       return { success: false, error: "Datos de pago inválidos." };
     }
 
-    const [member] = await sql`
-      SELECT id
-      FROM members
-      WHERE id = ${memberId}
-        AND gym_id = ${session.gymId}
-      LIMIT 1
-    `;
-
-    if (!member) {
-      return { success: false, error: "Miembro no encontrado." };
-    }
-
-    const [plan] = await sql`
-      SELECT id, price, duration_months
-      FROM membership_plans
-      WHERE id = ${planId}
-        AND gym_id = ${session.gymId}
-        AND is_active = true
-      LIMIT 1
-    `;
-
-    if (!plan) {
-      return { success: false, error: "Plan no encontrado." };
-    }
-
-    const amount = Number(plan.price);
-    const durationMonths = Math.max(1, Number(plan.duration_months) || 1);
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return { success: false, error: "El plan tiene un precio inválido." };
-    }
-
-    if (transactionId) {
-      const existingPayment = await sql`
-        SELECT p.id
-        FROM payments p
-        JOIN members m ON m.id = p.member_id
-        WHERE p.transaction_id = ${transactionId}
-          AND m.gym_id = ${session.gymId}
-        LIMIT 1
-      `;
-
-      if (existingPayment.length > 0) {
-        return { success: false, error: "La transacción ya fue registrada." };
-      }
-    }
-
-    const existingSub = await sql`
-      SELECT s.id
-      FROM subscriptions s
-      JOIN members m ON m.id = s.member_id
-      WHERE s.member_id = ${memberId}
-        AND m.gym_id = ${session.gymId}
-      ORDER BY s.id DESC
-      LIMIT 1
-    `;
-
-    let subscriptionId: number;
-
-    if (existingSub.length > 0) {
-      subscriptionId = Number(existingSub[0].id);
-
-      await sql`
-        UPDATE subscriptions
-        SET
-          plan_id = ${planId},
-          start_date = CURRENT_DATE,
-          end_date = CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
-          status = 'active',
-          payment_status = 'paid',
-          amount_paid = ${amount},
-          updated_at = NOW()
-        WHERE id = ${subscriptionId}
-          AND member_id = ${memberId}
-      `;
-    } else {
-      const [newSub] = await sql`
-        INSERT INTO subscriptions (
-          member_id,
-          plan_id,
-          start_date,
-          end_date,
-          status,
-          payment_status,
-          amount_paid,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          ${memberId},
-          ${planId},
-          CURRENT_DATE,
-          CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
-          'active',
-          'paid',
-          ${amount},
-          NOW(),
-          NOW()
-        )
-        RETURNING id
-      `;
-
-      subscriptionId = Number(newSub.id);
-    }
-
+    // A single PostgreSQL function records the payment and subscription atomically.
+    // It settles an existing pending period or creates a new renewal.
     await sql`
-      UPDATE members
-      SET status = 'active', updated_at = NOW()
-      WHERE id = ${memberId}
-        AND gym_id = ${session.gymId}
-    `;
-
-    await sql`
-      INSERT INTO payments (
-        member_id,
-        subscription_id,
-        amount,
-        payment_method,
-        transaction_id,
-        status,
-        notes,
-        payment_date
-      )
-      VALUES (
-        ${memberId},
-        ${subscriptionId},
-        ${amount},
-        ${paymentMethod},
-        ${transactionId},
-        'completed',
-        ${notes},
-        NOW()
-      )
+      SELECT public.record_gym_membership_payment(
+        ${session.gymId}, ${memberId}, ${planId},
+        ${paymentMethod}, ${transactionId}, ${notes}
+      ) AS payment_id
     `;
 
     revalidatePath("/admin/pagos");
