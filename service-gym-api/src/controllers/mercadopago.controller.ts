@@ -426,6 +426,24 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       });
     }
 
+    // Bind checkout to the exact unpaid membership period, if one exists.
+    const pendingSubscriptions = await sql`
+      SELECT id FROM subscriptions
+      WHERE member_id = ${member.member_id}
+        AND plan_id = ${plan.id}
+        AND payment_status = 'pending'
+        AND status IN ('active', 'scheduled')
+        AND end_date > CURRENT_DATE
+      ORDER BY start_date ASC
+      LIMIT 2
+    `;
+    if (pendingSubscriptions.length > 1) {
+      return res.status(409).json({
+        error: "Hay varias membresías pendientes para este plan. Requiere revisión administrativa.",
+      });
+    }
+    const checkoutSubscriptionId = pendingSubscriptions[0]?.id ?? null;
+
     const unitPrice = Number(plan.price);
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
       return res.status(500).json({
@@ -501,6 +519,7 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
             memberId: member.member_id,
             planId: plan.id,
             quotedAmount: unitPrice,
+            subscriptionId: checkoutSubscriptionId,
           }),
           back_urls: {
             success: successUrl,
@@ -717,6 +736,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
       memberId?: string | number;
       planId?: string | number;
       quotedAmount?: number;
+      subscriptionId?: number | null;
     } = {};
 
     try {
@@ -789,6 +809,18 @@ export const handleWebhook = async (req: Request, res: Response) => {
       return res.status(200).send("OK");
     }
 
+    if (externalRef.subscriptionId === undefined) {
+      console.error(
+        `[MP WEBHOOK] LEGACY_PAYMENT_REQUIRES_REVIEW payment=${paymentId}. Missing subscription binding.`
+      );
+      return res.status(200).send("OK");
+    }
+    const subscriptionId =
+      externalRef.subscriptionId === null ? null : Number(externalRef.subscriptionId);
+    if (subscriptionId !== null && (!Number.isSafeInteger(subscriptionId) || subscriptionId <= 0)) {
+      return res.status(200).send("OK");
+    }
+
     const expectedAmount = Number(externalRef.quotedAmount);
     const paidAmount = Number(paymentData.transaction_amount);
 
@@ -809,7 +841,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
     const applied = await sql`
       SELECT public.record_gym_membership_payment_v2(
         ${tenantId}, ${memberId}, ${planId},
-        'mercadopago', ${paymentId}, 'Mercado Pago webhook', ${paidAmount}
+        'mercadopago', ${paymentId}, 'Mercado Pago webhook', ${paidAmount}, ${subscriptionId}
       ) AS payment_id
     `;
 
