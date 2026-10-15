@@ -495,6 +495,7 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
             tenantId: tenantIdParam,
             memberId: member.member_id,
             planId: plan.id,
+            quotedAmount: unitPrice,
           }),
           back_urls: {
             success: successUrl,
@@ -710,6 +711,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
       tenantId?: string;
       memberId?: string | number;
       planId?: string | number;
+      quotedAmount?: number;
     } = {};
 
     try {
@@ -767,11 +769,14 @@ export const handleWebhook = async (req: Request, res: Response) => {
       return res.status(200).send("OK");
     }
 
-    const expectedAmount = Number(plan.price);
+    // The checkout quote is fixed when the preference is created.
+    // A later change to membership_plans.price must not invalidate a real payment.
+    const expectedAmount = Number(externalRef.quotedAmount);
     const paidAmount = Number(paymentData.transaction_amount);
 
     if (
       !Number.isFinite(expectedAmount) ||
+      expectedAmount <= 0 ||
       !Number.isFinite(paidAmount) ||
       Math.abs(expectedAmount - paidAmount) > 0.01
     ) {
@@ -784,9 +789,9 @@ export const handleWebhook = async (req: Request, res: Response) => {
     // The database function handles idempotency, tenant validation and
     // renewal + payment in one atomic operation without rewriting history.
     const applied = await sql`
-      SELECT public.record_gym_membership_payment(
+      SELECT public.record_gym_membership_payment_v2(
         ${tenantId}, ${memberId}, ${planId},
-        'mercadopago', ${paymentId}, 'Mercado Pago webhook'
+        'mercadopago', ${paymentId}, 'Mercado Pago webhook', ${paidAmount}
       ) AS payment_id
     `;
 
