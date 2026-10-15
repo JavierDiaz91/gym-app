@@ -81,7 +81,7 @@ const subResult = await sql`
   JOIN membership_plans p ON p.id = s.plan_id AND p.gym_id = m.gym_id
   WHERE m.user_id = ${userId}
     AND m.gym_id = ${session.gymId}
-    AND s.status = 'active'
+    AND s.status IN ('active', 'scheduled')
     AND s.start_date <= CURRENT_DATE
     AND s.end_date > CURRENT_DATE
   ORDER BY s.end_date DESC
@@ -99,7 +99,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
       JOIN subscriptions s ON s.member_id = m.id
       JOIN membership_plans p ON p.id = s.plan_id AND p.gym_id = m.gym_id
       WHERE m.user_id = ${userId} AND m.gym_id = ${session.gymId}
-        AND s.status = 'scheduled' AND s.end_date > CURRENT_DATE
+        AND s.status = 'scheduled' AND s.start_date > CURRENT_DATE AND s.end_date > CURRENT_DATE
       ORDER BY s.start_date ASC LIMIT 1
     `;
     upcoming = (futureRows[0] as SubscriptionData) || null;
