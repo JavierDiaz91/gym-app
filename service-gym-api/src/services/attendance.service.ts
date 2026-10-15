@@ -25,17 +25,22 @@ export async function registerCheckIn(gymId: number, identifier: string) {
     return { success: false, code: "NOT_FOUND", message: "Usuario no encontrado" };
   }
 
-  // 2. Verificamos la suscripción activa usando member_id
+  // La vigencia se determina por fechas; una renovacion futura no reemplaza
+  // a la membresia que cubre el dia actual.
   const [sub] = await sql`
-    SELECT s.status, s.end_date, mp.name as plan_name
+    SELECT s.status, s.end_date, mp.name AS plan_name
     FROM subscriptions s
-    LEFT JOIN membership_plans mp ON s.plan_id = mp.id
+    JOIN membership_plans mp ON mp.id = s.plan_id AND mp.gym_id = ${gymId}
     WHERE s.member_id = ${member.member_id}
-    ORDER BY s.end_date DESC
+      AND s.status IN ('active', 'scheduled')
+      AND s.payment_status = 'paid'
+      AND s.start_date <= CURRENT_DATE
+      AND s.end_date > CURRENT_DATE
+    ORDER BY s.start_date DESC
     LIMIT 1
   `;
 
-  const isExpired = !sub || new Date(sub.end_date) < new Date() || sub.status !== "active";
+  const isExpired = !sub;
 
   if (isExpired) {
     return {
