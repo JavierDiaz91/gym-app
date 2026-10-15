@@ -443,6 +443,11 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       });
     }
     const checkoutSubscriptionId = pendingSubscriptions[0]?.id ?? null;
+    if (checkoutSubscriptionId === null) {
+      return res.status(409).json({
+        error: "No hay una membresía pendiente para cobrar. Primero se debe generar la renovación pendiente.",
+      });
+    }
 
     const unitPrice = Number(plan.price);
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
