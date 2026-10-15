@@ -398,14 +398,19 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       plan = planRows[0];
     }
 
-    if (!plan) {
+    if (!plan && !planId) {
+      // Only offer the current unpaid period as a fallback. A historical
+      // subscription is not proof that a plan is still available for checkout.
       const activePlanResult = await sql`
         SELECT p.id, p.name, p.price
         FROM subscriptions s
         JOIN membership_plans p ON p.id = s.plan_id
         WHERE s.member_id = ${member.member_id}
           AND p.gym_id = ${Number(member.gym_id)}
-        ORDER BY s.created_at DESC
+          AND s.payment_status = 'pending'
+          AND s.status IN ('active', 'scheduled')
+          AND s.end_date > CURRENT_DATE
+        ORDER BY s.start_date ASC
         LIMIT 1
       `;
 
