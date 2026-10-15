@@ -79,29 +79,21 @@ export async function createGymMember(data: {
   emergencyContact?: string;
   planId?: number;
 }) {
-  const [member] = await sql`
-    INSERT INTO members (gym_id, first_name, last_name, email, phone, emergency_contact)
-    VALUES (
+  const [result] = await sql`
+    SELECT public.create_gym_member_with_plan(
       ${data.gymId},
       ${data.firstName},
       ${data.lastName},
-      ${data.email || null},
-      ${data.phone || null},
-      ${data.emergencyContact || null}
-    )
-    RETURNING *
+      ${data.email ?? null},
+      ${data.phone ?? null},
+      ${data.emergencyContact ?? null},
+      ${data.planId ?? null}
+    ) AS member_id
   `;
-
-  if (data.planId) {
-    // Duration and tenant ownership are checked in PostgreSQL.
-    // The new membership starts unpaid until a payment is recorded.
-    await sql`
-      SELECT * FROM public.renew_gym_membership(
-        ${data.gymId}, ${member.id}, ${data.planId}, 'pending', 0
-      )
-    `;
-  }
-
+  const [member] = await sql`
+    SELECT * FROM members
+    WHERE id = ${result.member_id} AND gym_id = ${data.gymId}
+  `;
   return member;
 }
 
