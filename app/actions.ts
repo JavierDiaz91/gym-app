@@ -106,6 +106,10 @@ export async function registerUser(formData: FormData) {
     `;
     return { success: true };
   } catch (error: any) {
+    if (error?.code === "42883") {
+      console.error("Falta aplicar la migración database/migrations/20261013_register_gym_member.sql en Neon.");
+      return { error: "El registro por QR aún no está configurado. Contactá al administrador del gimnasio." };
+    }
     if (error?.code === "P0001") {
       const message = String(error?.message || "");
       if (message.includes("correo ya tiene una cuenta")) {
