@@ -79,39 +79,21 @@ export async function createGymMember(data: {
   emergencyContact?: string;
   planId?: number;
 }) {
-  const [member] = await sql`
-    INSERT INTO members (gym_id, first_name, last_name, email, phone, emergency_contact)
-    VALUES (
+  const [result] = await sql`
+    SELECT public.create_gym_member_with_plan(
       ${data.gymId},
       ${data.firstName},
       ${data.lastName},
-      ${data.email || null},
-      ${data.phone || null},
-      ${data.emergencyContact || null}
-    )
-    RETURNING *
+      ${data.email ?? null},
+      ${data.phone ?? null},
+      ${data.emergencyContact ?? null},
+      ${data.planId ?? null}
+    ) AS member_id
   `;
-
-  if (data.planId) {
-    const [plan] = await sql`
-      SELECT id
-      FROM membership_plans
-      WHERE id = ${data.planId}
-        AND gym_id = ${data.gymId}
-    `;
-
-    if (!plan) throw new Error("Plan no encontrado para este gimnasio");
-
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + 1);
-
-    await sql`
-      INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-      VALUES (${member.id}, ${data.planId}, ${startDate.toISOString()}, ${endDate.toISOString()}, 'active')
-    `;
-  }
-
+  const [member] = await sql`
+    SELECT * FROM members
+    WHERE id = ${result.member_id} AND gym_id = ${data.gymId}
+  `;
   return member;
 }
 
@@ -129,7 +111,7 @@ export async function getMemberProfile(gymId: number, memberId: number) {
       mp.price AS plan_price
     FROM members m
     LEFT JOIN subscriptions s ON s.member_id = m.id
-    LEFT JOIN memberships mp ON s.membership_id = mp.id
+    LEFT JOIN membership_plans mp ON s.plan_id = mp.id
     WHERE m.id = ${memberId}
       AND m.gym_id = ${gymId}
     ORDER BY s.created_at DESC
@@ -153,7 +135,7 @@ export async function getMemberDashboard(gymId: number, memberId: number) {
       mp.price AS plan_price
     FROM members m
     LEFT JOIN subscriptions s ON s.member_id = m.id AND s.status = 'active'
-    LEFT JOIN memberships mp ON s.membership_id = mp.id
+    LEFT JOIN membership_plans mp ON s.plan_id = mp.id
     WHERE m.id = ${memberId}
       AND m.gym_id = ${gymId}
     ORDER BY s.created_at DESC

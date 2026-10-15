@@ -1,79 +1,39 @@
-import { Dumbbell, Users, Timer, Heart, Trophy, Utensils } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Users, CreditCard, CalendarCheck2, Dumbbell, ClipboardList, CalendarDays } from "lucide-react";
 
-const services = [
-  {
-    icon: Dumbbell,
-    title: "Equipos Premium",
-    description: "Máquinas de última generación y pesas libres para todos los niveles.",
-  },
-  {
-    icon: Users,
-    title: "Clases Grupales",
-    description: "Yoga, spinning, crossfit, zumba y más de 20 clases diferentes.",
-  },
-  {
-    icon: Timer,
-    title: "Entrenamiento Personal",
-    description: "Sesiones uno a uno con entrenadores certificados.",
-  },
-  {
-    icon: Heart,
-    title: "Zona Cardio",
-    description: "Cintas, bicicletas y elípticas con pantallas interactivas.",
-  },
-  {
-    icon: Trophy,
-    title: "Programas Especiales",
-    description: "Pérdida de peso, ganancia muscular y preparación deportiva.",
-  },
-  {
-    icon: Utensils,
-    title: "Nutrición",
-    description: "Planes alimenticios personalizados por nutriólogos.",
-  },
+const modules = [
+  { icon: Users, title: "Miembros", description: "Altas, perfiles, estados y membresías organizadas por gimnasio." },
+  { icon: CreditCard, title: "Cobros", description: "Pagos, historial y renovaciones conectados con la membresía de cada socio." },
+  { icon: CalendarCheck2, title: "Asistencia", description: "Registrá ingresos y consultá la actividad diaria desde un solo lugar." },
+  { icon: CalendarDays, title: "Clases", description: "Gestioná programación, cupos y reservas sin depender de planillas externas." },
+  { icon: Dumbbell, title: "Entrenadores", description: "Vinculá alumnos, asigná responsabilidades y mantené cada equipo ordenado." },
+  { icon: ClipboardList, title: "Rutinas", description: "Creá, asigná y administrá planes de entrenamiento desde la plataforma." },
 ];
 
 export function Services() {
   return (
-    <section id="servicios" className="py-24 bg-[#0d0f12] text-gray-100 border-t border-gray-800/40">
+    <section id="modulos" className="border-t border-white/[0.06] bg-[#0b0e14] py-24 text-white">
       <div className="container mx-auto px-4">
-        
-        {/* Encabezado */}
-        <div className="text-center mb-16">
-          <span className="text-[#00aeef] font-bold uppercase tracking-wider text-xs bg-[#00aeef]/10 px-3.5 py-1.5 rounded-full border border-[#00aeef]/20 inline-block mb-3">
-            Nuestros Servicios
-          </span>
-          <h2 
-            className="text-4xl md:text-5xl font-black text-white mt-2 mb-4 tracking-tight"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            Todo lo que Necesitás
+        <div className="mx-auto mb-14 max-w-3xl text-center">
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">Una sola plataforma</span>
+          <h2 className="mt-4 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
+            Todo lo que necesitás para operar mejor.
           </h2>
-          <p className="text-gray-400 max-w-2xl mx-auto text-base leading-relaxed">
-            Ofrecemos una experiencia fitness completa con instalaciones de primer nivel
-            y servicios diseñados para ayudarte a alcanzar tus metas.
+          <p className="mt-5 text-base leading-7 text-zinc-400 md:text-lg">
+            Menos herramientas separadas, menos tareas repetidas y más visibilidad sobre lo que pasa en tu gimnasio.
           </p>
         </div>
 
-        {/* Grilla de Servicios */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {services.map((service) => (
-            <Card 
-              key={service.title} 
-              className="group hover:-translate-y-1 transition-all duration-300 border-gray-800/80 bg-[#14171d] hover:border-[#00aeef]/50 hover:shadow-xl hover:shadow-[#00aeef]/5 rounded-2xl overflow-hidden"
-            >
-              <CardContent className="p-6">
-                <div className="w-12 h-12 bg-[#00aeef]/10 border border-[#00aeef]/20 rounded-xl flex items-center justify-center mb-5 group-hover:bg-[#00aeef] group-hover:border-[#00aeef] group-hover:scale-110 transition-all duration-300">
-                  <service.icon className="w-6 h-6 text-[#00aeef] group-hover:text-black transition-colors" />
-                </div>
-                <h3 className="text-xl font-extrabold text-white mb-2">{service.title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{service.description}</p>
-              </CardContent>
-            </Card>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {modules.map((module) => (
+            <div key={module.title} className="group rounded-2xl border border-white/[0.07] bg-white/[0.025] p-6 transition-all hover:-translate-y-1 hover:border-violet-400/20 hover:bg-white/[0.04]">
+              <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.08] bg-gradient-to-br from-violet-500/15 to-cyan-400/[0.04]">
+                <module.icon className="h-5 w-5 text-violet-200" />
+              </div>
+              <h3 className="text-lg font-semibold tracking-tight text-white">{module.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">{module.description}</p>
+            </div>
           ))}
         </div>
-
       </div>
     </section>
   );

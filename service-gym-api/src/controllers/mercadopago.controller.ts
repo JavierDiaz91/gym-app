@@ -398,14 +398,19 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       plan = planRows[0];
     }
 
-    if (!plan) {
+    if (!plan && !planId) {
+      // Only offer the current unpaid period as a fallback. A historical
+      // subscription is not proof that a plan is still available for checkout.
       const activePlanResult = await sql`
         SELECT p.id, p.name, p.price
         FROM subscriptions s
         JOIN membership_plans p ON p.id = s.plan_id
         WHERE s.member_id = ${member.member_id}
           AND p.gym_id = ${Number(member.gym_id)}
-        ORDER BY s.created_at DESC
+          AND s.payment_status = 'pending'
+          AND s.status IN ('active', 'scheduled')
+          AND s.end_date > CURRENT_DATE
+        ORDER BY s.start_date ASC
         LIMIT 1
       `;
 
@@ -419,6 +424,17 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
       return res.status(404).json({
         error: "No se encontró un plan válido para este socio.",
       });
+    }
+
+    // The DB function serializes checkout preparation for this member.
+    const [preparedCheckout] = await sql`
+      SELECT public.prepare_gym_membership_checkout(
+        ${Number(member.gym_id)}, ${Number(member.member_id)}, ${Number(plan.id)}
+      ) AS subscription_id
+    `;
+    const checkoutSubscriptionId = Number(preparedCheckout?.subscription_id);
+    if (!Number.isSafeInteger(checkoutSubscriptionId) || checkoutSubscriptionId <= 0) {
+      return res.status(500).json({ error: "No se pudo preparar la membresía pendiente." });
     }
 
     const unitPrice = Number(plan.price);
@@ -495,6 +511,8 @@ export const createPreference = async (req: AuthenticatedRequest, res: Response)
             tenantId: tenantIdParam,
             memberId: member.member_id,
             planId: plan.id,
+            quotedAmount: unitPrice,
+            subscriptionId: checkoutSubscriptionId,
           }),
           back_urls: {
             success: successUrl,
@@ -700,10 +718,18 @@ export const handleWebhook = async (req: Request, res: Response) => {
       return res.status(200).send("OK");
     }
 
+    // Never fulfill a payment in a different currency.
+    if (paymentData.currency_id !== "ARS") {
+      console.warn(`[MP WEBHOOK] Moneda inesperada para pago ${paymentId}`);
+      return res.status(200).send("OK");
+    }
+
     let externalRef: {
       tenantId?: string;
       memberId?: string | number;
       planId?: string | number;
+      quotedAmount?: number;
+      subscriptionId?: number | null;
     } = {};
 
     try {
@@ -761,11 +787,39 @@ export const handleWebhook = async (req: Request, res: Response) => {
       return res.status(200).send("OK");
     }
 
-    const expectedAmount = Number(plan.price);
+    // The checkout quote is fixed when the preference is created.
+    // A later change to membership_plans.price must not invalidate a real payment.
+    // Older preferences did not include quotedAmount. Do not silently
+    // substitute the current plan price: it may have changed since checkout.
+    // Flag these approved payments for manual reconciliation instead.
+    if (
+      externalRef.quotedAmount === undefined ||
+      externalRef.quotedAmount === null
+    ) {
+      console.error(
+        `[MP WEBHOOK] LEGACY_PAYMENT_REQUIRES_REVIEW payment=${paymentId} tenant=${tenantId} member=${memberId} plan=${planId}. Missing checkout quote; reconcile against Mercado Pago before applying.`
+      );
+      return res.status(200).send("OK");
+    }
+
+    if (externalRef.subscriptionId === undefined) {
+      console.error(
+        `[MP WEBHOOK] LEGACY_PAYMENT_REQUIRES_REVIEW payment=${paymentId}. Missing subscription binding.`
+      );
+      return res.status(200).send("OK");
+    }
+    const subscriptionId =
+      externalRef.subscriptionId === null ? null : Number(externalRef.subscriptionId);
+    if (subscriptionId !== null && (!Number.isSafeInteger(subscriptionId) || subscriptionId <= 0)) {
+      return res.status(200).send("OK");
+    }
+
+    const expectedAmount = Number(externalRef.quotedAmount);
     const paidAmount = Number(paymentData.transaction_amount);
 
     if (
       !Number.isFinite(expectedAmount) ||
+      expectedAmount <= 0 ||
       !Number.isFinite(paidAmount) ||
       Math.abs(expectedAmount - paidAmount) > 0.01
     ) {
@@ -775,123 +829,14 @@ export const handleWebhook = async (req: Request, res: Response) => {
       return res.status(200).send("OK");
     }
 
-    const durationMonths = Math.max(1, Number(plan.duration_months) || 1);
-
-    // Aplicamos suscripción + pago en una única sentencia atómica.
-    // El advisory lock serializa notificaciones concurrentes del mismo paymentId.
-    // Así evitamos extender dos veces la membresía antes de que el índice único
-    // de transaction_id pueda frenar el segundo INSERT.
+    // The database function handles idempotency, tenant validation and
+    // renewal + payment in one atomic operation without rewriting history.
     const applied = await sql`
-      WITH payment_lock AS MATERIALIZED (
-        SELECT pg_advisory_xact_lock(hashtext(${paymentId})::bigint)
-      ),
-      existing_payment AS MATERIALIZED (
-        SELECT p.id
-        FROM payments p
-        CROSS JOIN payment_lock
-        WHERE p.transaction_id = ${paymentId}
-        LIMIT 1
-      ),
-      latest_sub AS MATERIALIZED (
-        SELECT s.id
-        FROM subscriptions s
-        CROSS JOIN payment_lock
-        WHERE s.member_id = ${memberId}
-        ORDER BY s.id DESC
-        LIMIT 1
-      ),
-      updated_sub AS (
-        UPDATE subscriptions s
-        SET
-          status = 'active',
-          plan_id = ${planId},
-          start_date = CASE
-            WHEN s.end_date IS NOT NULL AND s.end_date >= CURRENT_DATE
-              THEN s.start_date
-            ELSE CURRENT_DATE
-          END,
-          end_date = CASE
-            WHEN s.end_date IS NOT NULL AND s.end_date >= CURRENT_DATE
-              THEN s.end_date + (${durationMonths} || ' month')::INTERVAL
-            ELSE CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL
-          END,
-          payment_status = 'paid',
-          amount_paid = ${paidAmount},
-          updated_at = NOW()
-        WHERE s.id = (SELECT id FROM latest_sub)
-          AND NOT EXISTS (SELECT 1 FROM existing_payment)
-        RETURNING s.id
-      ),
-      inserted_sub AS (
-        INSERT INTO subscriptions (
-          member_id,
-          plan_id,
-          status,
-          start_date,
-          end_date,
-          payment_status,
-          amount_paid,
-          created_at,
-          updated_at
-        )
-        SELECT
-          ${memberId},
-          ${planId},
-          'active',
-          CURRENT_DATE,
-          CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
-          'paid',
-          ${paidAmount},
-          NOW(),
-          NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM existing_payment)
-          AND NOT EXISTS (SELECT 1 FROM latest_sub)
-        RETURNING id
-      ),
-      chosen_sub AS MATERIALIZED (
-        SELECT id FROM updated_sub
-        UNION ALL
-        SELECT id FROM inserted_sub
-      ),
-      updated_member AS (
-        UPDATE members m
-        SET status = 'active', updated_at = NOW()
-        WHERE m.id = ${memberId}
-          AND m.gym_id = ${tenantId}
-          AND EXISTS (SELECT 1 FROM chosen_sub)
-        RETURNING m.id
-      )
-      INSERT INTO payments (
-        member_id,
-        subscription_id,
-        amount,
-        payment_method,
-        transaction_id,
-        status,
-        payment_date,
-        created_at
-      )
-      SELECT
-        ${memberId},
-        cs.id,
-        ${paidAmount},
-        'mercadopago',
-        ${paymentId},
-        'completed',
-        NOW(),
-        NOW()
-      FROM chosen_sub cs
-      CROSS JOIN updated_member
-      ON CONFLICT (transaction_id) WHERE transaction_id IS NOT NULL DO NOTHING
-      RETURNING id, subscription_id
+      SELECT public.record_gym_membership_payment_v2(
+        ${tenantId}, ${memberId}, ${planId},
+        'mercadopago', ${paymentId}, 'Mercado Pago webhook', ${paidAmount}, ${subscriptionId}
+      ) AS payment_id
     `;
-
-    if (applied.length === 0) {
-      console.log(
-        `[MP WEBHOOK] Pago ${paymentId} ya procesado; no se vuelve a extender la suscripción.`
-      );
-      return res.status(200).send("OK");
-    }
 
     console.log(
       `[MP WEBHOOK] Pago ${paymentId} aplicado al miembro ${memberId} del tenant ${tenantId}.`

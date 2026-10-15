@@ -75,41 +75,12 @@ export async function assignSubscription(data: {
   planId: number;
   durationMonths: number;
 }) {
-  const [member] = await sql`
-    SELECT id
-    FROM members
-    WHERE id = ${data.memberId}
-      AND gym_id = ${data.gymId}
-  `;
-  if (!member) throw new Error("Miembro no encontrado");
-
-  const [plan] = await sql`
-    SELECT id
-    FROM membership_plans
-    WHERE id = ${data.planId}
-      AND gym_id = ${data.gymId}
-      AND is_active = true
-  `;
-  if (!plan) throw new Error("Plan no encontrado");
-
-  await sql`
-    UPDATE subscriptions
-    SET status = 'inactive'
-    WHERE member_id = ${data.memberId}
-      AND status = 'active'
-  `;
-
+  // The database function owns duration, dates, tenant checks and locking.
+  // This entry point only schedules the renewal; it does not collect a payment.
   const [sub] = await sql`
-    INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-    VALUES (
-      ${data.memberId},
-      ${data.planId},
-      NOW(),
-      NOW() + (${data.durationMonths} || ' month')::INTERVAL,
-      'active'
+    SELECT * FROM public.renew_gym_membership(
+      ${data.gymId}, ${data.memberId}, ${data.planId}, 'pending', 0
     )
-    RETURNING *
   `;
-
   return sub;
 }

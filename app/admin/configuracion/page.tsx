@@ -44,7 +44,7 @@ export default function ConfiguracionPage() {
   const [loadingHorarios, setLoadingHorarios] = useState<boolean>(false);
   const [loadingNotif, setLoadingNotif] = useState<boolean>(false);
 
-  // Mensaje de éxito global
+  // Mensaje de Ã©xito global
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   // Formulario General
@@ -90,7 +90,7 @@ export default function ConfiguracionPage() {
   useEffect(() => {
     const fetchDatosGimnasio = async () => {
       try {
-        // Cargar Información General
+        // Cargar InformaciÃ³n General
         const resGeneral = await fetch(`${API_BASE_URL}/gyms/${gymId}`, { cache: "no-store" });
         if (resGeneral.ok) {
           const dataGeneral = await resGeneral.json();
@@ -180,14 +180,14 @@ export default function ConfiguracionPage() {
     window.print();
   };
 
-  // 2. GUARDAR INFORMACIÓN GENERAL CONTRA LA API EXPRESS
+  // 2. GUARDAR INFORMACIÃ“N GENERAL CONTRA LA API EXPRESS
   const handleSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingGeneral(true);
 
     try {
       const res = await fetch(`${API_BASE_URL}/gyms/${gymId}`, {
-        method: "PUT", // o POST según el endpoint de tu backend Express
+        method: "PUT", // o POST segÃºn el endpoint de tu backend Express
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(generalForm),
       });
@@ -195,16 +195,16 @@ export default function ConfiguracionPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Error al actualizar la información general");
+        throw new Error(data.error || "Error al actualizar la informaciÃ³n general");
       }
 
-      triggerSuccess("Información general guardada correctamente.");
+      triggerSuccess("InformaciÃ³n general guardada correctamente.");
       setTimeout(() => {
         router.refresh();
         router.push("/admin");
       }, 500);
     } catch (err: unknown) {
-      console.error("Error al guardar información general:", err);
+      console.error("Error al guardar informaciÃ³n general:", err);
       const errorMessage = err instanceof Error ? err.message : "Error desconocido";
       alert("Error al guardar: " + errorMessage);
     } finally {
@@ -251,7 +251,7 @@ export default function ConfiguracionPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "Error al guardar la configuración");
+        throw new Error(data.error || "Error al guardar la configuraciÃ³n");
       }
 
       triggerSuccess("Horarios y feriados actualizados correctamente.");
@@ -287,10 +287,10 @@ export default function ConfiguracionPage() {
             className="text-3xl font-bold tracking-tight text-white"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Configuración
+            ConfiguraciÃ³n
           </h1>
           <p className="text-gray-400">
-            Administrá la configuración del sistema y accesos de tu sede
+            AdministrÃ¡ la configuraciÃ³n del sistema y accesos de tu sede
           </p>
         </div>
 
@@ -310,12 +310,12 @@ export default function ConfiguracionPage() {
           <TabsTrigger value="notificaciones">Notificaciones</TabsTrigger>
         </TabsList>
 
-        {/* Pestaña: GENERAL */}
+        {/* PestaÃ±a: GENERAL */}
         <TabsContent value="general">
           <Card className="bg-[#14171d] border-gray-800 text-gray-100">
             <CardHeader>
-              <CardTitle className="text-white">Información del Gimnasio</CardTitle>
-              <CardDescription className="text-gray-400">Datos básicos de tu negocio</CardDescription>
+              <CardTitle className="text-white">InformaciÃ³n del Gimnasio</CardTitle>
+              <CardDescription className="text-gray-400">Datos bÃ¡sicos de tu negocio</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSaveGeneral} className="space-y-4">
@@ -327,11 +327,11 @@ export default function ConfiguracionPage() {
                       value={generalForm.name}
                       onChange={(e) => setGeneralForm({ ...generalForm, name: e.target.value })}
                       className="bg-[#0d0f12] border-gray-800 text-white"
-                      placeholder="Ej: FitZone Gym"
+                      placeholder="Ej: Kivra Gym"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-gray-300">Teléfono</Label>
+                    <Label htmlFor="phone" className="text-gray-300">TelÃ©fono</Label>
                     <Input
                       id="phone"
                       value={generalForm.phone}
@@ -342,7 +342,7 @@ export default function ConfiguracionPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="address" className="text-gray-300">Dirección</Label>
+                  <Label htmlFor="address" className="text-gray-300">DirecciÃ³n</Label>
                   <Input
                     id="address"
                     value={generalForm.address}
@@ -359,7 +359,7 @@ export default function ConfiguracionPage() {
                     value={generalForm.email}
                     onChange={(e) => setGeneralForm({ ...generalForm, email: e.target.value })}
                     className="bg-[#0d0f12] border-gray-800 text-white"
-                    placeholder="Ej: info@fitzone.com"
+                    placeholder="Ej: info@tugimnasio.com"
                   />
                 </div>
                 <Button
@@ -375,7 +375,7 @@ export default function ConfiguracionPage() {
           </Card>
         </TabsContent>
 
-        {/* Pestaña: ACCESO / QR */}
+        {/* PestaÃ±a: ACCESO / QR */}
         <TabsContent value="qr">
           <Card className="bg-[#14171d] border-gray-800 text-gray-100 shadow-2xl">
             <CardHeader>
@@ -384,9 +384,9 @@ export default function ConfiguracionPage() {
                   <QrCode className="w-5 h-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl font-bold text-white">Código QR de Auto-Registro</CardTitle>
+                  <CardTitle className="text-xl font-bold text-white">CÃ³digo QR de Auto-Registro</CardTitle>
                   <CardDescription className="text-gray-400">
-                    Código QR único para que los alumnos escaneen en recepción y se registren en tu gimnasio.
+                    CÃ³digo QR Ãºnico para que los alumnos escaneen en recepciÃ³n y se registren en tu gimnasio.
                   </CardDescription>
                 </div>
               </div>
@@ -448,13 +448,13 @@ export default function ConfiguracionPage() {
           </Card>
         </TabsContent>
 
-        {/* Pestaña: HORARIOS */}
+        {/* PestaÃ±a: HORARIOS */}
         <TabsContent value="horarios">
           <Card className="bg-[#14171d] border-gray-800 text-gray-100">
             <CardHeader>
-              <CardTitle className="text-white">Horarios de Operación y Feriados</CardTitle>
+              <CardTitle className="text-white">Horarios de OperaciÃ³n y Feriados</CardTitle>
               <CardDescription className="text-gray-400">
-                Define los horarios de apertura y los días festivos o cierres especiales para notificar a los socios.
+                Define los horarios de apertura y los dÃ­as festivos o cierres especiales para notificar a los socios.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
@@ -488,9 +488,9 @@ export default function ConfiguracionPage() {
                     </div>
                   </div>
 
-                  {/* Sábado */}
+                  {/* SÃ¡bado */}
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-center bg-[#0d0f12] p-3 rounded-xl border border-gray-800">
-                    <Label className="text-gray-200 font-medium">Sábado</Label>
+                    <Label className="text-gray-200 font-medium">SÃ¡bado</Label>
                     <Input
                       type="time"
                       value={horariosForm.sabApertura}
@@ -546,7 +546,7 @@ export default function ConfiguracionPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Feriados y Cierres Especiales</h3>
-                      <p className="text-xs text-gray-500">Se mostrarán avisos automáticos en la app de los alumnos.</p>
+                      <p className="text-xs text-gray-500">Se mostrarÃ¡n avisos automÃ¡ticos en la app de los alumnos.</p>
                     </div>
                     <Button
                       type="button"
@@ -574,7 +574,7 @@ export default function ConfiguracionPage() {
                           />
                           <Input
                             type="text"
-                            placeholder="Ej: Año Nuevo / Mantenimiento"
+                            placeholder="Ej: AÃ±o Nuevo / Mantenimiento"
                             value={f.motivo}
                             onChange={(e) => handleUpdateFeriado(f.id, "motivo", e.target.value)}
                             className="bg-[#14171d] border-gray-800 text-white flex-1"
@@ -606,19 +606,19 @@ export default function ConfiguracionPage() {
           </Card>
         </TabsContent>
 
-        {/* Pestaña: NOTIFICACIONES */}
+        {/* PestaÃ±a: NOTIFICACIONES */}
         <TabsContent value="notificaciones">
           <Card className="bg-[#14171d] border-gray-800 text-gray-100">
             <CardHeader>
               <CardTitle className="text-white">Preferencias de Notificaciones</CardTitle>
-              <CardDescription className="text-gray-400">Configurá las alertas del sistema</CardDescription>
+              <CardDescription className="text-gray-400">ConfigurÃ¡ las alertas del sistema</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSaveNotificaciones} className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-white">Nuevos registros</Label>
-                    <p className="text-sm text-gray-400">Recibir notificación cuando se registre un nuevo miembro</p>
+                    <p className="text-sm text-gray-400">Recibir notificaciÃ³n cuando se registre un nuevo miembro</p>
                   </div>
                   <Switch
                     checked={notifForm.nuevosRegistros}
@@ -627,8 +627,8 @@ export default function ConfiguracionPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-white">Membresías por vencer</Label>
-                    <p className="text-sm text-gray-400">Alertas de membresías próximas a expirar</p>
+                    <Label className="text-white">MembresÃ­as por vencer</Label>
+                    <p className="text-sm text-gray-400">Alertas de membresÃ­as prÃ³ximas a expirar</p>
                   </div>
                   <Switch
                     checked={notifForm.membresiasVencer}
@@ -638,7 +638,7 @@ export default function ConfiguracionPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-white">Pagos recibidos</Label>
-                    <p className="text-sm text-gray-400">Notificación de cada pago procesado</p>
+                    <p className="text-sm text-gray-400">NotificaciÃ³n de cada pago procesado</p>
                   </div>
                   <Switch
                     checked={notifForm.pagosRecibidos}

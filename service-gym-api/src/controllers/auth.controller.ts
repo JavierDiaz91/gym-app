@@ -32,7 +32,7 @@ export async function login(req: Request, res: Response) {
     if (user.role !== "superadmin" && user.gym_status === "suspended") {
       return res.status(403).json({
         success: false,
-        error: "Tu cuenta de gimnasio se encuentra suspendida. Contactá al soporte de FitZone.",
+        error: "Tu cuenta de gimnasio se encuentra suspendida. Contactá al soporte de Kivra.",
       });
     }
 

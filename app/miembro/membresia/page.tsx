@@ -47,6 +47,7 @@ interface SubscriptionData {
   plan_name: string;
   price: number;
   description: string;
+  payment_status?: string;
 }
 
 interface PaymentData {
@@ -65,32 +66,43 @@ export default async function MembershipPage() {
 
   let subscription: SubscriptionData | null = null;
   let payments: PaymentData[] = [];
+  let upcoming: SubscriptionData | null = null;
 
   try {
     // 1. Obtener datos de la membresía + estado del socio (m.status)
    // 1. Obtener datos de membresía con Fallback al plan por defecto del gimnasio
 const subResult = await sql`
-  SELECT 
-    m.id AS member_id,
-    m.status AS member_status,
-    COALESCE(s.plan_id, p_default.id) AS plan_id,
-    s.start_date,
-    s.end_date,
-    s.status AS subscription_status,
-    COALESCE(p_sub.name, p_default.name, 'Pase Libre') AS plan_name,
-    COALESCE(p_sub.price, p_default.price, 0) AS price
+  SELECT
+    m.id AS member_id, m.status AS member_status,
+    s.plan_id, s.start_date, s.end_date, s.status AS subscription_status,
+    s.payment_status, p.name AS plan_name, p.price, p.description
   FROM members m
-  LEFT JOIN subscriptions s ON s.member_id = m.id AND s.status = 'active'
-  LEFT JOIN membership_plans p_sub ON p_sub.id = s.plan_id
-  LEFT JOIN membership_plans p_default ON p_default.is_active = true AND (p_default.gym_id = m.gym_id OR m.gym_id IS NULL)
+  JOIN subscriptions s ON s.member_id = m.id
+  JOIN membership_plans p ON p.id = s.plan_id AND p.gym_id = m.gym_id
   WHERE m.user_id = ${userId}
     AND m.gym_id = ${session.gymId}
-  ORDER BY s.end_date DESC NULLS LAST
+    AND s.status IN ('active', 'scheduled')
+    AND s.start_date <= CURRENT_DATE
+    AND s.end_date > CURRENT_DATE
+  ORDER BY s.end_date DESC
   LIMIT 1
 `;
 
 const subRows = Array.isArray(subResult) ? subResult : (subResult as any).rows || [];
 subscription = (subRows[0] as SubscriptionData) || null;
+
+    const futureRows = await sql`
+      SELECT m.id AS member_id, m.status AS member_status,
+        s.plan_id, s.start_date, s.end_date, s.status,
+        s.payment_status, p.name AS plan_name, p.price, p.description
+      FROM members m
+      JOIN subscriptions s ON s.member_id = m.id
+      JOIN membership_plans p ON p.id = s.plan_id AND p.gym_id = m.gym_id
+      WHERE m.user_id = ${userId} AND m.gym_id = ${session.gymId}
+        AND s.status = 'scheduled' AND s.start_date > CURRENT_DATE AND s.end_date > CURRENT_DATE
+      ORDER BY s.start_date ASC LIMIT 1
+    `;
+    upcoming = (futureRows[0] as SubscriptionData) || null;
 
     // 2. Obtener el historial de pagos
     const payResult = await sql`
@@ -115,9 +127,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
 
   // Evaluar si la cuenta está suspendida o la cuota vencida
   const isSuspended = subscription?.member_status === "suspended" || subscription?.member_status === "inactive";
-  const isDateExpired = subscription?.end_date 
-    ? new Date(subscription.end_date) < new Date() 
-    : true;
+  const isDateExpired = !subscription || subscription.payment_status !== "paid";
 
   const isBlocked = isSuspended || isDateExpired;
 
@@ -142,7 +152,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
               Plan Actual
             </span>
             <h2 className="text-2xl font-bold text-foreground mt-1">
-              {subscription?.plan_name || "Sin Plan Activo"}
+              {subscription?.plan_name || "Sin membresía vigente"}
             </h2>
             {subscription?.description && (
               <p className="text-sm text-muted-foreground mt-1">
@@ -155,7 +165,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
             {isBlocked ? (
               <span className="px-3 py-1 bg-red-500/10 text-red-600 border border-red-500/20 rounded-full text-xs font-semibold flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4" /> 
-                {isSuspended ? "Cuenta Suspendida" : "Cuota Vencida"}
+                {isSuspended ? "Cuenta Suspendida" : "Sin cuota pagada vigente"}
               </span>
             ) : (
               <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-full text-xs font-semibold flex items-center gap-1.5">
@@ -166,7 +176,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
         </div>
 
         {/* Banner de Regularización / Pagar con Mercado Pago */}
-        {isBlocked && (
+        {isBlocked && subscription?.payment_status === "pending" && !upcoming && (
           <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-red-500/10 text-red-600 rounded-lg shrink-0">
@@ -191,7 +201,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
           </div>
         )}
 
-        {!isBlocked && subscription?.member_id && subscription?.plan_id && Number(subscription?.price || 0) > 0 && (
+        {!isBlocked && !upcoming && subscription?.member_id && subscription?.plan_id && Number(subscription?.price || 0) > 0 && (
           <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
               <h4 className="font-bold text-foreground text-sm">
@@ -234,6 +244,29 @@ subscription = (subRows[0] as SubscriptionData) || null;
           </div>
         </div>
       </div>
+
+      {upcoming && (
+        <div className="bg-card border rounded-xl p-6 shadow-sm space-y-4">
+          <div className="flex flex-wrap justify-between gap-3">
+            <h2 className="text-xl font-bold">Próxima membresía</h2>
+            <span className="text-sm font-semibold">
+              {upcoming.payment_status === "paid" ? "Programada y pagada" : "Programada - Pendiente de pago"}
+            </span>
+          </div>
+          <p className="font-medium">{upcoming.plan_name}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <p>Inicio: {formatDate(upcoming.start_date)}</p>
+            <p>Vencimiento: {formatDate(upcoming.end_date)}</p>
+            <p>Precio del plan: ${Number(upcoming.price).toLocaleString("es-AR")}</p>
+          </div>
+          {upcoming.payment_status !== "paid" && (
+            <p className="text-sm text-muted-foreground">
+              Renovación pendiente de pago. Podés abonarla en el gimnasio.
+              El pago online se habilitará cuando esté vinculado a esta suscripción.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Historial de Pagos */}
       <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm space-y-4">

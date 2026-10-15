@@ -1,126 +1,66 @@
-import { Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
+import { ShieldCheck, UserRoundCog, UserRound } from "lucide-react";
+
+const roles = [
+  {
+    icon: ShieldCheck,
+    title: "Administración",
+    description: "Una visión completa del gimnasio para gestionar miembros, cobros, planes, clases, asistencia y equipo.",
+    items: ["Dashboard operativo", "Membresías y pagos", "Gestión de entrenadores"],
+  },
+  {
+    icon: UserRoundCog,
+    title: "Entrenadores",
+    description: "Herramientas enfocadas en el seguimiento de alumnos y la planificación del trabajo diario.",
+    items: ["Alumnos vinculados", "Rutinas y asignaciones", "Seguimiento centralizado"],
+  },
+  {
+    icon: UserRound,
+    title: "Miembros",
+    description: "Una experiencia simple para que cada socio vea su información sin depender de mensajes o papeles.",
+    items: ["Estado de membresía", "Pagos e historial", "Rutinas y clases"],
+  },
+];
 
 export function Pricing() {
-  const plans = [
-    {
-      id: 1,
-      name: "2 Días por Semana",
-      features: [
-        "Acceso 2 días a la semana",
-        "Uso de sala de musculación",
-        "Acceso a vestuarios y casilleros",
-        "Seguimiento básico de rutina",
-      ],
-    },
-    {
-      id: 2,
-      name: "3 Días por Semana",
-      features: [
-        "Acceso 3 días a la semana",
-        "Uso de sala de musculación y cardio",
-        "Acceso a clases grupales seleccionadas",
-        "Acceso a vestuarios y casilleros",
-        "Plan de entrenamiento personalizado",
-      ],
-    },
-    {
-      id: 3,
-      name: "Pase Libre",
-      features: [
-        "Acceso ilimitado de lunes a sábados",
-        "Acceso total a musculación y cardio",
-        "Todas las clases grupales incluidas",
-        "Acceso a vestuarios y casillero premium",
-        "Seguimiento personalizado continuo",
-      ],
-    },
-  ];
-
   return (
-    <section id="planes" className="py-24 bg-[#0d0f12] text-gray-100 border-t border-gray-800/40">
+    <section id="roles" className="border-t border-white/[0.06] bg-[#090b10] py-24 text-white">
       <div className="container mx-auto px-4">
-        
-        {/* Encabezado */}
-        <div className="text-center mb-16">
-          <span className="text-[#00aeef] font-bold uppercase tracking-wider text-xs bg-[#00aeef]/10 px-3.5 py-1.5 rounded-full border border-[#00aeef]/20 inline-block mb-3">
-            Membresías
-          </span>
-          <h2 
-            className="text-4xl md:text-5xl font-black text-white mt-2 mb-4 tracking-tight"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            Planes de Entrenamiento
+        <div className="mb-14 max-w-3xl">
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Diseñado por rol</span>
+          <h2 className="mt-4 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
+            Cada persona ve lo que necesita.
           </h2>
-          <p className="text-gray-400 max-w-2xl mx-auto text-base leading-relaxed">
-            Elegí la frecuencia que mejor se adapte a tus objetivos y ritmo de vida.
+          <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-400 md:text-lg">
+            Kivra separa responsabilidades y accesos para mantener una operación clara, segura y fácil de usar.
           </p>
         </div>
 
-        {/* Grilla de Planes */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto items-stretch">
-          {plans.map((plan, index) => {
-            const isPopular = index === 2; // "Pase Libre" destacado
-
-            return (
-              <Card 
-                key={plan.id} 
-                className={`relative flex flex-col rounded-2xl transition-all duration-300 ${
-                  isPopular 
-                    ? "border-2 border-[#00aeef] shadow-xl shadow-[#00aeef]/10 md:-translate-y-2 bg-[#14171d]" 
-                    : "border border-gray-800 bg-[#14171d] hover:border-[#00aeef]/50 hover:shadow-lg hover:shadow-[#00aeef]/5"
-                }`}
-              >
-                {isPopular && (
-                  <Badge className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#00aeef] hover:bg-[#00aeef] text-black font-extrabold rounded-full px-4 py-1 text-xs shadow-md uppercase tracking-wider">
-                    Recomendado
-                  </Badge>
-                )}
-
-                <CardHeader className="text-center pb-4 pt-8">
-                  <h3 
-                    className="text-2xl font-extrabold text-white"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    {plan.name}
-                  </h3>
-                </CardHeader>
-
-                <CardContent className="flex-1 px-6 py-4">
-                  <div className="w-full h-px bg-gray-800/80 mb-6" />
-                  <ul className="space-y-3.5">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-3">
-                        <div className="w-5 h-5 rounded-full bg-[#00aeef]/10 border border-[#00aeef]/30 flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3.5 h-3.5 text-[#00aeef] stroke-[2.5]" />
-                        </div>
-                        <span className="text-sm font-medium text-gray-300">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-
-                <CardFooter className="p-6 pt-2">
-                  <Button 
-                    className={`w-full rounded-xl h-11 font-extrabold text-sm transition-all ${
-                      isPopular 
-                        ? "bg-[#00aeef] hover:bg-[#0098d4] text-black shadow-md shadow-[#00aeef]/20" 
-                        : "border-gray-800 text-gray-300 hover:bg-[#00aeef]/10 hover:text-[#00aeef] hover:border-[#00aeef]/40 bg-transparent"
-                    }`}
-                    variant={isPopular ? "default" : "outline"}
-                    asChild
-                  >
-                    <Link href="#contacto">Consultar Más</Link>
-                  </Button>
-                </CardFooter>
-              </Card>
-            );
-          })}
+        <div className="grid gap-4 lg:grid-cols-3">
+          {roles.map((role, index) => (
+            <div
+              key={role.title}
+              className={`rounded-3xl border p-7 ${
+                index === 0
+                  ? "border-violet-400/20 bg-violet-400/[0.055]"
+                  : "border-white/[0.07] bg-white/[0.025]"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04]">
+                <role.icon className="h-5 w-5 text-violet-200" />
+              </div>
+              <h3 className="mt-7 text-2xl font-semibold tracking-tight">{role.title}</h3>
+              <p className="mt-3 min-h-20 text-sm leading-6 text-zinc-500">{role.description}</p>
+              <div className="mt-7 space-y-3 border-t border-white/[0.07] pt-6">
+                {role.items.map((item) => (
+                  <div key={item} className="flex items-center gap-3 text-sm text-zinc-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-violet-300" />
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-
       </div>
     </section>
   );

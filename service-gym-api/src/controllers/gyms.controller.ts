@@ -53,7 +53,25 @@ export class GymsController {
 
       return res.status(201).json({ success: true, data: result });
     } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message });
+      if (error?.code === "23505") {
+        const constraint = String(error.constraint || "");
+        const field = constraint.includes("slug")
+          ? "Ya existe un gimnasio con ese identificador."
+          : constraint.includes("email")
+            ? "Ya existe un usuario con ese correo electronico."
+            : "Ya existe un gimnasio o usuario con esos datos.";
+        return res.status(409).json({ success: false, error: field });
+      }
+      if (error?.message?.startsWith("Faltan datos") ||
+          error?.message?.includes("invalido") ||
+          error?.message?.startsWith("La contrasena")) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+      console.error("Error al crear gimnasio:", error);
+      return res.status(500).json({
+        success: false,
+        error: "No se pudo crear el gimnasio y su administrador.",
+      });
     }
   }
 

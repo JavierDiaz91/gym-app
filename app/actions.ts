@@ -23,93 +23,115 @@ interface RoutineExercise {
 
 // ==================== AUTH ACTIONS ====================
 
+
+// Validación centralizada de cupos SaaS. El plan vigente es plan_id;
+// pending_plan_id no se aplica hasta la renovación efectiva.
+async function checkSaaSCapacity(gymId: number, resource: "members" | "trainers") {
+  const [gym] = await sql`
+    SELECT status FROM gyms WHERE id = ${gymId}
+  `;
+  if (!gym || gym.status !== "active") {
+    return "El gimnasio no está activo. Contactá al administrador de Kivra.";
+  }
+
+  const [subscription] = await sql`
+    SELECT s.status, s.current_period_end, p.max_members, p.max_trainers
+    FROM gym_saas_subscriptions s
+    JOIN saas_plans p ON p.id = s.plan_id
+    WHERE s.gym_id = ${gymId}
+    ORDER BY s.id DESC
+    LIMIT 1
+  `;
+  if (!subscription || subscription.status !== "active") {
+    return "El gimnasio no tiene una suscripción SaaS activa.";
+  }
+  if (subscription.current_period_end &&
+      String(subscription.current_period_end).slice(0, 10) < new Date().toISOString().slice(0, 10)) {
+    return "El período SaaS está vencido. Contactá al administrador de Kivra.";
+  }
+
+  const limit = resource === "members" ? subscription.max_members : subscription.max_trainers;
+  if (limit == null) return null; // Sin límite configurado
+  const [usage] = resource === "members"
+    ? await sql`SELECT COUNT(*)::int AS total FROM members WHERE gym_id = ${gymId}`
+    : await sql`SELECT COUNT(*)::int AS total FROM trainers WHERE gym_id = ${gymId}`;
+  if (Number(usage.total) >= Number(limit)) {
+    return `Alcanzaste el límite de ${limit} ${resource === "members" ? "alumnos" : "entrenadores"} de tu plan SaaS.`;
+  }
+  return null;
+}
+
 export async function registerUser(formData: FormData) {
   try {
-    const emailRaw = formData.get("email") as string;
-    const password = formData.get("password") as string;
-    const name = formData.get("name") as string;
-    const phone = formData.get("phone") as string | null;
-    const gymIdRaw = formData.get("gym_id") as string | null;
+    const emailRaw = formData.get("email");
+    const password = formData.get("password");
+    const nameRaw = formData.get("name");
+    const phoneRaw = formData.get("phone");
+    const gymIdRaw = formData.get("gym_id");
 
-    if (!emailRaw || !password || !name) {
+    if (typeof emailRaw !== "string" || typeof password !== "string" ||
+        typeof nameRaw !== "string" || typeof gymIdRaw !== "string") {
       return { error: "Todos los campos son requeridos" };
     }
 
-    if (!gymIdRaw) {
-      return { error: "No se especificó un gimnasio válido. Por favor escaneá el QR del gimnasio." };
-    }
-
-    // 1️⃣ Normalizar email
     const email = emailRaw.trim().toLowerCase();
-    const gymId = parseInt(gymIdRaw, 10);
-
-    // 2️⃣ Verificar si YA TIENE CREDENCIALES (en la tabla users)
-    const existingUser = await sql`
-      SELECT id FROM users WHERE LOWER(TRIM(email)) = ${email}
-    `;
-    if (existingUser.length > 0) {
-      return { error: "El email ya está registrado. Por favor iniciá sesión." };
+    const name = nameRaw.trim();
+    const phone = typeof phoneRaw === "string" ? phoneRaw.trim() : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
+        !name || name.length > 150 || password.length < 8 || password.length > 128) {
+      return { error: "Revisá el nombre, correo y contraseña (mínimo 8 caracteres)." };
     }
-
-    // Parsear Nombre y Apellido
-    const nameParts = name.trim().split(/\s+/);
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(" ") || "";
-
-    // 3️⃣ Hash de contraseña
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // 4️⃣ Crear usuario en la tabla 'users'
-    const userResult = await sql`
-      INSERT INTO users (email, password_hash, role, gym_id)
-      VALUES (${email}, ${hashedPassword}, 'member', ${gymId})
-      RETURNING id
-    `;
-    const userId = userResult[0].id;
-
-    // 5️⃣ REVISAR SI EL ADMIN YA LE HABÍA CREADO LA FICHA EN 'members'
-    const existingMember = await sql`
-      SELECT id FROM members 
-      WHERE LOWER(TRIM(email)) = ${email} AND gym_id = ${gymId}
-    `;
-
-    if (existingMember.length > 0) {
-      // VINCULAR CON EL LEGAJO EXISTENTE DEL ADMIN
-      await sql`
-        UPDATE members 
-        SET 
-          user_id = ${userId},
-          phone = COALESCE(NULLIF(${phone}, ''), phone)
-        WHERE id = ${existingMember[0].id}
-      `;
-    } else {
-      // CREAR FICHA NUEVA SI NO EXISTÍA
-      await sql`
-        INSERT INTO members (
-          user_id,
-          gym_id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          status,
-          join_date
-        )
-        VALUES (
-          ${userId},
-          ${gymId},
-          ${firstName},
-          ${lastName},
-          ${email},
-          ${phone || null},
-          'active',
-          NOW()
-        )
-      `;
+    if (!/^[1-9]\d*$/.test(gymIdRaw) || !Number.isSafeInteger(Number(gymIdRaw))) {
+      return { error: "Gimnasio inválido. Escaneá nuevamente el QR." };
     }
+    const gymId = Number(gymIdRaw);
+    const parts = name.split(/\s+/);
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(" ");
+    const hashedPassword = await bcrypt.hash(password, 12);
 
+    // La función PostgreSQL ejecuta todo en una transacción implícita.
+    // Si falla la creación o vinculación del socio, revierte también el usuario.
+    // Requiere aplicar database/migrations/20261013_register_gym_member.sql.
+    await sql`
+      SELECT user_id, member_id
+      FROM public.register_gym_member(
+        ${gymId},
+        ${email},
+        ${hashedPassword},
+        ${firstName},
+        ${lastName},
+        ${phone}
+      )
+    `;
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === "42883") {
+      console.error("Falta aplicar la migración database/migrations/20261013_register_gym_member.sql en Neon.");
+      return { error: "El registro por QR aún no está configurado. Contactá al administrador del gimnasio." };
+    }
+    if (error?.code === "P0001") {
+      const message = String(error?.message || "");
+      if (message.includes("correo ya tiene una cuenta")) {
+        return { error: "Este correo ya está registrado. Iniciá sesión o contactá al gimnasio." };
+      }
+      if (message.includes("ficha ya está vinculada")) {
+        return { error: "Este alumno ya tiene una cuenta vinculada. Iniciá sesión o contactá al gimnasio." };
+      }
+      if (message.includes("límite de alumnos")) {
+        return { error: "El gimnasio alcanzó el límite de alumnos de su plan SaaS." };
+      }
+      if (message.includes("suscripción SaaS vigente")) {
+        return { error: "El gimnasio no tiene una suscripción SaaS vigente." };
+      }
+      if (message.includes("gimnasio no está disponible")) {
+        return { error: "El gimnasio no está disponible para registros." };
+      }
+      return { error: "No se pudo completar el registro. Contactá al gimnasio." };
+    }
+    if (error?.code === "23505") {
+      return { error: "El correo o la ficha ya están registrados. Iniciá sesión o contactá al gimnasio." };
+    }
     console.error("Registration error:", error);
     return { error: "Error al registrar usuario" };
   }
@@ -185,6 +207,14 @@ async function requireTenantSession() {
     throw new Error("Sesión inválida o sin gimnasio asociado.");
   }
 
+  return { ...session, gymId: session.gymId };
+}
+
+async function requireGymAdminSession() {
+  const session = await requireTenantSession();
+  if (session.role !== "admin") {
+    throw new Error("No tenés permisos de administrador para esta operación.");
+  }
   return session;
 }
 
@@ -203,7 +233,11 @@ export async function getMembers(query: string = ""): Promise<Member[]> {
         s.end_date AS subscription_end
       FROM members m
       LEFT JOIN subscriptions s 
-        ON m.id = s.member_id AND s.status = 'active'
+        ON m.id = s.member_id
+               AND s.status IN ('active', 'scheduled')
+               AND s.payment_status = 'paid'
+               AND s.start_date <= CURRENT_DATE
+               AND s.end_date > CURRENT_DATE
       LEFT JOIN membership_plans mp 
         ON s.plan_id = mp.id
       WHERE m.gym_id = ${session.gymId}
@@ -236,7 +270,11 @@ export async function getMemberById(id: number): Promise<Member | null> {
         s.end_date AS subscription_end
       FROM members m
       LEFT JOIN subscriptions s 
-        ON m.id = s.member_id AND s.status = 'active'
+        ON m.id = s.member_id
+               AND s.status IN ('active', 'scheduled')
+               AND s.payment_status = 'paid'
+               AND s.start_date <= CURRENT_DATE
+               AND s.end_date > CURRENT_DATE
       LEFT JOIN membership_plans mp 
         ON s.plan_id = mp.id
       WHERE m.id = ${id}
@@ -251,59 +289,52 @@ export async function getMemberById(id: number): Promise<Member | null> {
 }
 
 export async function createMember(formData: FormData) {
-  const firstName = formData.get("firstName") as string;
-  const lastName = formData.get("lastName") as string;
-  const emailRaw = formData.get("email") as string;
-  const phone = formData.get("phone") as string;
-  const emergencyContact = formData.get("emergencyContact") as string;
-  const planIdRaw = formData.get("planId") as string;
-
-  const session = await requireTenantSession();
+  const session = await requireGymAdminSession();
   const gymId = session.gymId;
+  const firstName = String(formData.get("firstName") ?? "").trim();
+  const lastName = String(formData.get("lastName") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const emergencyContact = String(formData.get("emergencyContact") ?? "").trim();
+  const planIdRaw = String(formData.get("planId") ?? "").trim();
 
-  // 1. Normalizar email (sin espacios y en minúsculas)
-  const email = emailRaw ? emailRaw.trim().toLowerCase() : "";
-
-  if (!email) {
-    return { error: "El email es obligatorio" };
+  if (!firstName || !lastName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Completá nombre, apellido y un correo válido." };
+  }
+  if (planIdRaw && (!/^[1-9]\d*$/.test(planIdRaw) || !Number.isSafeInteger(Number(planIdRaw)))) {
+    return { error: "El plan de membresía no es válido." };
   }
 
   try {
-    // 2. Validar que no exista ya un miembro con ese correo
-    const existingMember = await sql`
-      SELECT id FROM members 
-      WHERE LOWER(TRIM(email)) = ${email} AND gym_id = ${gymId}
+    // Misma fila de gimnasio bloqueada que register_gym_member: evita exceder cupos
+    // ante altas administrativas y QR concurrentes, y revierte todo ante fallos.
+    await sql`
+      SELECT public.create_gym_member_admin(
+        ${gymId}, ${firstName}, ${lastName}, ${email},
+        ${phone}, ${emergencyContact},
+        ${planIdRaw ? Number(planIdRaw) : null}
+      ) AS member_id
     `;
-
-    if (existingMember.length > 0) {
-      return { error: "Ya existe un socio registrado con este correo electrónico." };
-    }
-
-    // 3. Insertar el miembro con el email sanitizado
-    const [member] = await sql`
-      INSERT INTO members (gym_id, first_name, last_name, email, phone, emergency_contact, status)
-      VALUES (${gymId}, ${firstName}, ${lastName}, ${email}, ${phone || null}, ${emergencyContact || null}, 'active')
-      RETURNING id
-    `;
-
-    // 4. Si seleccionó un plan, crear la suscripción inicial
-    if (planIdRaw && planIdRaw !== "") {
-      const planId = Number(planIdRaw);
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 1);
-
-      await sql`
-        INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-        VALUES (${member.id}, ${planId}, ${startDate.toISOString()}, ${endDate.toISOString()}, 'active')
-      `;
-    }
-
     revalidateTag("members", "max");
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === "P0001" || error?.code === "23505") {
+      const message = String(error?.message ?? "");
+      if (message.includes("límite de alumnos")) {
+        return { error: "Alcanzaste el límite de alumnos de tu plan SaaS." };
+      }
+      if (message.includes("Ya existe un socio") || error?.code === "23505") {
+        return { error: "Ya existe un socio registrado con este correo electrónico." };
+      }
+      if (message.includes("plan de membresía")) {
+        return { error: "El plan seleccionado no pertenece a tu gimnasio." };
+      }
+      if (message.includes("suscripción SaaS vigente")) {
+        return { error: "El gimnasio no tiene una suscripción SaaS vigente." };
+      }
+    }
     console.error("Error creating member:", error);
-    return { error: "Error al crear miembro" };
+    return { error: "Error al crear miembro." };
   }
 }
 
@@ -323,7 +354,7 @@ export async function updateMember(id: number, formData: FormData) {
   }
 
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
 
     // 2. Actualizar únicamente dentro del gimnasio autenticado
     const [updatedMember] = await sql`
@@ -363,7 +394,7 @@ export async function updateMember(id: number, formData: FormData) {
 //Eliminar miembro
 export async function deleteMember(id: number) {
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
 
     const [member] = await sql`
       SELECT user_id
@@ -430,36 +461,11 @@ export async function createSubscription(memberId: number, planId: number) {
 
     if (!member) return { error: "Miembro no encontrado" };
 
-    const plans = await sql`
-      SELECT *
-      FROM membership_plans
-      WHERE id = ${planId}
-        AND gym_id = ${session.gymId}
-        AND is_active = true
-    `;
-
-    if (plans.length === 0) return { error: "Plan no encontrado" };
-
-    const plan = plans[0];
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + plan.duration_days);
-
+    // Scheduling is atomic in PostgreSQL and preserves membership history.
     await sql`
-      UPDATE subscriptions
-      SET status = 'cancelled'
-      WHERE member_id = ${memberId}
-        AND status = 'active'
-    `;
-
-    await sql`
-      INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-      VALUES (${memberId}, ${planId}, ${startDate.toISOString()}, ${endDate.toISOString()}, 'active')
-    `;
-
-    await sql`
-      INSERT INTO payments (member_id, amount, payment_type, description)
-      VALUES (${memberId}, ${plan.price}, 'subscription', ${`Membresia: ${plan.name}`})
+      SELECT * FROM public.renew_gym_membership(
+        ${session.gymId}, ${memberId}, ${planId}, 'pending', 0
+      )
     `;
 
     revalidateTag("members", "max");
@@ -706,8 +712,11 @@ export async function createTrainer(formData: FormData) {
   }
 
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
     const gymId = session.gymId;
+    const capacityError = await checkSaaSCapacity(gymId, "trainers");
+    if (capacityError) return { error: capacityError };
+
     // 1. Encriptamos la clave con bcryptjs
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -2033,6 +2042,18 @@ export async function createGymAction(formData: any): Promise<{
 }
 export async function toggleGymStatusAction(gymId: number, newStatus: string) {
   try {
+    const session = await requireSuperAdminSession();
+
+    if (!Number.isSafeInteger(gymId) || gymId <= 0 || !["active", "suspended"].includes(newStatus)) {
+      return { success: false, error: "Datos de gimnasio o estado inválidos." };
+    }
+
+    const [gym] = await sql`
+      SELECT id, name, status FROM gyms WHERE id = ${gymId} LIMIT 1
+    `;
+    if (!gym) return { success: false, error: "Gimnasio no encontrado." };
+    if (gym.status === newStatus) return { success: true };
+
     const res = await fetch(apiUrl(`/gyms/${gymId}/status`), {
       method: "PATCH",
       headers: await getApiAuthHeaders(),
@@ -2040,19 +2061,38 @@ export async function toggleGymStatusAction(gymId: number, newStatus: string) {
       cache: "no-store",
     });
 
-    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: "No se pudo actualizar el estado del gimnasio." };
+    }
 
+    const data = await res.json();
     if (data.success) {
-      // Invalida la caché del Server Component para esta ruta
+      try {
+        await sql`
+          INSERT INTO saas_audit_log (actor_user_id, action, entity_type, entity_id, gym_id, details)
+          VALUES (
+            ${session.id},
+            'gym_status_changed',
+            'gym',
+            ${String(gymId)},
+            ${gymId},
+            ${JSON.stringify({ gymName: gym.name, previousStatus: gym.status, newStatus })}::jsonb
+          )
+        `;
+      } catch (auditError) {
+        console.error("El gimnasio cambió de estado, pero falló el registro de auditoría:", auditError);
+      }
       revalidatePath("/admin/gimnasios");
+      revalidatePath("/admin/clientes");
+      revalidatePath("/admin/actividad");
     }
 
     return data;
   } catch (error) {
+    console.error("Error al actualizar estado del gimnasio:", error);
     return { success: false, error: "Error al actualizar estado" };
   }
 }
-
 
 
 export async function getGymsAction() {
@@ -2273,33 +2313,9 @@ export async function updateMemberAction(
     }
 
     if (data.plan_id) {
-      const [plan] = await sql`
-        SELECT id
-        FROM membership_plans
-        WHERE id = ${data.plan_id}
-          AND gym_id = ${session.gymId}
-          AND is_active = true
-      `;
-
-      if (!plan) {
-        return { success: false, error: "Plan no encontrado" };
-      }
-
       await sql`
-        UPDATE subscriptions 
-        SET status = 'cancelled' 
-        WHERE member_id = ${id}
-          AND status = 'active'
-      `;
-
-      await sql`
-        INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-        VALUES (
-          ${id},
-          ${data.plan_id},
-          NOW(),
-          NOW() + INTERVAL '30 days',
-          'active'
+        SELECT * FROM public.renew_gym_membership(
+          ${session.gymId}, ${id}, ${data.plan_id}, 'pending', 0
         )
       `;
     }
@@ -2408,7 +2424,11 @@ export async function registerAttendanceAction(memberIdentifier: string) {
             s.status AS subscription_status
           FROM members m
           LEFT JOIN subscriptions s 
-            ON m.id = s.member_id AND s.status = 'active'
+            ON m.id = s.member_id
+               AND s.status IN ('active', 'scheduled')
+               AND s.payment_status = 'paid'
+               AND s.start_date <= CURRENT_DATE
+               AND s.end_date > CURRENT_DATE
           LEFT JOIN membership_plans mp 
             ON s.plan_id = mp.id
           WHERE m.gym_id = ${gymId}
@@ -2426,7 +2446,11 @@ export async function registerAttendanceAction(memberIdentifier: string) {
             s.status AS subscription_status
           FROM members m
           LEFT JOIN subscriptions s 
-            ON m.id = s.member_id AND s.status = 'active'
+            ON m.id = s.member_id
+               AND s.status IN ('active', 'scheduled')
+               AND s.payment_status = 'paid'
+               AND s.start_date <= CURRENT_DATE
+               AND s.end_date > CURRENT_DATE
           LEFT JOIN membership_plans mp 
             ON s.plan_id = mp.id
           WHERE m.gym_id = ${gymId}
@@ -2445,8 +2469,7 @@ export async function registerAttendanceAction(memberIdentifier: string) {
     }
 
     const member = members[0];
-    const now = new Date();
-    const isSubscriptionValid = member.subscription_end && new Date(member.subscription_end) >= now;
+    const isSubscriptionValid = Boolean(member.subscription_end);
 
     // 2. Determinar estado de acceso
     let accessGranted = false;
@@ -2521,139 +2544,13 @@ export async function createPayment(formData: FormData) {
       return { success: false, error: "Datos de pago inválidos." };
     }
 
-    const [member] = await sql`
-      SELECT id
-      FROM members
-      WHERE id = ${memberId}
-        AND gym_id = ${session.gymId}
-      LIMIT 1
-    `;
-
-    if (!member) {
-      return { success: false, error: "Miembro no encontrado." };
-    }
-
-    const [plan] = await sql`
-      SELECT id, price, duration_months
-      FROM membership_plans
-      WHERE id = ${planId}
-        AND gym_id = ${session.gymId}
-        AND is_active = true
-      LIMIT 1
-    `;
-
-    if (!plan) {
-      return { success: false, error: "Plan no encontrado." };
-    }
-
-    const amount = Number(plan.price);
-    const durationMonths = Math.max(1, Number(plan.duration_months) || 1);
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return { success: false, error: "El plan tiene un precio inválido." };
-    }
-
-    if (transactionId) {
-      const existingPayment = await sql`
-        SELECT p.id
-        FROM payments p
-        JOIN members m ON m.id = p.member_id
-        WHERE p.transaction_id = ${transactionId}
-          AND m.gym_id = ${session.gymId}
-        LIMIT 1
-      `;
-
-      if (existingPayment.length > 0) {
-        return { success: false, error: "La transacción ya fue registrada." };
-      }
-    }
-
-    const existingSub = await sql`
-      SELECT s.id
-      FROM subscriptions s
-      JOIN members m ON m.id = s.member_id
-      WHERE s.member_id = ${memberId}
-        AND m.gym_id = ${session.gymId}
-      ORDER BY s.id DESC
-      LIMIT 1
-    `;
-
-    let subscriptionId: number;
-
-    if (existingSub.length > 0) {
-      subscriptionId = Number(existingSub[0].id);
-
-      await sql`
-        UPDATE subscriptions
-        SET
-          plan_id = ${planId},
-          start_date = CURRENT_DATE,
-          end_date = CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
-          status = 'active',
-          payment_status = 'paid',
-          amount_paid = ${amount},
-          updated_at = NOW()
-        WHERE id = ${subscriptionId}
-          AND member_id = ${memberId}
-      `;
-    } else {
-      const [newSub] = await sql`
-        INSERT INTO subscriptions (
-          member_id,
-          plan_id,
-          start_date,
-          end_date,
-          status,
-          payment_status,
-          amount_paid,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          ${memberId},
-          ${planId},
-          CURRENT_DATE,
-          CURRENT_DATE + (${durationMonths} || ' month')::INTERVAL,
-          'active',
-          'paid',
-          ${amount},
-          NOW(),
-          NOW()
-        )
-        RETURNING id
-      `;
-
-      subscriptionId = Number(newSub.id);
-    }
-
+    // A single PostgreSQL function records the payment and subscription atomically.
+    // It settles an existing pending period or creates a new renewal.
     await sql`
-      UPDATE members
-      SET status = 'active', updated_at = NOW()
-      WHERE id = ${memberId}
-        AND gym_id = ${session.gymId}
-    `;
-
-    await sql`
-      INSERT INTO payments (
-        member_id,
-        subscription_id,
-        amount,
-        payment_method,
-        transaction_id,
-        status,
-        notes,
-        payment_date
-      )
-      VALUES (
-        ${memberId},
-        ${subscriptionId},
-        ${amount},
-        ${paymentMethod},
-        ${transactionId},
-        'completed',
-        ${notes},
-        NOW()
-      )
+      SELECT public.record_gym_membership_payment(
+        ${session.gymId}, ${memberId}, ${planId},
+        ${paymentMethod}, ${transactionId}, ${notes}
+      ) AS payment_id
     `;
 
     revalidatePath("/admin/pagos");
@@ -2777,5 +2674,718 @@ export async function getPaymentsHistory() {
   } catch (error) {
     console.error("Error al obtener pagos:", error);
     return [];
+  }
+}
+
+// ==================== KIVRA SAAS / SUPERADMIN ====================
+
+async function requireSuperAdminSession() {
+  const session = await getSession();
+
+  if (!session || session.role !== "superadmin") {
+    throw new Error("No autorizado.");
+  }
+
+  return session;
+}
+
+export async function getSaaSPlansAction() {
+  try {
+    await requireSuperAdminSession();
+
+    const plans = await sql`
+      SELECT
+        id,
+        name,
+        description,
+        monthly_price,
+        max_members,
+        max_trainers,
+        status,
+        created_at,
+        updated_at
+      FROM saas_plans
+      ORDER BY id ASC
+    `;
+
+    return { success: true, data: plans };
+  } catch (error) {
+    console.error("Error al obtener planes SaaS:", error);
+    return { success: false, data: [], error: "No se pudieron cargar los planes SaaS." };
+  }
+}
+
+export async function createSaaSPlanAction(input: {
+  name: string;
+  description?: string;
+  monthlyPrice?: number | null;
+  maxMembers?: number | null;
+  maxTrainers?: number | null;
+  status?: "draft" | "active" | "archived";
+}) {
+  try {
+    const session = await requireSuperAdminSession();
+
+    const name = input.name?.trim();
+    if (!name) {
+      return { success: false, error: "El nombre del plan es obligatorio." };
+    }
+
+    const status = input.status || "draft";
+    if (!["draft", "active", "archived"].includes(status)) {
+      return { success: false, error: "Estado de plan inválido." };
+    }
+
+    const monthlyPrice =
+      input.monthlyPrice == null || Number.isNaN(Number(input.monthlyPrice))
+        ? null
+        : Number(input.monthlyPrice);
+
+    const maxMembers =
+      input.maxMembers == null || Number.isNaN(Number(input.maxMembers))
+        ? null
+        : Math.max(0, Math.trunc(Number(input.maxMembers)));
+
+    const maxTrainers =
+      input.maxTrainers == null || Number.isNaN(Number(input.maxTrainers))
+        ? null
+        : Math.max(0, Math.trunc(Number(input.maxTrainers)));
+
+    const [plan] = await sql`
+      INSERT INTO saas_plans (
+        name,
+        description,
+        monthly_price,
+        max_members,
+        max_trainers,
+        status,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${name},
+        ${input.description?.trim() || null},
+        ${monthlyPrice},
+        ${maxMembers},
+        ${maxTrainers},
+        ${status},
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+    `;
+
+    await sql`
+      INSERT INTO saas_audit_log (
+        actor_user_id,
+        action,
+        entity_type,
+        entity_id,
+        details
+      )
+      VALUES (
+        ${session.id},
+        'saas_plan_created',
+        'saas_plan',
+        ${String(plan.id)},
+        ${JSON.stringify({ name: plan.name, status: plan.status })}::jsonb
+      )
+    `;
+
+    revalidatePath("/admin/planes-saas");
+    revalidatePath("/admin/actividad");
+
+    return { success: true, data: plan };
+  } catch (error: any) {
+    console.error("Error al crear plan SaaS:", error);
+
+    if (error?.code === "23505") {
+      return { success: false, error: "Ya existe un plan SaaS con ese nombre." };
+    }
+
+    return { success: false, error: "No se pudo crear el plan SaaS." };
+  }
+}
+
+export async function updateSaaSPlanAction(
+  id: number,
+  input: {
+    name: string;
+    description?: string;
+    monthlyPrice?: number | null;
+    maxMembers?: number | null;
+    maxTrainers?: number | null;
+    status: "draft" | "active" | "archived";
+  }
+) {
+  try {
+    const session = await requireSuperAdminSession();
+
+    if (!Number.isFinite(id) || id <= 0) {
+      return { success: false, error: "Plan inválido." };
+    }
+
+    const name = input.name?.trim();
+    if (!name) {
+      return { success: false, error: "El nombre del plan es obligatorio." };
+    }
+
+    if (!["draft", "active", "archived"].includes(input.status)) {
+      return { success: false, error: "Estado de plan inválido." };
+    }
+
+    const monthlyPrice =
+      input.monthlyPrice == null || Number.isNaN(Number(input.monthlyPrice))
+        ? null
+        : Number(input.monthlyPrice);
+
+    const maxMembers =
+      input.maxMembers == null || Number.isNaN(Number(input.maxMembers))
+        ? null
+        : Math.max(0, Math.trunc(Number(input.maxMembers)));
+
+    const maxTrainers =
+      input.maxTrainers == null || Number.isNaN(Number(input.maxTrainers))
+        ? null
+        : Math.max(0, Math.trunc(Number(input.maxTrainers)));
+
+    const [plan] = await sql`
+      UPDATE saas_plans
+      SET
+        name = ${name},
+        description = ${input.description?.trim() || null},
+        monthly_price = ${monthlyPrice},
+        max_members = ${maxMembers},
+        max_trainers = ${maxTrainers},
+        status = ${input.status},
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    if (!plan) {
+      return { success: false, error: "Plan SaaS no encontrado." };
+    }
+
+    await sql`
+      INSERT INTO saas_audit_log (
+        actor_user_id,
+        action,
+        entity_type,
+        entity_id,
+        details
+      )
+      VALUES (
+        ${session.id},
+        'saas_plan_updated',
+        'saas_plan',
+        ${String(id)},
+        ${JSON.stringify({ name: plan.name, status: plan.status })}::jsonb
+      )
+    `;
+
+    revalidatePath("/admin/planes-saas");
+    revalidatePath("/admin/actividad");
+
+    return { success: true, data: plan };
+  } catch (error: any) {
+    console.error("Error al actualizar plan SaaS:", error);
+
+    if (error?.code === "23505") {
+      return { success: false, error: "Ya existe otro plan SaaS con ese nombre." };
+    }
+
+    return { success: false, error: "No se pudo actualizar el plan SaaS." };
+  }
+}
+
+
+export async function getGymSaaSSubscriptionsAction() {
+  try {
+    await requireSuperAdminSession();
+
+    const subscriptions = await sql`
+      SELECT
+        gss.id,
+        gss.gym_id,
+        gss.plan_id,
+        gss.status,
+        gss.started_at,
+        gss.current_period_start,
+        gss.current_period_end,
+        gss.next_billing_date,
+        gss.price_override,
+        sp.name AS plan_name,
+        sp.monthly_price
+      FROM gym_saas_subscriptions gss
+      JOIN saas_plans sp ON sp.id = gss.plan_id
+      ORDER BY gss.gym_id ASC
+    `;
+
+    return { success: true, data: subscriptions };
+  } catch (error) {
+    console.error("Error al obtener suscripciones SaaS:", error);
+    return {
+      success: false,
+      data: [],
+      error: "No se pudieron cargar las suscripciones SaaS.",
+    };
+  }
+}
+
+export async function assignGymSaaSPlanAction(
+  gymId: number,
+  planId: number,
+  status: "trial" | "active" | "past_due" | "cancelled" = "active"
+) {
+  try {
+    const session = await requireSuperAdminSession();
+
+    if (!Number.isFinite(gymId) || gymId <= 0 || !Number.isFinite(planId) || planId <= 0) {
+      return { success: false, error: "Gimnasio o plan inválido." };
+    }
+
+    if (!["trial", "active", "past_due", "cancelled"].includes(status)) {
+      return { success: false, error: "Estado de suscripción inválido." };
+    }
+
+    const [gym] = await sql`
+      SELECT id, name
+      FROM gyms
+      WHERE id = ${gymId}
+      LIMIT 1
+    `;
+
+    if (!gym) {
+      return { success: false, error: "Gimnasio no encontrado." };
+    }
+
+    const [plan] = await sql`
+      SELECT id, name, monthly_price, status
+      FROM saas_plans
+      WHERE id = ${planId}
+      LIMIT 1
+    `;
+
+    if (!plan) {
+      return { success: false, error: "Plan SaaS no encontrado." };
+    }
+
+    if (plan.status !== "active") {
+      return { success: false, error: "Solo podés asignar planes SaaS activos." };
+    }
+
+    // No sobrescribir el período de una suscripción existente.
+    // Los cambios de plan se programarán para el siguiente ciclo mediante un flujo separado.
+    const [currentSubscription] = await sql`
+      SELECT id, plan_id, status, current_period_start, current_period_end
+      FROM gym_saas_subscriptions
+      WHERE gym_id = ${gymId}
+      LIMIT 1
+    `;
+
+    if (currentSubscription) {
+      if (Number(currentSubscription.plan_id) === planId) {
+        return { success: false, error: "Este gimnasio ya tiene asignado ese plan SaaS." };
+      }
+      return {
+        success: false,
+        error: "Este gimnasio ya tiene una suscripción. Para proteger el período vigente y las facturas emitidas, el cambio de plan debe programarse para el próximo ciclo.",
+      };
+    }
+
+    const [subscription] = await sql`
+      INSERT INTO gym_saas_subscriptions (
+        gym_id,
+        plan_id,
+        status,
+        started_at,
+        current_period_start,
+        current_period_end,
+        next_billing_date,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${gymId},
+        ${planId},
+        ${status},
+        NOW(),
+        CURRENT_DATE,
+        CURRENT_DATE + INTERVAL '1 month',
+        CURRENT_DATE + INTERVAL '1 month',
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (gym_id)
+      DO UPDATE SET
+        plan_id = EXCLUDED.plan_id,
+        status = EXCLUDED.status,
+        current_period_start = CURRENT_DATE,
+        current_period_end = CURRENT_DATE + INTERVAL '1 month',
+        next_billing_date = CURRENT_DATE + INTERVAL '1 month',
+        updated_at = NOW()
+      RETURNING *
+    `;
+
+    await sql`
+      INSERT INTO saas_audit_log (
+        actor_user_id,
+        action,
+        entity_type,
+        entity_id,
+        gym_id,
+        details
+      )
+      VALUES (
+        ${session.id},
+        'gym_saas_plan_assigned',
+        'gym_saas_subscription',
+        ${String(subscription.id)},
+        ${gymId},
+        ${JSON.stringify({
+          gymName: gym.name,
+          planName: plan.name,
+          status,
+        })}::jsonb
+      )
+    `;
+
+    revalidatePath("/admin/gimnasios");
+    revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/actividad");
+
+    return { success: true, data: subscription };
+  } catch (error) {
+    console.error("Error al asignar plan SaaS al gimnasio:", error);
+    return { success: false, error: "No se pudo asignar el plan SaaS." };
+  }
+}
+
+
+
+export async function scheduleGymSaaSPlanChangeAction(gymId: number, newPlanId: number) {
+  try {
+    const session = await requireSuperAdminSession();
+    if (!Number.isSafeInteger(gymId) || gymId <= 0 || !Number.isSafeInteger(newPlanId) || newPlanId <= 0) {
+      return { success: false, error: "Gimnasio o plan inválido." };
+    }
+
+    const [plan] = await sql`
+      SELECT id, name, monthly_price FROM saas_plans
+      WHERE id = ${newPlanId} AND status = 'active' LIMIT 1
+    `;
+    if (!plan || plan.monthly_price == null || Number(plan.monthly_price) <= 0) {
+      return { success: false, error: "El nuevo plan debe estar activo y tener un precio válido." };
+    }
+
+    // Actualización condicional atómica: nunca cambia plan_id ni las fechas del ciclo actual.
+    const [scheduled] = await sql`
+      UPDATE gym_saas_subscriptions
+      SET pending_plan_id = ${newPlanId},
+          pending_plan_effective_date = current_period_end,
+          updated_at = NOW()
+      WHERE gym_id = ${gymId}
+        AND plan_id <> ${newPlanId}
+        AND status = 'active'
+        AND current_period_end > CURRENT_DATE
+        AND pending_plan_id IS NULL
+      RETURNING id, gym_id, plan_id, current_period_end, pending_plan_effective_date
+    `;
+
+    if (!scheduled) {
+      return {
+        success: false,
+        error: "No se pudo programar el cambio: verificá que exista una suscripción activa, sin otro cambio pendiente, y con período vigente.",
+      };
+    }
+
+    try {
+      await sql`
+        INSERT INTO saas_audit_log (actor_user_id, action, entity_type, entity_id, gym_id, details)
+        VALUES (
+          ${session.id}, 'gym_saas_plan_change_scheduled', 'gym_saas_subscription',
+          ${String(scheduled.id)}, ${gymId},
+          ${JSON.stringify({
+            previousPlanId: Number(scheduled.plan_id),
+            newPlanId,
+            newPlanName: plan.name,
+            effectiveDate: scheduled.pending_plan_effective_date,
+          })}::jsonb
+        )
+      `;
+    } catch (auditError) {
+      console.error("Cambio de plan programado, pero falló su auditoría:", auditError);
+    }
+
+    revalidatePath("/admin/gimnasios");
+    revalidatePath(`/admin/gimnasios/${gymId}`);
+    revalidatePath("/admin/actividad");
+    return { success: true, data: scheduled };
+  } catch (error) {
+    console.error("Error al programar cambio de plan SaaS:", error);
+    return { success: false, error: "No se pudo programar el cambio. Verificá que la migración de Neon esté aplicada." };
+  }
+}
+
+
+export async function getSaaSBillingOverviewAction() {
+  try {
+    await requireSuperAdminSession();
+
+    const [subscriptions, invoices] = await Promise.all([
+      sql`
+        SELECT
+          gss.id,
+          gss.gym_id,
+          g.name AS gym_name,
+          g.slug AS gym_slug,
+          gss.plan_id,
+          sp.name AS plan_name,
+          COALESCE(gss.price_override, sp.monthly_price) AS effective_price,
+          gss.status,
+          gss.current_period_start,
+          gss.current_period_end,
+          gss.next_billing_date
+        FROM gym_saas_subscriptions gss
+        JOIN gyms g ON g.id = gss.gym_id
+        JOIN saas_plans sp ON sp.id = gss.plan_id
+        ORDER BY g.name ASC
+      `,
+      sql`
+        SELECT
+          i.id,
+          i.gym_id,
+          g.name AS gym_name,
+          i.subscription_id,
+          sp.name AS plan_name,
+          i.period_start,
+          i.period_end,
+          i.amount,
+          i.status,
+          i.due_date,
+          i.paid_at,
+          i.external_reference,
+          i.created_at
+        FROM saas_invoices i
+        JOIN gyms g ON g.id = i.gym_id
+        LEFT JOIN gym_saas_subscriptions gss ON gss.id = i.subscription_id
+        LEFT JOIN saas_plans sp ON sp.id = gss.plan_id
+        ORDER BY i.created_at DESC
+      `,
+    ]);
+
+    return { success: true, subscriptions, invoices };
+  } catch (error) {
+    console.error("Error al cargar facturación SaaS:", error);
+    return {
+      success: false,
+      subscriptions: [],
+      invoices: [],
+      error: "No se pudo cargar la facturación SaaS.",
+    };
+  }
+}
+
+export async function generateSaaSInvoiceAction(subscriptionId: number) {
+  try {
+    const session = await requireSuperAdminSession();
+
+    if (!Number.isFinite(subscriptionId) || subscriptionId <= 0) {
+      return { success: false, error: "Suscripción inválida." };
+    }
+
+    const [subscription] = await sql`
+      SELECT
+        gss.id,
+        gss.gym_id,
+        g.name AS gym_name,
+        gss.current_period_start,
+        gss.current_period_end,
+        gss.next_billing_date,
+        COALESCE(gss.price_override, sp.monthly_price) AS effective_price,
+        sp.name AS plan_name
+      FROM gym_saas_subscriptions gss
+      JOIN gyms g ON g.id = gss.gym_id
+      JOIN saas_plans sp ON sp.id = gss.plan_id
+      WHERE gss.id = ${subscriptionId}
+      LIMIT 1
+    `;
+
+    if (!subscription) {
+      return { success: false, error: "Suscripción SaaS no encontrada." };
+    }
+
+    const amount = Number(subscription.effective_price);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return {
+        success: false,
+        error: "El plan no tiene un precio mensual válido para facturar.",
+      };
+    }
+
+    const existing = await sql`
+      SELECT id
+      FROM saas_invoices
+      WHERE subscription_id = ${subscriptionId}
+        AND period_start = ${subscription.current_period_start}
+        AND period_end = ${subscription.current_period_end}
+        AND status <> 'cancelled'
+      LIMIT 1
+    `;
+
+    if (existing.length > 0) {
+      return {
+        success: false,
+        error: "Ya existe una factura para el período actual.",
+      };
+    }
+
+    const [invoice] = await sql`
+      INSERT INTO saas_invoices (
+        gym_id,
+        subscription_id,
+        period_start,
+        period_end,
+        amount,
+        status,
+        due_date,
+        created_at
+      )
+      VALUES (
+        ${subscription.gym_id},
+        ${subscriptionId},
+        ${subscription.current_period_start},
+        ${subscription.current_period_end},
+        ${amount},
+        'pending',
+        COALESCE(${subscription.next_billing_date}::date, ${subscription.current_period_end}::date),
+        NOW()
+      )
+      RETURNING *
+    `;
+
+    await sql`
+      INSERT INTO saas_audit_log (
+        actor_user_id,
+        action,
+        entity_type,
+        entity_id,
+        gym_id,
+        details
+      )
+      VALUES (
+        ${session.id},
+        'saas_invoice_generated',
+        'saas_invoice',
+        ${String(invoice.id)},
+        ${subscription.gym_id},
+        ${JSON.stringify({
+          gymName: subscription.gym_name,
+          planName: subscription.plan_name,
+          amount,
+        })}::jsonb
+      )
+    `;
+
+    revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/actividad");
+
+    return { success: true, data: invoice };
+  } catch (error) {
+    console.error("Error al generar factura SaaS:", error);
+    return { success: false, error: "No se pudo generar la factura SaaS." };
+  }
+}
+
+export async function markSaaSInvoicePaidAction(invoiceId: number) {
+  try {
+    const session = await requireSuperAdminSession();
+
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+      return { success: false, error: "Factura inválida." };
+    }
+
+    const [invoice] = await sql`
+      UPDATE saas_invoices
+      SET
+        status = 'paid',
+        paid_at = NOW()
+      WHERE id = ${invoiceId}
+        AND status IN ('pending', 'overdue')
+      RETURNING id, gym_id, amount
+    `;
+
+    if (!invoice) {
+      return {
+        success: false,
+        error: "La factura no existe o ya no está pendiente.",
+      };
+    }
+
+    await sql`
+      INSERT INTO saas_audit_log (
+        actor_user_id,
+        action,
+        entity_type,
+        entity_id,
+        gym_id,
+        details
+      )
+      VALUES (
+        ${session.id},
+        'saas_invoice_paid',
+        'saas_invoice',
+        ${String(invoice.id)},
+        ${invoice.gym_id},
+        ${JSON.stringify({ amount: Number(invoice.amount) })}::jsonb
+      )
+    `;
+
+    revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/actividad");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error al marcar factura SaaS como pagada:", error);
+    return { success: false, error: "No se pudo actualizar la factura SaaS." };
+  }
+}
+
+
+export async function getSaaSAuditLogAction(limit: number = 100) {
+  try {
+    await requireSuperAdminSession();
+
+    const safeLimit = Math.min(Math.max(Math.trunc(limit) || 100, 1), 250);
+
+    const events = await sql`
+      SELECT
+        l.id,
+        l.actor_user_id,
+        u.email AS actor_email,
+        l.action,
+        l.entity_type,
+        l.entity_id,
+        l.gym_id,
+        g.name AS gym_name,
+        l.details,
+        l.created_at
+      FROM saas_audit_log l
+      LEFT JOIN users u ON u.id = l.actor_user_id
+      LEFT JOIN gyms g ON g.id = l.gym_id
+      ORDER BY l.created_at DESC
+      LIMIT ${safeLimit}
+    `;
+
+    return { success: true, data: events };
+  } catch (error) {
+    console.error("Error al obtener actividad SaaS:", error);
+    return {
+      success: false,
+      data: [],
+      error: "No se pudo cargar el historial de actividad.",
+    };
   }
 }

@@ -29,6 +29,8 @@ interface MemberDashboardData {
   start_date: string | null;
   end_date: string | null;
   sub_status: string | null;
+  payment_status: string | null;
+  member_status: string | null;
   plan_name: string | null;
   routine_id: number | null;
 }
@@ -69,14 +71,23 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
         s.start_date,
         s.end_date,
         s.status AS sub_status,
+        s.payment_status,
         mp.name AS plan_name
       FROM members m
-      LEFT JOIN users u ON m.user_id = u.id
-      LEFT JOIN subscriptions s ON m.id = s.member_id
-      LEFT JOIN membership_plans mp ON s.plan_id = mp.id
+      LEFT JOIN LATERAL (
+        SELECT sub.start_date, sub.end_date, sub.status, sub.payment_status, sub.plan_id
+        FROM subscriptions sub
+        WHERE sub.member_id = m.id
+          AND sub.status IN ('active', 'scheduled')
+          AND sub.payment_status = 'paid'
+          AND sub.start_date <= CURRENT_DATE
+          AND sub.end_date > CURRENT_DATE
+        ORDER BY sub.end_date DESC, sub.id DESC
+        LIMIT 1
+      ) s ON TRUE
+      LEFT JOIN membership_plans mp ON s.plan_id = mp.id AND mp.gym_id = m.gym_id
       WHERE m.user_id = ${userId}
         AND m.gym_id = ${session.gymId}
-      ORDER BY s.updated_at DESC, s.end_date DESC
       LIMIT 1
     `;
 
@@ -166,7 +177,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
   }
 
   // La suscripción está totalmente activa sólo si no está vencida Y su estado no es suspended/inactive
-  const isFullyActive = !isExpired && !isSuspended && memberData?.sub_status === "active";
+  const isFullyActive = !isExpired && !isSuspended && ["active", "scheduled"].includes(memberData?.sub_status || "") && memberData?.payment_status === "paid";
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 p-6">
@@ -176,7 +187,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
           ¡Hola, {memberData?.first_name || "Atleta"}! 👋
         </h1>
         <p className="text-muted-foreground mt-1">
-          Bienvenido a tu panel general de FitZone.
+          Bienvenido a tu panel general de Kivra.
         </p>
       </div>
 

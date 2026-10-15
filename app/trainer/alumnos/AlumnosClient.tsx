@@ -415,7 +415,7 @@ export default function AlumnosClient({
           <div className="bg-card rounded-2xl max-w-md w-full p-6 shadow-2xl border border-border space-y-4 text-card-foreground">
             <h3 className="text-lg font-bold text-foreground">Vincular nuevo alumno</h3>
             <p className="text-xs text-muted-foreground">
-              Ingresá el correo electrónico con el que el alumno se registró en FitZone.
+              Ingresá el correo electrónico con el que el alumno se registró en Kivra.
             </p>
 
             <form onSubmit={handleAddMember} className="space-y-4">

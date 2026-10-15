@@ -48,7 +48,7 @@ export default function TrainerSidebar() {
           </div>
           <div>
             <h1 className="font-bold text-white text-sm leading-none tracking-tight">
-              PulseFit
+              Kivra
             </h1>
             <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">
               Trainer Hub
@@ -91,7 +91,7 @@ export default function TrainerSidebar() {
               </div>
               <div>
                 <h1 className="font-bold text-white text-base leading-none tracking-tight">
-                  PulseFit
+                  Kivra
                 </h1>
                 <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
                   Trainer Hub

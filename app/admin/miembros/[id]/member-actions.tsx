@@ -18,6 +18,8 @@ import {
   updateMemberStatusAction,
   deleteMemberAction,
   updateMemberAction,
+  createSubscription,
+  getMembershipPlans,
 } from "@/app/actions";
 import type { Member } from "@/app/types/member";
 
@@ -36,6 +38,8 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isOpen, setIsOpen] = useState(false);
+  const [isRenewOpen, setIsRenewOpen] = useState(false);
+  const [renewPlanId, setRenewPlanId] = useState("");
   const [membershipsList, setMembershipsList] = useState<MembershipOption[]>(initialMemberships);
 
   const [formData, setFormData] = useState({
@@ -43,31 +47,18 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
     last_name: member.last_name || "",
     email: member.email || "",
     phone: member.phone || "",
-    membership_id: member.membership_id?.toString() || "",
   });
 
   useEffect(() => {
-  if (isOpen) {
+  if (isOpen || isRenewOpen) {
     const fetchMemberships = async () => {
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-        
-        // 1. Declaramos la variable extrayendo gym_id del objeto member (o fallback a 1)
-        const gymId = (member as any).gym_id || 1;
-
-        // 2. Realizamos el fetch con la subruta /plans y la query param gymId
-        const res = await fetch(`${API_BASE_URL}/memberships/plans?gymId=${gymId}`);
-        const data = await res.json();
-
-        if (Array.isArray(data)) {
-          setMembershipsList(data);
-        } else if (data.success && Array.isArray(data.plan)) {
-          setMembershipsList(data.plan);
-        } else if (data.success && Array.isArray(data.data)) {
-          setMembershipsList(data.data);
-        } else {
-          console.error("Estructura de respuesta no esperada:", data);
-        }
+        const plans = await getMembershipPlans();
+        setMembershipsList(plans.map((plan) => ({
+          id: Number(plan.id),
+          name: String(plan.name),
+          price: Number(plan.price),
+        })));
       } catch (error) {
         console.error("Error al obtener membresías:", error);
       }
@@ -75,7 +66,7 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
 
     fetchMemberships();
   }
-}, [isOpen, member]);
+}, [isOpen, isRenewOpen, member]);
 
   const handleStatusChange = (newStatus: string) => {
     startTransition(async () => {
@@ -111,7 +102,6 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
         last_name: formData.last_name,
         email: formData.email,
         phone: formData.phone,
-        plan_id: formData.membership_id ? Number(formData.membership_id) : undefined,
       });
 
       if (res?.success) {
@@ -182,27 +172,6 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
                 />
               </div>
 
-              {/* Selector de Membresía */}
-              <div className="grid gap-2">
-                <Label htmlFor="membership_id" className="flex items-center gap-1.5">
-                  <CreditCard className="w-4 h-4 text-sky-500" /> Plan / Membresía
-                </Label>
-                <select
-                  id="membership_id"
-                  value={formData.membership_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, membership_id: e.target.value })
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="">Sin membresía activa</option>
-                  {membershipsList.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} (${m.price})
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
             <DialogFooter>
               <Button
@@ -214,6 +183,63 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
               </Button>
               <Button type="submit" disabled={isPending}>
                 {isPending ? "Guardando..." : "Guardar Cambios"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* La renovación es una operación independiente de la edición del socio. */}
+      <Dialog open={isRenewOpen} onOpenChange={setIsRenewOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <CreditCard className="w-4 h-4" /> Renovar membresía
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            const planId = Number(renewPlanId);
+            if (!Number.isInteger(planId) || planId <= 0) return;
+            startTransition(async () => {
+              const result = await createSubscription(member.id, planId);
+              if (result?.success) {
+                setIsRenewOpen(false);
+                setRenewPlanId("");
+                router.refresh();
+              } else {
+                alert(result?.error || "No se pudo programar la renovación");
+              }
+            });
+          }}>
+            <DialogHeader>
+              <DialogTitle>Renovar membresía</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                La nueva membresía comienza cuando termina la actual.
+                Se registra pendiente de pago; no se cobra automáticamente.
+              </p>
+              <div className="grid gap-2">
+                <Label htmlFor="renew_plan_id">Plan de la nueva membresía</Label>
+                <select id="renew_plan_id" required value={renewPlanId}
+                  onChange={(event) => setRenewPlanId(event.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <option value="">Seleccioná un plan</option>
+                  {membershipsList.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name} (${Number(plan.price).toLocaleString("es-AR")})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsRenewOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isPending || !renewPlanId}>
+                {isPending ? "Programando..." : "Programar renovación"}
               </Button>
             </DialogFooter>
           </form>
