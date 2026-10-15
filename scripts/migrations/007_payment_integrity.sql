@@ -1,5 +1,6 @@
--- Run only after reviewing duplicate transaction IDs and approving a Neon migration.
--- The new function coexists with the original 6-argument function.
+-- Apply only after explicit approval and a database backup.
+-- Requires the existing global unique index ux_payments_transaction_id.
+-- This v2 function coexists with the original 6-argument function.
 BEGIN;
 DO $$
 BEGIN
@@ -11,9 +12,19 @@ BEGIN
    RAISE EXCEPTION 'Duplicate transaction_id values: resolve before adding unique index';
  END IF;
 END $$;
-CREATE UNIQUE INDEX IF NOT EXISTS ux_payments_transaction_id_nonempty
- ON public.payments(transaction_id)
- WHERE NULLIF(BTRIM(transaction_id),'') IS NOT NULL;
+-- The existing unique index already prevents reuse of non-null transaction IDs.
+-- Reject blank IDs instead of creating a second overlapping index.
+DO $
+BEGIN
+ IF NOT EXISTS (
+   SELECT 1 FROM pg_indexes
+   WHERE schemaname='public' AND tablename='payments'
+     AND indexname='ux_payments_transaction_id'
+     AND indexdef ILIKE 'CREATE UNIQUE INDEX%'
+ ) THEN
+   RAISE EXCEPTION 'Expected unique index ux_payments_transaction_id is missing';
+ END IF;
+END $;
 
 CREATE OR REPLACE FUNCTION public.record_gym_membership_payment_v2(
  p_gym_id integer, p_member_id integer, p_plan_id integer,
@@ -31,6 +42,9 @@ DECLARE
 BEGIN
  IF NULLIF(BTRIM(p_payment_method),'') IS NULL OR p_amount IS NULL OR p_amount <= 0 THEN
    RAISE EXCEPTION 'Invalid payment method or amount';
+ END IF;
+ IF p_transaction_id IS NOT NULL AND NULLIF(BTRIM(p_transaction_id),'') IS NULL THEN
+   RAISE EXCEPTION 'Blank transaction ID is not allowed';
  END IF;
  PERFORM 1 FROM public.members WHERE id=p_member_id AND gym_id=p_gym_id FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'Member not found in gym'; END IF;
