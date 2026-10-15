@@ -14,7 +14,7 @@ BEGIN
 END $$;
 -- The existing unique index already prevents reuse of non-null transaction IDs.
 -- Reject blank IDs instead of creating a second overlapping index.
-DO $
+DO $$
 BEGIN
  IF NOT EXISTS (
    SELECT 1 FROM pg_indexes
@@ -24,7 +24,7 @@ BEGIN
  ) THEN
    RAISE EXCEPTION 'Expected unique index ux_payments_transaction_id is missing';
  END IF;
-END $;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.record_gym_membership_payment_v2(
  p_gym_id integer, p_member_id integer, p_plan_id integer,
