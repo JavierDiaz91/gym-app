@@ -44,6 +44,10 @@ BEGIN
  IF NULLIF(BTRIM(p_payment_method),'') IS NULL OR p_amount IS NULL OR p_amount <= 0 THEN
    RAISE EXCEPTION 'Invalid payment method or amount';
  END IF;
+ IF LOWER(BTRIM(p_payment_method))='mercadopago' AND
+    (p_subscription_id IS NULL OR NULLIF(BTRIM(p_transaction_id),'') IS NULL) THEN
+   RAISE EXCEPTION 'Mercado Pago requires a bound subscription and transaction ID';
+ END IF;
  IF p_transaction_id IS NOT NULL AND NULLIF(BTRIM(p_transaction_id),'') IS NULL THEN
    RAISE EXCEPTION 'Blank transaction ID is not allowed';
  END IF;
