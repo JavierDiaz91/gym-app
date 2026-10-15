@@ -82,6 +82,8 @@ DECLARE
  v_existing_plan integer;
  v_existing_method text;
  v_existing_amount numeric;
+ v_existing_subscription_id integer;
+ v_existing_status text;
  v_pending_count integer;
 BEGIN
  IF NULLIF(BTRIM(p_payment_method),'') IS NULL OR p_amount IS NULL OR p_amount <= 0 THEN
@@ -97,14 +99,16 @@ BEGIN
  PERFORM 1 FROM public.members WHERE id=p_member_id AND gym_id=p_gym_id FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'Member not found in gym'; END IF;
  IF NULLIF(BTRIM(p_transaction_id),'') IS NOT NULL THEN
-   SELECT p.id,p.member_id,s.plan_id,p.payment_method,p.amount
-   INTO v_payment_id,v_existing_member,v_existing_plan,v_existing_method,v_existing_amount
+   SELECT p.id,p.member_id,s.plan_id,p.payment_method,p.amount,p.subscription_id,p.status
+   INTO v_payment_id,v_existing_member,v_existing_plan,v_existing_method,v_existing_amount,v_existing_subscription_id,v_existing_status
    FROM public.payments p
    JOIN public.subscriptions s ON s.id=p.subscription_id
    WHERE p.transaction_id=p_transaction_id;
    IF FOUND THEN
      IF v_existing_member<>p_member_id OR v_existing_plan<>p_plan_id
-       OR v_existing_method<>p_payment_method OR v_existing_amount<>p_amount THEN
+       OR v_existing_method<>p_payment_method OR v_existing_amount<>p_amount
+       OR v_existing_status<>'completed'
+       OR (p_subscription_id IS NOT NULL AND v_existing_subscription_id<>p_subscription_id) THEN
        RAISE EXCEPTION 'Transaction already registered with different details';
      END IF;
      RETURN v_payment_id;
