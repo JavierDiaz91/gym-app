@@ -30,7 +30,7 @@ END $$;
 -- All competing requests for a member serialize on the same member row.
 CREATE OR REPLACE FUNCTION public.prepare_gym_membership_checkout(
  p_gym_id integer, p_member_id integer, p_plan_id integer
-) RETURNS integer LANGUAGE plpgsql AS $
+) RETURNS integer LANGUAGE plpgsql AS $$
 DECLARE
  v_sub public.subscriptions%ROWTYPE;
  v_count integer;
@@ -67,7 +67,7 @@ BEGIN
  END IF;
  RETURN v_sub.id;
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.record_gym_membership_payment_v2(
  p_gym_id integer, p_member_id integer, p_plan_id integer,
