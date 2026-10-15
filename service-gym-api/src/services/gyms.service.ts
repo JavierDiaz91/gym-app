@@ -62,7 +62,7 @@ export async function createGymWithAdmin(data: CreateGymInput) {
   if (name.length > 150 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 100) {
     throw new Error("Nombre o identificador del gimnasio invalido.");
   }
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     throw new Error("Correo del administrador invalido.");
   }
   if (password.length < 8 || password.length > 128) {
