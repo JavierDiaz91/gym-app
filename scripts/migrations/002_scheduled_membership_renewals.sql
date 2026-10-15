@@ -2,10 +2,30 @@
 -- This migration changes the allowed lifecycle states; it does not migrate payments.
 BEGIN;
 
-ALTER TABLE subscriptions
-  DROP CONSTRAINT IF EXISTS subscriptions_status_check;
+-- Find the actual status CHECK by its definition; constraint names vary
+-- across environments. Fail if the schema has an unexpected CHECK.
+DO $$
+DECLARE
+  v_constraint record;
+BEGIN
+  FOR v_constraint IN
+    SELECT c.conname, pg_get_constraintdef(c.oid) AS definition
+    FROM pg_constraint c
+    WHERE c.conrelid = 'public.subscriptions'::regclass
+      AND c.contype = 'c'
+      AND pg_get_constraintdef(c.oid) ILIKE '%status%'
+      AND pg_get_constraintdef(c.oid) NOT ILIKE '%payment_status%'
+  LOOP
+    IF v_constraint.definition NOT ILIKE '%active%'
+       OR v_constraint.definition NOT ILIKE '%expired%'
+       OR v_constraint.definition NOT ILIKE '%cancelled%' THEN
+      RAISE EXCEPTION 'Unexpected subscriptions status constraint: %', v_constraint.conname;
+    END IF;
+    EXECUTE format('ALTER TABLE public.subscriptions DROP CONSTRAINT %I', v_constraint.conname);
+  END LOOP;
+END $$;
 
-ALTER TABLE subscriptions
+ALTER TABLE public.subscriptions
   ADD CONSTRAINT subscriptions_status_check
   CHECK (status IN ('active', 'scheduled', 'expired', 'cancelled'));
 
