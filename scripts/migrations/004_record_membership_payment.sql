@@ -8,6 +8,7 @@ DECLARE
  v_plan membership_plans%ROWTYPE;
  v_sub subscriptions%ROWTYPE;
  v_payment_id integer;
+ v_existing_member_id integer;
 BEGIN
  IF NULLIF(BTRIM(p_payment_method),'') IS NULL THEN
    RAISE EXCEPTION 'Metodo de pago obligatorio';
@@ -19,9 +20,16 @@ BEGIN
  IF NOT FOUND OR v_plan.price IS NULL OR v_plan.price <= 0 THEN
    RAISE EXCEPTION 'Plan inexistente o precio invalido';
  END IF;
- IF NULLIF(BTRIM(p_transaction_id),'') IS NOT NULL AND EXISTS(
-   SELECT 1 FROM payments WHERE transaction_id=p_transaction_id
- ) THEN RAISE EXCEPTION 'La transaccion ya fue registrada'; END IF;
+ IF NULLIF(BTRIM(p_transaction_id),'') IS NOT NULL THEN
+   SELECT id, member_id INTO v_payment_id, v_existing_member_id
+     FROM payments WHERE transaction_id=p_transaction_id;
+   IF FOUND THEN
+     IF v_existing_member_id <> p_member_id THEN
+       RAISE EXCEPTION 'La transaccion pertenece a otro socio';
+     END IF;
+     RETURN v_payment_id; -- webhook retries must not extend twice
+   END IF;
+ END IF;
  -- Collect payment for an existing unpaid subscription to this plan first.
  SELECT * INTO v_sub FROM subscriptions
  WHERE member_id=p_member_id AND plan_id=p_plan_id
