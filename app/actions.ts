@@ -297,7 +297,7 @@ export async function createMember(formData: FormData) {
   if (!firstName || !lastName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "Completá nombre, apellido y un correo válido." };
   }
-  if (planIdRaw && (!/^[1-9]\\d*$/.test(planIdRaw) || !Number.isSafeInteger(Number(planIdRaw)))) {
+  if (planIdRaw && (!/^[1-9]\d*$/.test(planIdRaw) || !Number.isSafeInteger(Number(planIdRaw)))) {
     return { error: "El plan de membresía no es válido." };
   }
 
