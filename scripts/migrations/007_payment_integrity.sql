@@ -26,6 +26,49 @@ BEGIN
  END IF;
 END $$;
 
+-- Reserve exactly one unpaid membership period for a checkout.
+-- All competing requests for a member serialize on the same member row.
+CREATE OR REPLACE FUNCTION public.prepare_gym_membership_checkout(
+ p_gym_id integer, p_member_id integer, p_plan_id integer
+) RETURNS integer LANGUAGE plpgsql AS $
+DECLARE
+ v_sub public.subscriptions%ROWTYPE;
+ v_count integer;
+BEGIN
+ PERFORM 1 FROM public.members
+ WHERE id=p_member_id AND gym_id=p_gym_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Member not found in gym'; END IF;
+ PERFORM 1 FROM public.membership_plans
+ WHERE id=p_plan_id AND gym_id=p_gym_id AND is_active=true;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Active plan not found in gym'; END IF;
+
+ SELECT COUNT(*) INTO v_count FROM public.subscriptions
+ WHERE member_id=p_member_id AND payment_status='pending'
+   AND status IN ('active','scheduled') AND end_date>CURRENT_DATE;
+ IF v_count>1 THEN
+   RAISE EXCEPTION 'Multiple pending memberships: manual reconciliation required';
+ END IF;
+ IF v_count=1 THEN
+   SELECT * INTO v_sub FROM public.subscriptions
+   WHERE member_id=p_member_id AND payment_status='pending'
+     AND status IN ('active','scheduled') AND end_date>CURRENT_DATE
+   FOR UPDATE;
+   IF v_sub.plan_id<>p_plan_id THEN
+     RAISE EXCEPTION 'Another plan has a pending membership';
+   END IF;
+   IF EXISTS (SELECT 1 FROM public.payments
+              WHERE subscription_id=v_sub.id AND status='completed') THEN
+     RAISE EXCEPTION 'Pending membership already has a completed payment';
+   END IF;
+ ELSE
+   SELECT * INTO v_sub FROM public.renew_gym_membership(
+      p_gym_id,p_member_id,p_plan_id,'pending',0
+   );
+ END IF;
+ RETURN v_sub.id;
+END;
+$;
+
 CREATE OR REPLACE FUNCTION public.record_gym_membership_payment_v2(
  p_gym_id integer, p_member_id integer, p_plan_id integer,
  p_payment_method text, p_transaction_id text,
