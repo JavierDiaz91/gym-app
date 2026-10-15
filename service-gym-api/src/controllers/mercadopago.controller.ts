@@ -771,6 +771,19 @@ export const handleWebhook = async (req: Request, res: Response) => {
 
     // The checkout quote is fixed when the preference is created.
     // A later change to membership_plans.price must not invalidate a real payment.
+    // Older preferences did not include quotedAmount. Do not silently
+    // substitute the current plan price: it may have changed since checkout.
+    // Flag these approved payments for manual reconciliation instead.
+    if (
+      externalRef.quotedAmount === undefined ||
+      externalRef.quotedAmount === null
+    ) {
+      console.error(
+        `[MP WEBHOOK] LEGACY_PAYMENT_REQUIRES_REVIEW payment=${paymentId} tenant=${tenantId} member=${memberId} plan=${planId}. Missing checkout quote; reconcile against Mercado Pago before applying.`
+      );
+      return res.status(200).send("OK");
+    }
+
     const expectedAmount = Number(externalRef.quotedAmount);
     const paidAmount = Number(paymentData.transaction_amount);
 
