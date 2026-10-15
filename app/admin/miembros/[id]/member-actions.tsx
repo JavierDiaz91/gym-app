@@ -19,6 +19,7 @@ import {
   deleteMemberAction,
   updateMemberAction,
   createSubscription,
+  getMembershipPlans,
 } from "@/app/actions";
 import type { Member } from "@/app/types/member";
 
@@ -46,31 +47,18 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
     last_name: member.last_name || "",
     email: member.email || "",
     phone: member.phone || "",
-    membership_id: member.membership_id?.toString() || "",
   });
 
   useEffect(() => {
   if (isOpen || isRenewOpen) {
     const fetchMemberships = async () => {
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-        
-        // 1. Declaramos la variable extrayendo gym_id del objeto member (o fallback a 1)
-        const gymId = (member as any).gym_id || 1;
-
-        // 2. Realizamos el fetch con la subruta /plans y la query param gymId
-        const res = await fetch(`${API_BASE_URL}/memberships/plans?gymId=${gymId}`);
-        const data = await res.json();
-
-        if (Array.isArray(data)) {
-          setMembershipsList(data);
-        } else if (data.success && Array.isArray(data.plan)) {
-          setMembershipsList(data.plan);
-        } else if (data.success && Array.isArray(data.data)) {
-          setMembershipsList(data.data);
-        } else {
-          console.error("Estructura de respuesta no esperada:", data);
-        }
+        const plans = await getMembershipPlans();
+        setMembershipsList(plans.map((plan) => ({
+          id: Number(plan.id),
+          name: String(plan.name),
+          price: Number(plan.price),
+        })));
       } catch (error) {
         console.error("Error al obtener membresías:", error);
       }
