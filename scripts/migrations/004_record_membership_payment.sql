@@ -9,6 +9,8 @@ DECLARE
  v_sub subscriptions%ROWTYPE;
  v_payment_id integer;
  v_existing_member_id integer;
+ v_existing_plan_id integer;
+ v_existing_method text;
 BEGIN
  IF NULLIF(BTRIM(p_payment_method),'') IS NULL THEN
    RAISE EXCEPTION 'Metodo de pago obligatorio';
@@ -21,11 +23,16 @@ BEGIN
    RAISE EXCEPTION 'Plan inexistente o precio invalido';
  END IF;
  IF NULLIF(BTRIM(p_transaction_id),'') IS NOT NULL THEN
-   SELECT id, member_id INTO v_payment_id, v_existing_member_id
-     FROM payments WHERE transaction_id=p_transaction_id;
+   SELECT p.id, p.member_id, s.plan_id, p.payment_method
+     INTO v_payment_id, v_existing_member_id, v_existing_plan_id, v_existing_method
+     FROM payments p
+     JOIN subscriptions s ON s.id=p.subscription_id
+     WHERE p.transaction_id=p_transaction_id;
    IF FOUND THEN
-     IF v_existing_member_id <> p_member_id THEN
-       RAISE EXCEPTION 'La transaccion pertenece a otro socio';
+     IF v_existing_member_id <> p_member_id
+        OR v_existing_plan_id <> p_plan_id
+        OR v_existing_method <> p_payment_method THEN
+       RAISE EXCEPTION 'La transaccion ya existe con otros datos';
      END IF;
      RETURN v_payment_id; -- webhook retries must not extend twice
    END IF;
