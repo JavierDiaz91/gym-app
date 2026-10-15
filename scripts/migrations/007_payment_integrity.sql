@@ -39,8 +39,7 @@ BEGIN
    INTO v_payment_id,v_existing_member,v_existing_plan,v_existing_method,v_existing_amount
    FROM public.payments p
    JOIN public.subscriptions s ON s.id=p.subscription_id
-   JOIN public.members m ON m.id=p.member_id
-   WHERE p.transaction_id=p_transaction_id AND m.gym_id=p_gym_id;
+   WHERE p.transaction_id=p_transaction_id;
    IF FOUND THEN
      IF v_existing_member<>p_member_id OR v_existing_plan<>p_plan_id
        OR v_existing_method<>p_payment_method OR v_existing_amount<>p_amount THEN
