@@ -47,6 +47,7 @@ interface SubscriptionData {
   plan_name: string;
   price: number;
   description: string;
+  payment_status?: string;
 }
 
 interface PaymentData {
@@ -65,6 +66,7 @@ export default async function MembershipPage() {
 
   let subscription: SubscriptionData | null = null;
   let payments: PaymentData[] = [];
+  let upcoming: SubscriptionData | null = null;
 
   try {
     // 1. Obtener datos de la membresía + estado del socio (m.status)
@@ -91,6 +93,19 @@ const subResult = await sql`
 
 const subRows = Array.isArray(subResult) ? subResult : (subResult as any).rows || [];
 subscription = (subRows[0] as SubscriptionData) || null;
+
+    const futureRows = await sql`
+      SELECT m.id AS member_id, m.status AS member_status,
+        s.plan_id, s.start_date, s.end_date, s.status,
+        s.payment_status, p.name AS plan_name, p.price, p.description
+      FROM members m
+      JOIN subscriptions s ON s.member_id = m.id
+      JOIN membership_plans p ON p.id = s.plan_id AND p.gym_id = m.gym_id
+      WHERE m.user_id = ${userId} AND m.gym_id = ${session.gymId}
+        AND s.status = 'scheduled' AND s.end_date > CURRENT_DATE
+      ORDER BY s.start_date ASC LIMIT 1
+    `;
+    upcoming = (futureRows[0] as SubscriptionData) || null;
 
     // 2. Obtener el historial de pagos
     const payResult = await sql`
@@ -191,7 +206,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
           </div>
         )}
 
-        {!isBlocked && subscription?.member_id && subscription?.plan_id && Number(subscription?.price || 0) > 0 && (
+        {!isBlocked && !upcoming && subscription?.member_id && subscription?.plan_id && Number(subscription?.price || 0) > 0 && (
           <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
               <h4 className="font-bold text-foreground text-sm">
@@ -234,6 +249,29 @@ subscription = (subRows[0] as SubscriptionData) || null;
           </div>
         </div>
       </div>
+
+      {upcoming && (
+        <div className="bg-card border rounded-xl p-6 shadow-sm space-y-4">
+          <div className="flex flex-wrap justify-between gap-3">
+            <h2 className="text-xl font-bold">Próxima membresía</h2>
+            <span className="text-sm font-semibold">
+              {upcoming.payment_status === "paid" ? "Programada y pagada" : "Programada - Pendiente de pago"}
+            </span>
+          </div>
+          <p className="font-medium">{upcoming.plan_name}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <p>Inicio: {formatDate(upcoming.start_date)}</p>
+            <p>Vencimiento: {formatDate(upcoming.end_date)}</p>
+            <p>Precio del plan: ${Number(upcoming.price).toLocaleString("es-AR")}</p>
+          </div>
+          {upcoming.payment_status !== "paid" && (
+            <p className="text-sm text-muted-foreground">
+              Renovación pendiente de pago. Podés abonarla en el gimnasio.
+              El pago online se habilitará cuando esté vinculado a esta suscripción.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Historial de Pagos */}
       <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm space-y-4">
