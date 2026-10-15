@@ -259,11 +259,19 @@ subscription = (subRows[0] as SubscriptionData) || null;
             <p>Vencimiento: {formatDate(upcoming.end_date)}</p>
             <p>Precio del plan: ${Number(upcoming.price).toLocaleString("es-AR")}</p>
           </div>
-          {upcoming.payment_status !== "paid" && (
-            <p className="text-sm text-muted-foreground">
-              Renovación pendiente de pago. Podés abonarla en el gimnasio.
-              El pago online se habilitará cuando esté vinculado a esta suscripción.
-            </p>
+          {upcoming.payment_status === "pending" && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+              <p className="text-sm text-muted-foreground">
+                Tu renovación está pendiente de pago. Podés abonarla en el gimnasio
+                o pagarla ahora con Mercado Pago.
+              </p>
+              <PayButton
+                memberId={upcoming.member_id}
+                planId={upcoming.plan_id}
+                price={Number(upcoming.price || 0)}
+                label="Pagar renovación"
+              />
+            </div>
           )}
         </div>
       )}
