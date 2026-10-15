@@ -27,6 +27,19 @@ BEGIN
   IF v_plan.duration_months IS NULL OR v_plan.duration_months <= 0 THEN
     RAISE EXCEPTION 'Duracion de plan invalida';
   END IF;
+  -- Normalize past periods before checking the one-scheduled-renewal rule.
+  -- Date validity remains authoritative even if a job has not run.
+  UPDATE subscriptions
+     SET status='expired', updated_at=NOW()
+   WHERE member_id=p_member_id
+     AND status IN ('active','scheduled')
+     AND end_date <= CURRENT_DATE;
+  UPDATE subscriptions
+     SET status='active', updated_at=NOW()
+   WHERE member_id=p_member_id
+     AND status='scheduled'
+     AND start_date <= CURRENT_DATE
+     AND end_date > CURRENT_DATE;
   IF EXISTS (
     SELECT 1 FROM subscriptions
     WHERE member_id=p_member_id AND status='scheduled'
