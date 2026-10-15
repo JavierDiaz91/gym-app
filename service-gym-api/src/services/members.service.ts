@@ -129,7 +129,7 @@ export async function getMemberProfile(gymId: number, memberId: number) {
       mp.price AS plan_price
     FROM members m
     LEFT JOIN subscriptions s ON s.member_id = m.id
-    LEFT JOIN memberships mp ON s.membership_id = mp.id
+    LEFT JOIN membership_plans mp ON s.plan_id = mp.id
     WHERE m.id = ${memberId}
       AND m.gym_id = ${gymId}
     ORDER BY s.created_at DESC
@@ -153,7 +153,7 @@ export async function getMemberDashboard(gymId: number, memberId: number) {
       mp.price AS plan_price
     FROM members m
     LEFT JOIN subscriptions s ON s.member_id = m.id AND s.status = 'active'
-    LEFT JOIN memberships mp ON s.membership_id = mp.id
+    LEFT JOIN membership_plans mp ON s.plan_id = mp.id
     WHERE m.id = ${memberId}
       AND m.gym_id = ${gymId}
     ORDER BY s.created_at DESC
