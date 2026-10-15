@@ -29,7 +29,7 @@ END $$;
 CREATE OR REPLACE FUNCTION public.record_gym_membership_payment_v2(
  p_gym_id integer, p_member_id integer, p_plan_id integer,
  p_payment_method text, p_transaction_id text,
- p_notes text, p_amount numeric
+ p_notes text, p_amount numeric, p_subscription_id integer DEFAULT NULL
 ) RETURNS integer LANGUAGE plpgsql AS $$
 DECLARE
  v_plan public.membership_plans%ROWTYPE;
@@ -66,6 +66,23 @@ BEGIN
  SELECT * INTO v_plan FROM public.membership_plans
  WHERE id=p_plan_id AND gym_id=p_gym_id;
  IF NOT FOUND THEN RAISE EXCEPTION 'Plan not found in gym'; END IF;
+ -- A checkout with an explicit subscription must never settle another period.
+ IF p_subscription_id IS NOT NULL THEN
+   SELECT * INTO v_sub FROM public.subscriptions
+   WHERE id=p_subscription_id AND member_id=p_member_id AND plan_id=p_plan_id
+     AND payment_status='pending' AND status IN ('active','scheduled')
+     AND end_date>CURRENT_DATE
+   FOR UPDATE;
+   IF NOT FOUND THEN
+     RAISE EXCEPTION 'Checkout subscription is not pending or no longer valid';
+   END IF;
+   IF EXISTS (
+     SELECT 1 FROM public.payments p
+     WHERE p.subscription_id=v_sub.id AND p.status='completed'
+   ) THEN
+     RAISE EXCEPTION 'Subscription already has a completed payment';
+   END IF;
+ ELSE
  -- Existing pending period may be settled even if the plan has been deactivated.
  -- Reject ambiguous unpaid periods instead of arbitrarily assigning a payment.
  SELECT COUNT(*) INTO v_pending_count FROM public.subscriptions
@@ -92,6 +109,7 @@ BEGIN
       p_gym_id,p_member_id,p_plan_id,'pending',0
    );
  END IF;
+ END IF; -- explicit subscription versus unassigned checkout
  INSERT INTO public.payments(member_id,subscription_id,amount,payment_method,transaction_id,status,notes,payment_date)
  VALUES(p_member_id,v_sub.id,p_amount,p_payment_method,NULLIF(BTRIM(p_transaction_id),''),'completed',p_notes,NOW())
  RETURNING id INTO v_payment_id;
