@@ -78,7 +78,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
         SELECT sub.start_date, sub.end_date, sub.status, sub.payment_status, sub.plan_id
         FROM subscriptions sub
         WHERE sub.member_id = m.id
-          AND sub.status = 'active'
+          AND sub.status IN ('active', 'scheduled')
           AND sub.payment_status = 'paid'
           AND sub.start_date <= CURRENT_DATE
           AND sub.end_date > CURRENT_DATE
@@ -177,7 +177,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
   }
 
   // La suscripción está totalmente activa sólo si no está vencida Y su estado no es suspended/inactive
-  const isFullyActive = !isExpired && !isSuspended && memberData?.sub_status === "active" && memberData?.payment_status === "paid";
+  const isFullyActive = !isExpired && !isSuspended && ["active", "scheduled"].includes(memberData?.sub_status || "") && memberData?.payment_status === "paid";
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 p-6">
