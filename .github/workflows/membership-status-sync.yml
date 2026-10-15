@@ -1,8 +1,11 @@
-name: Membership status sync (manual)
+name: Membership status sync
 
-# Intentionally manual only. Enable a daily schedule after review and approval.
+# GitHub Actions schedules run on the repository default branch.
+# 06:00 UTC = 03:00 Argentina (UTC-3, no daylight saving time).
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
 
 permissions:
   contents: read
