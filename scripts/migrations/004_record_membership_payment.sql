@@ -17,11 +17,6 @@ BEGIN
  END IF;
  PERFORM 1 FROM members WHERE id=p_member_id AND gym_id=p_gym_id FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'Miembro no encontrado'; END IF;
- SELECT * INTO v_plan FROM membership_plans
-   WHERE id=p_plan_id AND gym_id=p_gym_id AND is_active=true;
- IF NOT FOUND OR v_plan.price IS NULL OR v_plan.price <= 0 THEN
-   RAISE EXCEPTION 'Plan inexistente o precio invalido';
- END IF;
  IF NULLIF(BTRIM(p_transaction_id),'') IS NOT NULL THEN
    SELECT p.id, p.member_id, s.plan_id, p.payment_method
      INTO v_payment_id, v_existing_member_id, v_existing_plan_id, v_existing_method
@@ -36,6 +31,12 @@ BEGIN
      END IF;
      RETURN v_payment_id; -- webhook retries must not extend twice
    END IF;
+ END IF;
+ -- Idempotent retries must work even if the plan was later deactivated.
+ SELECT * INTO v_plan FROM membership_plans
+   WHERE id=p_plan_id AND gym_id=p_gym_id AND is_active=true;
+ IF NOT FOUND OR v_plan.price IS NULL OR v_plan.price <= 0 THEN
+   RAISE EXCEPTION 'Plan inexistente o precio invalido';
  END IF;
  -- Collect payment for an existing unpaid subscription to this plan first.
  SELECT * INTO v_sub FROM subscriptions
