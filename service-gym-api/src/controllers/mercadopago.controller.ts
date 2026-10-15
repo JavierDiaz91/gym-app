@@ -700,6 +700,12 @@ export const handleWebhook = async (req: Request, res: Response) => {
       return res.status(200).send("OK");
     }
 
+    // Never fulfill a payment in a different currency.
+    if (paymentData.currency_id !== "ARS") {
+      console.warn(`[MP WEBHOOK] Moneda inesperada para pago ${paymentId}`);
+      return res.status(200).send("OK");
+    }
+
     let externalRef: {
       tenantId?: string;
       memberId?: string | number;
