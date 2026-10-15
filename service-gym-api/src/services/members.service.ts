@@ -93,22 +93,12 @@ export async function createGymMember(data: {
   `;
 
   if (data.planId) {
-    const [plan] = await sql`
-      SELECT id
-      FROM membership_plans
-      WHERE id = ${data.planId}
-        AND gym_id = ${data.gymId}
-    `;
-
-    if (!plan) throw new Error("Plan no encontrado para este gimnasio");
-
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + 1);
-
+    // Duration and tenant ownership are checked in PostgreSQL.
+    // The new membership starts unpaid until a payment is recorded.
     await sql`
-      INSERT INTO subscriptions (member_id, plan_id, start_date, end_date, status)
-      VALUES (${member.id}, ${data.planId}, ${startDate.toISOString()}, ${endDate.toISOString()}, 'active')
+      SELECT * FROM public.renew_gym_membership(
+        ${data.gymId}, ${member.id}, ${data.planId}, 'pending', 0
+      )
     `;
   }
 
