@@ -50,8 +50,8 @@ export async function registerCheckIn(gymId: number, identifier: string) {
       member: {
         id: member.member_id,
         name: `${member.first_name} ${member.last_name}`,
-        plan: sub?.plan_name || "Sin plan activo",
-        endDate: sub?.end_date || null,
+        plan: "Sin plan activo",
+        endDate: null,
       },
     };
   }
