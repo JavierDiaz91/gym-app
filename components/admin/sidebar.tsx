@@ -40,6 +40,8 @@ const navItems = [
   { href: "/admin/actividad", label: "Actividad", icon: Activity, roles: ["superadmin"] },
   { href: "/admin/configuracion-kivra", label: "Configuración Kivra", icon: Settings2, roles: ["superadmin"] },
 
+  { href: "/admin/mi-suscripcion", label: "Mi suscripción Kivra", icon: Receipt, roles: ["admin"] },
+
   // Funciones operativas de un gimnasio: requieren tenant (gym_id).
   { href: "/admin/miembros", label: "Miembros", icon: Users, roles: ["admin"] },
   { href: "/admin/pagos", label: "Pagos y Cobros", icon: DollarSign, roles: ["admin"] },
