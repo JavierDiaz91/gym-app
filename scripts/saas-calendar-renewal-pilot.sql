@@ -14,6 +14,9 @@ DECLARE
   v_sub record;
   v_start date;
   v_end date;
+  v_bill_start date;
+  v_due_date date;
+  v_amount numeric(12,2);
   v_id integer;
   v_existing record;
 BEGIN
@@ -46,6 +49,16 @@ BEGIN
     RAISE EXCEPTION 'El precio SaaS no está configurado';
   END IF;
 
+  -- Prorate only the onboarding month; future months are full price.
+  v_bill_start := GREATEST(v_start, v_sub.started_at::date);
+  v_amount := ROUND(v_sub.amount * (v_end - v_bill_start + 1)::numeric
+                    / (v_end - v_start + 1)::numeric, 2);
+  -- If onboarding occurred after the 10th, grant ten calendar days from signup.
+  v_due_date := GREATEST(v_start + 9, v_sub.started_at::date + 10);
+  IF v_bill_start = v_start THEN
+    v_due_date := v_start + 9;
+  END IF;
+
   -- Reject historical overlap rather than silently double-charge.
   SELECT i.id, i.period_start, i.period_end INTO v_existing
   FROM public.saas_invoices i
@@ -55,7 +68,7 @@ BEGIN
   ORDER BY i.id LIMIT 1;
 
   IF FOUND THEN
-    IF v_existing.period_start = v_start AND v_existing.period_end = v_end THEN
+    IF v_existing.period_start = v_bill_start AND v_existing.period_end = v_end THEN
       invoice_id := v_existing.id; result := 'already_exists';
       RETURN NEXT; RETURN;
     END IF;
@@ -65,14 +78,14 @@ BEGIN
   INSERT INTO public.saas_invoices (
     gym_id, subscription_id, period_start, period_end, amount, status, due_date, created_at
   ) VALUES (
-    p_gym_id, v_sub.id, v_start, v_end, v_sub.amount, 'pending', v_start + 9, NOW()
+    p_gym_id, v_sub.id, v_bill_start, v_end, v_amount, 'pending', v_due_date, NOW()
   ) RETURNING id INTO v_id;
 
   INSERT INTO public.saas_audit_log
     (actor_user_id, action, entity_type, entity_id, gym_id, details)
   VALUES (p_actor_user_id, 'saas_pilot_calendar_invoice_created',
           'saas_invoice', v_id::text, p_gym_id,
-          jsonb_build_object('periodStart', v_start, 'periodEnd', v_end, 'dueDate', v_start + 9));
+          jsonb_build_object('periodStart', v_bill_start, 'periodEnd', v_end, 'dueDate', v_due_date, 'prorated', v_bill_start > v_start, 'amount', v_amount));
 
   invoice_id := v_id; result := 'created'; RETURN NEXT;
 END;
