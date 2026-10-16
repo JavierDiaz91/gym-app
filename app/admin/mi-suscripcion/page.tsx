@@ -1,4 +1,5 @@
 import { getSession } from "@/app/actions";
+import { SaaSCheckoutButton } from "./SaaSCheckoutButton";
 import { sql } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,19 +74,20 @@ export default async function MiSuscripcionKivraPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead><tr className="border-b text-muted-foreground"><th className="py-3">Período</th><th>Importe</th><th>Vencimiento</th><th>Estado</th></tr></thead>
+                <thead><tr className="border-b text-muted-foreground"><th className="py-3">Período</th><th>Importe</th><th>Vencimiento</th><th>Estado</th><th>Acción</th></tr></thead>
                 <tbody>{invoices.map((invoice) => (
                   <tr key={Number(invoice.id)} className="border-b">
                     <td className="py-3">{date(invoice.period_start)} - {date(invoice.period_end)}</td>
                     <td>{money(invoice.amount)}</td>
                     <td>{date(invoice.due_date)}</td>
                     <td>{labels[String(invoice.status)] ?? String(invoice.status)}</td>
+                    <td>{["pending", "overdue"].includes(String(invoice.status)) ? <SaaSCheckoutButton invoiceId={Number(invoice.id)} /> : "-"}</td>
                   </tr>
                 ))}</tbody>
               </table>
             </div>
           )}
-          <p className="mt-4 text-xs text-muted-foreground">Los pagos online y la presentación de transferencias estarán disponibles cuando se complete y valide la integración. Esta pantalla es solo de consulta.</p>
+          <p className="mt-4 text-xs text-muted-foreground">Mercado Pago está en modo prueba y solo funcionará con credenciales de vendedor de prueba configuradas. Las transferencias todavía no están habilitadas.</p>
         </CardContent>
       </Card>
     </div>
