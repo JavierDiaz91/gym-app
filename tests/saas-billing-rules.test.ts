@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calendarBillingPeriod, evaluateInvoiceAccess } from "../lib/saas-billing-rules";
+import { calendarBillingPeriod, evaluateInvoiceAccess } from "../lib/saas-billing-rules.ts";
 
 test("calendar billing uses first through last day, due on 10th", () => {
   assert.deepEqual(calendarBillingPeriod("2026-11-15"), {
