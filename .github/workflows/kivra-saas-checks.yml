@@ -1,0 +1,26 @@
+name: Kivra SaaS checks
+
+on:
+  pull_request:
+    paths:
+      - 'lib/saas-billing-rules.ts'
+      - 'tests/saas-billing-rules.test.ts'
+      - 'app/api/saas/**'
+      - 'app/admin/mi-suscripcion/**'
+      - 'scripts/saas-*.sql'
+      - '.github/workflows/kivra-saas-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  billing-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run billing rules tests
+        run: node --experimental-strip-types --test tests/saas-billing-rules.test.ts
