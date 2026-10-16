@@ -1,6 +1,7 @@
 "use server";
 
 import { sql } from "@/lib/db";
+import { requireSaaSOperationalAccess } from "@/lib/saas-access";
 import { revalidateTag, revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
@@ -207,6 +208,9 @@ async function requireTenantSession() {
     throw new Error("Sesión inválida o sin gimnasio asociado.");
   }
 
+  if (session.role === "admin") {
+    await requireSaaSOperationalAccess(session.gymId);
+  }
   return { ...session, gymId: session.gymId };
 }
 
