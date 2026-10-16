@@ -37,6 +37,7 @@ const navItems = [
   { href: "/admin/clientes", label: "Clientes / Administradores", icon: UsersRound, roles: ["superadmin"] },
   { href: "/admin/planes-saas", label: "Planes SaaS", icon: Boxes, roles: ["superadmin"] },
   { href: "/admin/facturacion", label: "Facturación", icon: Receipt, roles: ["superadmin"] },
+  { href: "/admin/facturacion/transferencias", label: "Transferencias Kivra", icon: Receipt, roles: ["superadmin"] },
   { href: "/admin/actividad", label: "Actividad", icon: Activity, roles: ["superadmin"] },
   { href: "/admin/configuracion-kivra", label: "Configuración Kivra", icon: Settings2, roles: ["superadmin"] },
 
