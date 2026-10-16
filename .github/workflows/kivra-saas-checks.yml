@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'lib/saas-billing-rules.ts'
+      - 'app/actions.ts'
+      - 'app/middleware.ts'
+      - 'app/admin/**'
+      - 'lib/saas-access.ts'
       - 'tests/saas-billing-rules.test.ts'
       - 'app/api/saas/**'
       - 'app/admin/mi-suscripcion/**'
@@ -24,3 +28,7 @@ jobs:
           node-version: '22'
       - name: Run billing rules tests
         run: node --experimental-strip-types --test tests/saas-billing-rules.test.ts
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Check TypeScript
+        run: npx tsc --noEmit
