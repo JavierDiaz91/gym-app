@@ -1,5 +1,6 @@
 import { getSession } from "@/app/actions";
 import { SaaSCheckoutButton } from "./SaaSCheckoutButton";
+import { TransferSubmissionForm } from "./TransferSubmissionForm";
 import { sql } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +47,12 @@ export default async function MiSuscripcionKivraPage() {
     LIMIT 24
   `;
 
+  const submissions = await sql`
+    SELECT invoice_id, status, provisional_until
+    FROM public.saas_transfer_submissions
+    WHERE gym_id = ${gymId}
+  `;
+  const submitted = new Map(submissions.map((s) => [Number(s.invoice_id), s]));
   return (
     <div className="space-y-6">
       <div>
@@ -81,13 +88,13 @@ export default async function MiSuscripcionKivraPage() {
                     <td>{money(invoice.amount)}</td>
                     <td>{date(invoice.due_date)}</td>
                     <td>{labels[String(invoice.status)] ?? String(invoice.status)}</td>
-                    <td>{["pending", "overdue"].includes(String(invoice.status)) ? <SaaSCheckoutButton invoiceId={Number(invoice.id)} /> : "-"}</td>
+                    <td>{["pending", "overdue"].includes(String(invoice.status)) ? <div className="space-y-2"><SaaSCheckoutButton invoiceId={Number(invoice.id)} />{submitted.has(Number(invoice.id)) ? <p className="text-xs">Transferencia: {String(submitted.get(Number(invoice.id))?.status)}. Acceso provisorio hasta {new Date(String(submitted.get(Number(invoice.id))?.provisional_until)).toLocaleString("es-AR")} (si no fue rechazada).</p> : <TransferSubmissionForm invoiceId={Number(invoice.id)} />}</div> : "-"}</td>
                   </tr>
                 ))}</tbody>
               </table>
             </div>
           )}
-          <p className="mt-4 text-xs text-muted-foreground">Mercado Pago está en modo prueba y solo funcionará con credenciales de vendedor de prueba configuradas. Las transferencias todavía no están habilitadas.</p>
+          <p className="mt-4 text-xs text-muted-foreground">Mercado Pago está en modo prueba y solo funcionará con credenciales de vendedor de prueba configuradas. Las transferencias se verifican manualmente; el comprobante no acredita el pago.</p>
         </CardContent>
       </Card>
     </div>
