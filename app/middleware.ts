@@ -71,10 +71,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/trainer", request.url));
   }
 
-  // Rollout guard: gym admin pages except billing recovery.
+  // Rollout guard: all gym-admin reachable pages (admin, trainer, member),
+  // except the billing recovery page. Direct APIs require separate guards.
   // Only the explicitly configured test gym is evaluated.
   if (
-    isAdminRoute &&
+    isProtectedRoute &&
     session.role === "admin" &&
     session.gymId != null &&
     pathname !== "/admin/mi-suscripcion" &&
