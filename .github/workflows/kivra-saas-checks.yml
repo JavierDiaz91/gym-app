@@ -5,6 +5,8 @@ on:
     paths:
       - 'lib/saas-billing-rules.ts'
       - 'app/actions.ts'
+      - 'service-gym-api/src/**'
+      - 'service-gym-api/package*.json'
       - 'app/middleware.ts'
       - 'app/admin/**'
       - 'lib/saas-access.ts'
@@ -37,4 +39,19 @@ jobs:
           # Placeholder for module initialization during static build only.
           # No Neon connection or payment integration is exercised by CI.
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?sslmode=disable
+        run: npm run build
+
+  render-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: service-gym-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Render API dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Compile Render API
         run: npm run build
