@@ -19,6 +19,10 @@ function money(value: unknown) {
   return Number.isFinite(n) ? n.toLocaleString("es-AR", { style: "currency", currency: "ARS" }) : "Sin definir";
 }
 
+const subscriptionLabels: Record<string, string> = {
+  active: "Activa", trialing: "En prueba", past_due: "Con deuda", suspended: "Suspendida", cancelled: "Cancelada"
+};
+
 const labels: Record<string, string> = {
   pending: "Pendiente", overdue: "Vencida", paid: "Pagada", cancelled: "Cancelada"
 };
@@ -31,8 +35,9 @@ export default async function MiSuscripcionKivraPage() {
   // Never accept gym_id from a query parameter or client input.
   const gymId = session.gymId;
   const [subscription] = await sql`
-    SELECT s.id, s.status, s.current_period_start, s.current_period_end,
-           s.next_billing_date, p.name AS plan_name,
+    SELECT s.id, s.status, to_char(s.current_period_start, 'YYYY-MM-DD') AS current_period_start,
+           to_char(s.current_period_end, 'YYYY-MM-DD') AS current_period_end,
+           to_char(s.next_billing_date, 'YYYY-MM-DD') AS next_billing_date, p.name AS plan_name,
            COALESCE(s.price_override, p.monthly_price) AS monthly_price
     FROM gym_saas_subscriptions s
     JOIN saas_plans p ON p.id = s.plan_id
@@ -40,7 +45,9 @@ export default async function MiSuscripcionKivraPage() {
     LIMIT 1
   `;
   const invoices = await sql`
-    SELECT id, period_start, period_end, amount, status, due_date, paid_at
+    SELECT id, to_char(period_start, 'YYYY-MM-DD') AS period_start,
+           to_char(period_end, 'YYYY-MM-DD') AS period_end,
+           amount, status, to_char(due_date, 'YYYY-MM-DD') AS due_date, paid_at
     FROM saas_invoices
     WHERE gym_id = ${gymId}
     ORDER BY period_start DESC NULLS LAST, id DESC
@@ -64,7 +71,7 @@ export default async function MiSuscripcionKivraPage() {
         <Card>
           <CardHeader><CardTitle>Plan {String(subscription.plan_name)}</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p><strong>Estado:</strong> {String(subscription.status)}</p>
+            <p><strong>Estado:</strong> {subscriptionLabels[String(subscription.status)] ?? String(subscription.status)}</p>
             <p><strong>Precio mensual:</strong> {money(subscription.monthly_price)}</p>
             <p><strong>Período registrado:</strong> {date(subscription.current_period_start)} al {date(subscription.current_period_end)}</p>
             <p><strong>Próximo vencimiento registrado:</strong> {date(subscription.next_billing_date)}</p>
@@ -99,7 +106,7 @@ export default async function MiSuscripcionKivraPage() {
                     <td>{money(invoice.amount)}</td>
                     <td>{date(invoice.due_date)}</td>
                     <td>{labels[String(invoice.status)] ?? String(invoice.status)}</td>
-                    <td>{["pending", "overdue"].includes(String(invoice.status)) ? <div className="space-y-2"><SaaSCheckoutButton invoiceId={Number(invoice.id)} />{submitted.has(Number(invoice.id)) ? <p className="text-xs">Transferencia: {String(submitted.get(Number(invoice.id))?.status)}. Acceso provisorio hasta {new Date(String(submitted.get(Number(invoice.id))?.provisional_until)).toLocaleString("es-AR")} (si no fue rechazada).</p> : <TransferSubmissionForm invoiceId={Number(invoice.id)} />}</div> : "-"}</td>
+                    <td>{["pending", "overdue"].includes(String(invoice.status)) ? <div className="space-y-2"><SaaSCheckoutButton invoiceId={Number(invoice.id)} />{submitted.has(Number(invoice.id)) ? <p className="text-xs">Transferencia: {String(submitted.get(Number(invoice.id))?.status)}. {String(submitted.get(Number(invoice.id))?.status) === "under_review" && new Date(String(submitted.get(Number(invoice.id))?.provisional_until)).getTime() > Date.now() ? `Acceso provisorio hasta ${new Date(String(submitted.get(Number(invoice.id))?.provisional_until)).toLocaleString("es-AR")}.` : "Sin acceso provisorio vigente."}</p> : <TransferSubmissionForm invoiceId={Number(invoice.id)} />}</div> : "-"}</td>
                   </tr>
                 ))}</tbody>
               </table>
