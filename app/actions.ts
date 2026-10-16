@@ -3148,9 +3148,9 @@ export async function getSaaSBillingOverviewAction() {
           sp.name AS plan_name,
           COALESCE(gss.price_override, sp.monthly_price) AS effective_price,
           gss.status,
-          gss.current_period_start,
-          gss.current_period_end,
-          gss.next_billing_date
+          to_char(gss.current_period_start, 'YYYY-MM-DD') AS current_period_start,
+          to_char(gss.current_period_end, 'YYYY-MM-DD') AS current_period_end,
+          to_char(gss.next_billing_date, 'YYYY-MM-DD') AS next_billing_date
         FROM gym_saas_subscriptions gss
         JOIN gyms g ON g.id = gss.gym_id
         JOIN saas_plans sp ON sp.id = gss.plan_id
@@ -3163,11 +3163,11 @@ export async function getSaaSBillingOverviewAction() {
           g.name AS gym_name,
           i.subscription_id,
           sp.name AS plan_name,
-          i.period_start,
-          i.period_end,
+          to_char(i.period_start, 'YYYY-MM-DD') AS period_start,
+          to_char(i.period_end, 'YYYY-MM-DD') AS period_end,
           i.amount,
           i.status,
-          i.due_date,
+          to_char(i.due_date, 'YYYY-MM-DD') AS due_date,
           i.paid_at,
           i.external_reference,
           i.created_at
@@ -3195,7 +3195,7 @@ export async function generateSaaSInvoiceAction(subscriptionId: number, month: s
   try {
     const session = await requireSuperAdminSession();
     if (!Number.isSafeInteger(subscriptionId) || subscriptionId <= 0 ||
-        !/^\\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+        !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
       return { success: false, error: "Suscripción o mes inválidos." };
     }
 
