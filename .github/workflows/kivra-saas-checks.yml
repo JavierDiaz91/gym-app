@@ -56,4 +56,4 @@ jobs:
       - name: Compile Render API
         run: npm run build
       - name: Test Render SaaS pilot authorization policy
-        run: node --experimental-strip-types --test tests/saasPilotPolicy.test.ts
+        run: node -r ts-node/register --test tests/saasPilotPolicy.test.ts
