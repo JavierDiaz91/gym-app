@@ -1,12 +1,7 @@
+import { shouldCheckSaaSAccess } from "./saasPilotPolicy";
 import { NextFunction, Response } from "express";
 import { AuthenticatedRequest } from "./auth";
 import { sql } from "../db/neon";
-
-function isPilotEnabled(gymId: number): boolean {
-  const selected = process.env.KIVRA_SAAS_ACCESS_TEST_GYM_ID;
-  return process.env.KIVRA_SAAS_ACCESS_GATE_ENABLED === "true" &&
-    !!selected && /^\d+$/.test(selected) && Number(selected) === gymId;
-}
 
 export async function checkTenantStatus(
   req: AuthenticatedRequest,
@@ -36,7 +31,7 @@ export async function checkTenantStatus(
   // Members and trainers keep their gym operations; SuperAdmin is exempt.
   // Never rely on the frontend navigation gate for API authorization.
   const gymId = req.auth.gymId;
-  if (req.auth.role !== "admin" || gymId == null || !isPilotEnabled(gymId)) {
+  if (req.auth.role !== "admin" || gymId == null || !shouldCheckSaaSAccess(req.auth.role, gymId, process.env.KIVRA_SAAS_ACCESS_GATE_ENABLED, process.env.KIVRA_SAAS_ACCESS_TEST_GYM_ID)) {
     return next();
   }
 
