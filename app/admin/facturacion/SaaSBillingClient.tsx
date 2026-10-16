@@ -50,7 +50,12 @@ function formatMoney(value: number | string | null | undefined) {
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "-";
-  return new Date(value).toLocaleDateString("es-AR");
+  // PostgreSQL DATE fields represent calendar days, not instants.
+  // Render the date part directly to avoid UTC -> Argentina day shifts.
+  const datePart = value.slice(0, 10);
+  const match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(datePart);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  return new Date(value).toLocaleDateString("es-AR", { timeZone: "UTC" });
 }
 
 function StatusBadge({ status }: { status: string }) {
