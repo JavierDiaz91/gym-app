@@ -40,7 +40,7 @@ export default async function SaaSTransfersPage() {
           </div>
           <p className="text-sm">Importe: {Number(t.amount).toLocaleString("es-AR", { style: "currency", currency: "ARS" })}</p>
           <p className="text-sm">Operación: <strong>{String(t.operation_number)}</strong></p>
-          <p className="text-xs text-muted-foreground">Referencia privada del comprobante: {String(t.receipt_storage_key)}</p>
+          <p className="text-xs"><a className="underline text-primary" href={`/api/saas/transfers/${t.id}/receipt`}>Descargar comprobante privado</a></p>
           <p className="text-xs text-muted-foreground">Enviado: {new Date(String(t.submitted_at)).toLocaleString("es-AR")}. Acceso provisorio hasta: {new Date(String(t.provisional_until)).toLocaleString("es-AR")}.</p>
           <p className="text-xs text-muted-foreground">Estado de factura: {String(t.invoice_status)}</p>
           {t.status === "under_review" && <TransferReviewControls id={Number(t.id)} />}
