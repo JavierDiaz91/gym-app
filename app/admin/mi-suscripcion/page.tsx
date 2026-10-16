@@ -73,6 +73,17 @@ export default async function MiSuscripcionKivraPage() {
       ) : (
         <Card><CardContent className="p-6">Tu gimnasio todavía no tiene un plan SaaS asignado. Contactá a Kivra.</CardContent></Card>
       )}
+      {process.env.KIVRA_TRANSFER_ALIAS && process.env.KIVRA_TRANSFER_HOLDER && (
+        <Card>
+          <CardHeader><CardTitle>Datos para transferir a Kivra</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p><strong>Titular:</strong> {process.env.KIVRA_TRANSFER_HOLDER}</p>
+            <p><strong>Alias:</strong> {process.env.KIVRA_TRANSFER_ALIAS}</p>
+            {process.env.KIVRA_TRANSFER_CVU && <p><strong>CVU:</strong> {process.env.KIVRA_TRANSFER_CVU}</p>}
+            <p className="text-xs text-muted-foreground">Transferí desde tu banco o billetera y luego informá el número de operación y adjuntá el comprobante en la cuota correspondiente.</p>
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardHeader><CardTitle>Cuotas registradas</CardTitle></CardHeader>
         <CardContent>
