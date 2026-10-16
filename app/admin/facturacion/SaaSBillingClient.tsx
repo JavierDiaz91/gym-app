@@ -50,7 +50,12 @@ function formatMoney(value: number | string | null | undefined) {
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "-";
-  return new Date(value).toLocaleDateString("es-AR");
+  // PostgreSQL DATE fields represent calendar days, not instants.
+  // Render the date part directly to avoid UTC -> Argentina day shifts.
+  const datePart = value.slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(datePart);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  return new Date(value).toLocaleDateString("es-AR", { timeZone: "UTC" });
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -81,6 +86,7 @@ export default function SaaSBillingClient({
     Array.isArray(initialInvoices) ? initialInvoices : []
   );
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [billingMonth, setBillingMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   const totalPending = useMemo(
     () =>
@@ -102,7 +108,7 @@ export default function SaaSBillingClient({
     const key = "subscription-" + subscriptionId;
     setBusyId(key);
 
-    const result = await generateSaaSInvoiceAction(subscriptionId);
+    const result = await generateSaaSInvoiceAction(subscriptionId, billingMonth);
 
     setBusyId(null);
 
@@ -111,7 +117,7 @@ export default function SaaSBillingClient({
       return;
     }
 
-    toast.success("Factura SaaS generada.");
+    toast.success(result.alreadyExists ? `La factura #${result.invoiceId} ya existe; no se duplicó.` : `Factura #${result.invoiceId} generada correctamente.`);
     router.refresh();
   }
 
@@ -119,6 +125,7 @@ export default function SaaSBillingClient({
     const key = "invoice-" + invoiceId;
     setBusyId(key);
 
+    if (!window.confirm(`¿Confirmás que verificaste el ingreso real de la factura #${invoiceId} antes de marcarla como pagada?`)) return;
     const result = await markSaaSInvoicePaidAction(invoiceId);
 
     setBusyId(null);
@@ -167,6 +174,19 @@ export default function SaaSBillingClient({
 
       <Card>
         <CardHeader>
+          <CardTitle>Generación de facturas por mes calendario</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <label htmlFor="billing-month" className="block text-sm font-medium">Mes a facturar</label>
+          <input id="billing-month" type="month" value={billingMonth} max={new Date().toISOString().slice(0, 7)}
+            onChange={(event) => setBillingMonth(event.target.value)}
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm" />
+          <p className="text-xs text-muted-foreground">Seleccioná el mes y presioná Generar factura en el gimnasio correspondiente. El primer mes se prorratea desde el alta y no se duplican facturas existentes. Los meses futuros no están habilitados en el piloto.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Suscripciones de gimnasios</CardTitle>
         </CardHeader>
         <CardContent>
@@ -210,7 +230,7 @@ export default function SaaSBillingClient({
                           ) : (
                             <Receipt className="mr-2 h-4 w-4" />
                           )}
-                          Generar factura
+                          Generar factura del mes
                         </Button>
                       </td>
                     </tr>

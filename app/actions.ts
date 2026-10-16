@@ -1,6 +1,7 @@
 "use server";
 
 import { sql } from "@/lib/db";
+import { requireSaaSOperationalAccess } from "@/lib/saas-access";
 import { revalidateTag, revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
@@ -207,6 +208,9 @@ async function requireTenantSession() {
     throw new Error("Sesión inválida o sin gimnasio asociado.");
   }
 
+  if (session.role === "admin") {
+    await requireSaaSOperationalAccess(session.gymId);
+  }
   return { ...session, gymId: session.gymId };
 }
 
@@ -3144,9 +3148,9 @@ export async function getSaaSBillingOverviewAction() {
           sp.name AS plan_name,
           COALESCE(gss.price_override, sp.monthly_price) AS effective_price,
           gss.status,
-          gss.current_period_start,
-          gss.current_period_end,
-          gss.next_billing_date
+          to_char(gss.current_period_start, 'YYYY-MM-DD') AS current_period_start,
+          to_char(gss.current_period_end, 'YYYY-MM-DD') AS current_period_end,
+          to_char(gss.next_billing_date, 'YYYY-MM-DD') AS next_billing_date
         FROM gym_saas_subscriptions gss
         JOIN gyms g ON g.id = gss.gym_id
         JOIN saas_plans sp ON sp.id = gss.plan_id
@@ -3159,11 +3163,11 @@ export async function getSaaSBillingOverviewAction() {
           g.name AS gym_name,
           i.subscription_id,
           sp.name AS plan_name,
-          i.period_start,
-          i.period_end,
+          to_char(i.period_start, 'YYYY-MM-DD') AS period_start,
+          to_char(i.period_end, 'YYYY-MM-DD') AS period_end,
           i.amount,
           i.status,
-          i.due_date,
+          to_char(i.due_date, 'YYYY-MM-DD') AS due_date,
           i.paid_at,
           i.external_reference,
           i.created_at
@@ -3187,114 +3191,59 @@ export async function getSaaSBillingOverviewAction() {
   }
 }
 
-export async function generateSaaSInvoiceAction(subscriptionId: number) {
+export async function generateSaaSInvoiceAction(subscriptionId: number, month: string) {
   try {
     const session = await requireSuperAdminSession();
-
-    if (!Number.isFinite(subscriptionId) || subscriptionId <= 0) {
-      return { success: false, error: "Suscripción inválida." };
+    if (!Number.isSafeInteger(subscriptionId) || subscriptionId <= 0 ||
+        !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+      return { success: false, error: "Suscripción o mes inválidos." };
     }
 
     const [subscription] = await sql`
-      SELECT
-        gss.id,
-        gss.gym_id,
-        g.name AS gym_name,
-        gss.current_period_start,
-        gss.current_period_end,
-        gss.next_billing_date,
-        COALESCE(gss.price_override, sp.monthly_price) AS effective_price,
-        sp.name AS plan_name
-      FROM gym_saas_subscriptions gss
-      JOIN gyms g ON g.id = gss.gym_id
-      JOIN saas_plans sp ON sp.id = gss.plan_id
-      WHERE gss.id = ${subscriptionId}
-      LIMIT 1
+      SELECT id, gym_id FROM public.gym_saas_subscriptions
+      WHERE id = ${subscriptionId} LIMIT 1
     `;
-
     if (!subscription) {
       return { success: false, error: "Suscripción SaaS no encontrada." };
     }
 
-    const amount = Number(subscription.effective_price);
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return {
-        success: false,
-        error: "El plan no tiene un precio mensual válido para facturar.",
-      };
+    // Atomic, audited, duplicate-safe calendar invoice creation in PostgreSQL.
+    // Requires scripts/saas-calendar-renewal-pilot.sql installed in Neon.
+    const [result] = await sql`
+      SELECT invoice_id, result
+      FROM public.kivra_generate_monthly_invoice_pilot(
+        ${Number(subscription.gym_id)},
+        ${month + "-01"}::date,
+        ${session.id}
+      )
+    `;
+    if (!result) {
+      return { success: false, error: "No se obtuvo respuesta al generar la factura." };
     }
-
-    const existing = await sql`
-      SELECT id
-      FROM saas_invoices
-      WHERE subscription_id = ${subscriptionId}
-        AND period_start = ${subscription.current_period_start}
-        AND period_end = ${subscription.current_period_end}
-        AND status <> 'cancelled'
-      LIMIT 1
-    `;
-
-    if (existing.length > 0) {
-      return {
-        success: false,
-        error: "Ya existe una factura para el período actual.",
-      };
+    if (result.result === "before_onboarding") {
+      return { success: false, error: "La suscripción todavía no había comenzado en ese mes." };
     }
-
-    const [invoice] = await sql`
-      INSERT INTO saas_invoices (
-        gym_id,
-        subscription_id,
-        period_start,
-        period_end,
-        amount,
-        status,
-        due_date,
-        created_at
-      )
-      VALUES (
-        ${subscription.gym_id},
-        ${subscriptionId},
-        ${subscription.current_period_start},
-        ${subscription.current_period_end},
-        ${amount},
-        'pending',
-        COALESCE(${subscription.next_billing_date}::date, ${subscription.current_period_end}::date),
-        NOW()
-      )
-      RETURNING *
-    `;
-
-    await sql`
-      INSERT INTO saas_audit_log (
-        actor_user_id,
-        action,
-        entity_type,
-        entity_id,
-        gym_id,
-        details
-      )
-      VALUES (
-        ${session.id},
-        'saas_invoice_generated',
-        'saas_invoice',
-        ${String(invoice.id)},
-        ${subscription.gym_id},
-        ${JSON.stringify({
-          gymName: subscription.gym_name,
-          planName: subscription.plan_name,
-          amount,
-        })}::jsonb
-      )
-    `;
 
     revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/mi-suscripcion");
     revalidatePath("/admin/actividad");
-
-    return { success: true, data: invoice };
-  } catch (error) {
-    console.error("Error al generar factura SaaS:", error);
+    return {
+      success: true,
+      invoiceId: result.invoice_id == null ? null : Number(result.invoice_id),
+      alreadyExists: result.result === "already_exists",
+    };
+  } catch (error: any) {
+    console.error("Error al generar factura SaaS de calendario:", error);
+    const message = String(error?.message || "");
+    if (message.includes("factura histórica superpuesta")) {
+      return { success: false, error: "Ya existe una factura con un período superpuesto. Revisala antes de continuar." };
+    }
+    if (message.includes("No se permite facturar meses futuros")) {
+      return { success: false, error: "No se pueden generar facturas de meses futuros." };
+    }
+    if (error?.code === "42883") {
+      return { success: false, error: "Falta instalar el generador de facturas de calendario en Neon." };
+    }
     return { success: false, error: "No se pudo generar la factura SaaS." };
   }
 }
