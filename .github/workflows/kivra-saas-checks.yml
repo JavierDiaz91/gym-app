@@ -33,4 +33,8 @@ jobs:
       - name: Check TypeScript
         run: npx tsc --noEmit
       - name: Build Next.js application
+        env:
+          # Placeholder for module initialization during static build only.
+          # No Neon connection or payment integration is exercised by CI.
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?sslmode=disable
         run: npm run build
