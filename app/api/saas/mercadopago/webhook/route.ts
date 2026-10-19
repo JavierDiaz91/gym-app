@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 type SignatureCheck = { valid: true } | { valid: false; reason: string };
 
-function checkSignature(request: NextRequest, paymentId: string, secret: string): SignatureCheck {
+function checkSignature(request: NextRequest, signedDataId: string | null, secret: string): SignatureCheck {
   const signature = request.headers.get("x-signature") ?? "";
   const requestId = request.headers.get("x-request-id") ?? "";
   if (!signature) return { valid: false, reason: "missing_signature" };
@@ -29,7 +29,7 @@ function checkSignature(request: NextRequest, paymentId: string, secret: string)
     return { valid: false, reason: "timestamp_out_of_window" };
   }
 
-  const manifest = `id:${paymentId.toLowerCase()};request-id:${requestId};ts:${ts};`;
+  // Mercado Pago signs only the URL query parameter "data.id", not legacy "id"\n  // or the JSON body. Omit the id segment entirely when data.id is absent.\n  const idSegment = signedDataId ? `id:${signedDataId.toLowerCase()};` : "";\n  const manifest = `${idSegment}request-id:${requestId};ts:${ts};`;
   const expected = createHmac("sha256", secret).update(manifest).digest();
   const supplied = Buffer.from(v1, "hex");
   if (!timingSafeEqual(expected, supplied)) {
@@ -58,23 +58,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
   const legacyTopic = request.nextUrl.searchParams.get("topic");
-  // Signed webhooks must always pass HMAC verification. Legacy IPN callbacks
-  // use query parameters and may omit signature headers; verify their payment
-  // server-to-server and enforce seller, invoice and amount checks below.
-  const isUnsignedLegacyIpn =
-    legacyTopic === "payment" &&
-    legacyIdFromQuery === paymentId &&
-    idFromBody == null &&
-    idFromQuery == null &&
-    !request.headers.has("x-signature") &&
-    !request.headers.has("x-request-id");
-  if (!isUnsignedLegacyIpn) {
-    const signatureCheck = checkSignature(request, paymentId, secret);
-    if (!signatureCheck.valid) {
-      // Only emit a fixed reason code; never log tokens, signatures, headers or URLs.
-      console.warn("Kivra SaaS MP webhook signature rejected", signatureCheck.reason);
-      return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
-    }
+  // Require a valid signature for modern webhooks and legacy IPN alike.
+  // Legacy ?id=... is used to fetch the payment but is NOT part of the
+  // signed manifest. Only the query parameter data.id is signed.
+  const signatureCheck = checkSignature(request, idFromQuery, secret);
+  if (!signatureCheck.valid) {
+    console.warn("Kivra SaaS MP webhook signature rejected", signatureCheck.reason);
+    return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
   }
   if (payload?.type !== "payment" && payload?.action !== "payment.updated" && payload?.action !== "payment.created" && legacyTopic !== "payment") {
     return NextResponse.json({ received: true });
