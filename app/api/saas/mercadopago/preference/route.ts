@@ -40,6 +40,27 @@ export async function POST(request: NextRequest) {
     }
 
     const origin = new URL(publicUrl).origin;
+    const webhookUrlValue = process.env.KIVRA_MP_TEST_NOTIFICATION_URL;
+    if (!webhookUrlValue) {
+      return NextResponse.json({ error: "Webhook de prueba no configurado" }, { status: 503 });
+    }
+    let webhookUrl: URL;
+    try {
+      webhookUrl = new URL(webhookUrlValue);
+    } catch {
+      return NextResponse.json({ error: "URL de webhook inválida" }, { status: 503 });
+    }
+    if (
+      webhookUrl.protocol !== "https:" ||
+      webhookUrl.origin !== origin ||
+      webhookUrl.pathname !== "/api/saas/mercadopago/webhook" ||
+      !webhookUrl.searchParams.get("x-vercel-protection-bypass") ||
+      webhookUrl.username ||
+      webhookUrl.password ||
+      webhookUrl.hash
+    ) {
+      return NextResponse.json({ error: "URL de webhook inválida" }, { status: 503 });
+    }
     const preference = {
       items: [{
         id: `kivra-saas-invoice-${invoice.id}`,
@@ -54,7 +75,7 @@ export async function POST(request: NextRequest) {
         failure: `${origin}/admin/mi-suscripcion`,
         pending: `${origin}/admin/mi-suscripcion`
       },
-      notification_url: `${origin}/api/saas/mercadopago/webhook`
+      notification_url: webhookUrl.toString()
     };
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
