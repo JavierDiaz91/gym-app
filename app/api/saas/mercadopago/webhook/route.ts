@@ -31,14 +31,19 @@ export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
   const idFromBody = payload?.data?.id;
   const idFromQuery = request.nextUrl.searchParams.get("data.id");
-  const paymentId = String(idFromQuery ?? idFromBody ?? "");
-  if (!/^\d{1,30}$/.test(paymentId) || (idFromQuery && idFromBody && idFromQuery !== String(idFromBody))) {
+  const legacyIdFromQuery = request.nextUrl.searchParams.get("id");
+  const ids = [idFromBody, idFromQuery, legacyIdFromQuery]
+    .filter((id) => id !== null && id !== undefined)
+    .map(String);
+  const paymentId = ids[0] ?? "";
+  if (!/^\d{1,30}$/.test(paymentId) || ids.some((id) => id !== paymentId)) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
   if (!validSignature(request, paymentId, secret)) {
     return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
   }
-  if (payload?.type !== "payment" && payload?.action !== "payment.updated" && payload?.action !== "payment.created") {
+  const legacyTopic = request.nextUrl.searchParams.get("topic");
+  if (payload?.type !== "payment" && payload?.action !== "payment.updated" && payload?.action !== "payment.created" && legacyTopic !== "payment") {
     return NextResponse.json({ received: true });
   }
 
