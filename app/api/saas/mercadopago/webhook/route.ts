@@ -29,7 +29,10 @@ function checkSignature(request: NextRequest, signedDataId: string | null, secre
     return { valid: false, reason: "timestamp_out_of_window" };
   }
 
-  // Mercado Pago signs only the URL query parameter "data.id", not legacy "id"\n  // or the JSON body. Omit the id segment entirely when data.id is absent.\n  const idSegment = signedDataId ? `id:${signedDataId.toLowerCase()};` : "";\n  const manifest = `${idSegment}request-id:${requestId};ts:${ts};`;
+  // Only the URL query parameter data.id belongs in the signed manifest.
+  // Legacy IPN query parameter id and JSON body IDs are not signed.
+  const idSegment = signedDataId ? `id:${signedDataId.toLowerCase()};` : "";
+  const manifest = `${idSegment}request-id:${requestId};ts:${ts};`;
   const expected = createHmac("sha256", secret).update(manifest).digest();
   const supplied = Buffer.from(v1, "hex");
   if (!timingSafeEqual(expected, supplied)) {
