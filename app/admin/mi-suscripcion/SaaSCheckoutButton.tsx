@@ -21,8 +21,8 @@ export function SaaSCheckoutButton({ invoiceId }: { invoiceId: number }) {
       }
       // Only navigate to the official Mercado Pago checkout domain.
       const destination = new URL(data.checkoutUrl);
-      if (destination.protocol !== "https:" ||
-          !["mercadopago.com.ar", "www.mercadopago.com.ar", "mercadopago.com", "www.mercadopago.com"].includes(destination.hostname)) {
+      if (destination.protocol !== "https:" || destination.username || destination.password ||
+          !["mercadopago.com.ar", "www.mercadopago.com.ar", "mercadopago.com", "www.mercadopago.com", "sandbox.mercadopago.com.ar", "sandbox.mercadopago.com"].includes(destination.hostname)) {
         throw new Error("La dirección de pago no es válida");
       }
       window.location.assign(destination.toString());
