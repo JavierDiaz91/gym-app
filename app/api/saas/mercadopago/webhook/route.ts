@@ -5,19 +5,37 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function validSignature(request: NextRequest, paymentId: string, secret: string): boolean {
+type SignatureCheck = { valid: true } | { valid: false; reason: string };
+
+function checkSignature(request: NextRequest, paymentId: string, secret: string): SignatureCheck {
   const signature = request.headers.get("x-signature") ?? "";
   const requestId = request.headers.get("x-request-id") ?? "";
+  if (!signature) return { valid: false, reason: "missing_signature" };
+  if (!requestId) return { valid: false, reason: "missing_request_id" };
+
   const ts = signature.match(/(?:^|,)\s*ts=([^,]+)/)?.[1];
-  const v1 = signature.match(/(?:^|,)\s*v1=([0-9a-fA-F]+)/)?.[1];
-  if (!ts || !v1 || !requestId || !/^\d+$/.test(ts)) return false;
+  const v1 = signature.match(/(?:^|,)\s*v1=([^,]+)/)?.[1];
+  if (!ts || !/^\d+$/.test(ts)) return { valid: false, reason: "invalid_timestamp" };
+  if (!v1 || !/^[0-9a-fA-F]{64}$/.test(v1)) {
+    return { valid: false, reason: "invalid_signature_format" };
+  }
+
   const timestamp = Number(ts);
-  // MP uses millisecond timestamps; reject stale or future signatures.
-  if (!Number.isSafeInteger(timestamp) || Math.abs(Date.now() - timestamp) > 10 * 60 * 1000) return false;
+  if (!Number.isSafeInteger(timestamp)) return { valid: false, reason: "invalid_timestamp" };
+  // Support both seconds and milliseconds while keeping the original ts in
+  // the signed manifest. Do not log timestamps or signature contents.
+  const timestampMs = ts.length <= 10 ? timestamp * 1000 : timestamp;
+  if (!Number.isSafeInteger(timestampMs) || Math.abs(Date.now() - timestampMs) > 10 * 60 * 1000) {
+    return { valid: false, reason: "timestamp_out_of_window" };
+  }
+
   const manifest = `id:${paymentId.toLowerCase()};request-id:${requestId};ts:${ts};`;
   const expected = createHmac("sha256", secret).update(manifest).digest();
   const supplied = Buffer.from(v1, "hex");
-  return expected.length === supplied.length && timingSafeEqual(expected, supplied);
+  if (!timingSafeEqual(expected, supplied)) {
+    return { valid: false, reason: "signature_mismatch" };
+  }
+  return { valid: true };
 }
 
 export async function POST(request: NextRequest) {
@@ -50,8 +68,13 @@ export async function POST(request: NextRequest) {
     idFromQuery == null &&
     !request.headers.has("x-signature") &&
     !request.headers.has("x-request-id");
-  if (!isUnsignedLegacyIpn && !validSignature(request, paymentId, secret)) {
-    return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
+  if (!isUnsignedLegacyIpn) {
+    const signatureCheck = checkSignature(request, paymentId, secret);
+    if (!signatureCheck.valid) {
+      // Only emit a fixed reason code; never log tokens, signatures, headers or URLs.
+      console.warn("Kivra SaaS MP webhook signature rejected", signatureCheck.reason);
+      return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
+    }
   }
   if (payload?.type !== "payment" && payload?.action !== "payment.updated" && payload?.action !== "payment.created" && legacyTopic !== "payment") {
     return NextResponse.json({ received: true });
