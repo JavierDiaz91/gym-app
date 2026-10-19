@@ -85,6 +85,15 @@ export async function POST(request: NextRequest) {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store"
     });
+    if (response.status === 404) {
+      // A signed simulator event may reference a fictitious payment ID.
+      // Acknowledge the notification without creating a payment or changing an invoice.
+      console.info("Kivra MP webhook: payment not found; no settlement performed");
+      return NextResponse.json(
+        { received: true, credited: false, reason: "payment_not_found" },
+        { status: 200, headers: { "Cache-Control": "no-store" } }
+      );
+    }
     if (!response.ok) {
       console.error("Kivra MP payment fetch failed", response.status);
       return NextResponse.json({ error: "No se pudo verificar el pago" }, { status: 502 });
