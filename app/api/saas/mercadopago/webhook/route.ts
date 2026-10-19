@@ -39,10 +39,20 @@ export async function POST(request: NextRequest) {
   if (!/^\d{1,30}$/.test(paymentId) || ids.some((id) => id !== paymentId)) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
-  if (!validSignature(request, paymentId, secret)) {
+  const legacyTopic = request.nextUrl.searchParams.get("topic");
+  // Signed webhooks must always pass HMAC verification. Legacy IPN callbacks
+  // use query parameters and may omit signature headers; verify their payment
+  // server-to-server and enforce seller, invoice and amount checks below.
+  const isUnsignedLegacyIpn =
+    legacyTopic === "payment" &&
+    legacyIdFromQuery === paymentId &&
+    idFromBody == null &&
+    idFromQuery == null &&
+    !request.headers.has("x-signature") &&
+    !request.headers.has("x-request-id");
+  if (!isUnsignedLegacyIpn && !validSignature(request, paymentId, secret)) {
     return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
   }
-  const legacyTopic = request.nextUrl.searchParams.get("topic");
   if (payload?.type !== "payment" && payload?.action !== "payment.updated" && payload?.action !== "payment.created" && legacyTopic !== "payment") {
     return NextResponse.json({ received: true });
   }
