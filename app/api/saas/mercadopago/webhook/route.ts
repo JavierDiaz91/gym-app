@@ -36,6 +36,17 @@ function checkSignature(request: NextRequest, signedDataId: string | null, secre
   const expected = createHmac("sha256", secret).update(manifest).digest();
   const supplied = Buffer.from(v1, "hex");
   if (!timingSafeEqual(expected, supplied)) {
+    // Diagnostics expose only structural flags, never signatures, secrets,
+    // request identifiers, timestamps or full webhook URLs.
+    console.warn("Kivra MP HMAC diagnostics", {
+      hasSignedDataId: signedDataId !== null,
+      signedDataIdLength: signedDataId?.length ?? 0,
+      signatureHasTs: Boolean(ts),
+      signatureHasV1: Boolean(v1),
+      requestIdPresent: Boolean(requestId),
+      queryType: request.nextUrl.searchParams.get("type") === "payment",
+      legacyTopic: request.nextUrl.searchParams.get("topic") === "payment"
+    });
     return { valid: false, reason: "signature_mismatch" };
   }
   return { valid: true };
