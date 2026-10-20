@@ -38,7 +38,22 @@ function checkSignature(request: NextRequest, signedDataId: string | null, secre
   if (!timingSafeEqual(expected, supplied)) {
     // Diagnostics expose only structural flags, never signatures, secrets,
     // request identifiers, timestamps or full webhook URLs.
-    console.warn("Kivra MP HMAC diagnostics", {
+    // Diagnose possible manifest differences without accepting alternate signatures.
+    const legacyId = request.nextUrl.searchParams.get("id");
+    const candidateManifests = {
+      noId: `request-id:${requestId};ts:${ts};`,
+      legacyId: legacyId ? `id:${legacyId.toLowerCase()};request-id:${requestId};ts:${ts};` : null,
+      queryId: signedDataId ? `id:${signedDataId.toLowerCase()};request-id:${requestId};ts:${ts};` : null
+    };
+    const candidateMatches = Object.fromEntries(
+      Object.entries(candidateManifests).map(([name, value]) => [
+        name, value !== null && timingSafeEqual(
+          createHmac("sha256", secret).update(value).digest(), supplied
+        )
+      ])
+    );
+    console.warn("Kivra MP HMAC diagnostics", {      candidateMatches,
+
       hasSignedDataId: signedDataId !== null,
       signedDataIdLength: signedDataId?.length ?? 0,
       signatureHasTs: Boolean(ts),
