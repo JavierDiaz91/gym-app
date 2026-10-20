@@ -49,14 +49,20 @@ function formatMoney(value: number | string | null | undefined) {
   return "$" + amount.toLocaleString("es-AR");
 }
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
-  // PostgreSQL DATE fields represent calendar days, not instants.
-  // Render the date part directly to avoid UTC -> Argentina day shifts.
-  const datePart = value.slice(0, 10);
+function formatDate(value: string | Date | null | undefined) {
+  if (value == null || value === "") return "-";
+  // Neon/Next may serialize SQL DATE and TIMESTAMP values as Date objects
+  // rather than strings. Normalize before using string methods.
+  const text = value instanceof Date
+    ? (Number.isNaN(value.getTime()) ? "" : value.toISOString())
+    : typeof value === "string" ? value : "";
+  if (!text) return "-";
+  // Preserve the calendar date to avoid UTC -> Argentina day shifts.
+  const datePart = text.slice(0, 10);
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(datePart);
   if (match) return `${match[3]}/${match[2]}/${match[1]}`;
-  return new Date(value).toLocaleDateString("es-AR", { timeZone: "UTC" });
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleDateString("es-AR", { timeZone: "UTC" });
 }
 
 function StatusBadge({ status }: { status: string }) {
