@@ -72,9 +72,9 @@ export async function POST(request: NextRequest) {
       external_reference: `kivra_saas_invoice_${invoice.id}_gym_${session.gymId}`,
       auto_return: "approved",
       back_urls: {
-        success: `${origin}/admin/mi-suscripcion`,
-        failure: `${origin}/admin/mi-suscripcion`,
-        pending: `${origin}/admin/mi-suscripcion`
+        success: `${origin}/admin/mi-suscripcion?mp_return=success&invoice=${invoice.id}`,
+        failure: `${origin}/admin/mi-suscripcion?mp_return=failure&invoice=${invoice.id}`,
+        pending: `${origin}/admin/mi-suscripcion?mp_return=pending&invoice=${invoice.id}`
       },
       notification_url: webhookUrl.toString()
     };
