@@ -64,12 +64,13 @@ export async function POST(request: NextRequest) {
     const preference = {
       items: [{
         id: `kivra-saas-invoice-${invoice.id}`,
-        title: `Kivra SaaS - cuota ${String(invoice.period_start).slice(0, 10)}`,
+        title: invoice.period_start ? `Kivra SaaS - cuota ${String(invoice.period_start).slice(0, 10)}` : `Kivra SaaS - factura #${invoice.id}`,
         quantity: 1,
         currency_id: "ARS",
         unit_price: amount
       }],
       external_reference: `kivra_saas_invoice_${invoice.id}_gym_${session.gymId}`,
+      auto_return: "approved",
       back_urls: {
         success: `${origin}/admin/mi-suscripcion`,
         failure: `${origin}/admin/mi-suscripcion`,
