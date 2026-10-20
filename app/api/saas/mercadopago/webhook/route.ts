@@ -86,13 +86,29 @@ export async function POST(request: NextRequest) {
   if (legacyTopic === "merchant_order" || queryType === "merchant_order" || payload?.type === "merchant_order") {
     return NextResponse.json({ received: true, ignored: "merchant_order" });
   }
-  // Require a valid signature for modern webhooks and legacy IPN alike.
-  // Legacy ?id=... is used to fetch the payment but is NOT part of the
-  // signed manifest. Only the query parameter data.id is signed.
-  const signatureCheck = checkSignature(request, idFromQuery, secret);
-  if (!signatureCheck.valid) {
-    console.warn("Kivra SaaS MP webhook signature rejected", signatureCheck.reason);
-    return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
+  // Mercado Pago's legacy IPN (?id=...&topic=payment) may include an
+  // x-signature that does not match the modern webhook manifest. Do not
+  // interpret that mismatch as authentication: instead, accept ONLY this
+  // narrowly identified legacy notification as a trigger for an authenticated
+  // server-to-server payment lookup. The seller, invoice reference, amount,
+  // currency and payment status are verified below before any DB write.
+  // Modern notifications always require a valid HMAC.
+  const isLegacyPaymentIpn =
+    legacyTopic === "payment" &&
+    queryType === null &&
+    idFromQuery === null &&
+    legacyIdFromQuery !== null &&
+    /^\d{1,30}$/.test(legacyIdFromQuery) &&
+    String(idFromBody ?? legacyIdFromQuery) === legacyIdFromQuery &&
+    (payload === null || (payload?.data?.id === undefined && payload?.type === undefined));
+  if (!isLegacyPaymentIpn) {
+    const signatureCheck = checkSignature(request, idFromQuery, secret);
+    if (!signatureCheck.valid) {
+      console.warn("Kivra SaaS MP webhook signature rejected", signatureCheck.reason);
+      return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
+    }
+  } else {
+    console.info("Kivra MP legacy IPN: verifying payment directly with provider");
   }
   if (payload?.type !== "payment" && payload?.action !== "payment.updated" && payload?.action !== "payment.created" && legacyTopic !== "payment" && queryType !== "payment") {
     return NextResponse.json({ received: true });
