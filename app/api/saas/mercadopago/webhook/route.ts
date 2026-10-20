@@ -37,7 +37,7 @@ function checkSignature(request: NextRequest, signedDataId: string | null, secre
     ? [{ name: "dataId", id: signedDataId }]
     : [
         { name: "noId", id: null },
-        ...(legacyId && /^\\d{1,30}$/.test(legacyId)
+        ...(legacyId && /^\d{1,30}$/.test(legacyId)
           ? [{ name: "legacyId", id: legacyId }]
           : [])
       ];
