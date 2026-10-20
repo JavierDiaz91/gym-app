@@ -72,6 +72,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
   const legacyTopic = request.nextUrl.searchParams.get("topic");
+  const queryType = request.nextUrl.searchParams.get("type");
+  // Merchant orders are not payments; acknowledge without touching invoices.
+  if (legacyTopic === "merchant_order" || queryType === "merchant_order" || payload?.type === "merchant_order") {
+    return NextResponse.json({ received: true, ignored: "merchant_order" });
+  }
   // Require a valid signature for modern webhooks and legacy IPN alike.
   // Legacy ?id=... is used to fetch the payment but is NOT part of the
   // signed manifest. Only the query parameter data.id is signed.
@@ -80,7 +85,7 @@ export async function POST(request: NextRequest) {
     console.warn("Kivra SaaS MP webhook signature rejected", signatureCheck.reason);
     return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
   }
-  if (payload?.type !== "payment" && payload?.action !== "payment.updated" && payload?.action !== "payment.created" && legacyTopic !== "payment") {
+  if (payload?.type !== "payment" && payload?.action !== "payment.updated" && payload?.action !== "payment.created" && legacyTopic !== "payment" && queryType !== "payment") {
     return NextResponse.json({ received: true });
   }
 
