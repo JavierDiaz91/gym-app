@@ -140,6 +140,23 @@ export async function assignSubscription(data: {
   planId: number;
   durationMonths: number;
 }) {
+  if (!Number.isInteger(data.gymId) || data.gymId <= 0 ||
+      !Number.isInteger(data.memberId) || data.memberId <= 0 ||
+      !Number.isInteger(data.planId) || data.planId <= 0) {
+    throw new Error("Gimnasio, socio o plan invalido.");
+  }
+  // Hasta habilitar la venta de pases flexibles, el flujo legacy solo
+  // admite planes mensuales activos. Esta verificacion NO reemplaza la
+  // validacion atomica dentro de renew_gym_membership en la base.
+  const [plan] = await sql`
+    SELECT id FROM membership_plans
+    WHERE id = ${data.planId} AND gym_id = ${data.gymId}
+      AND is_active = true AND access_mode = 'monthly'
+    LIMIT 1
+  `;
+  if (!plan) {
+    throw new Error("Este plan no esta habilitado para la renovacion mensual.");
+  }
   // The database function owns duration, dates, tenant checks and locking.
   // This entry point only schedules the renewal; it does not collect a payment.
   const [sub] = await sql`
