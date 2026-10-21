@@ -166,3 +166,36 @@ export async function assignSubscription(data: {
   `;
   return sub;
 }
+
+
+export async function recordFlexiblePassPaymentInDev(data: {
+  gymId: number;
+  memberId: number;
+  planId: number;
+  paymentMethod: string;
+  transactionId: string;
+  amount: number;
+  notes?: string;
+}) {
+  // Fail closed: a deployment must explicitly opt into this experimental path.
+  if (process.env.NODE_ENV === "production" ||
+      process.env.ENABLE_FLEXIBLE_PASS_DEV !== "true") {
+    throw new Error("Venta de pases flexibles deshabilitada.");
+  }
+  if (![data.gymId, data.memberId, data.planId].every(
+    value => Number.isSafeInteger(value) && value > 0
+  ) || !Number.isFinite(data.amount) || data.amount <= 0 ||
+      !data.paymentMethod?.trim() || !data.transactionId?.trim()) {
+    throw new Error("Datos del pago incompletos o invalidos.");
+  }
+  // Solo cobros presenciales ya confirmados por un administrador.
+  // NO usar con pagos MP pendientes ni con webhooks.
+  const rows = await sql`
+    SELECT * FROM public.record_flexible_gym_pass_payment_draft(
+      ${data.gymId}, ${data.memberId}, ${data.planId},
+      ${data.paymentMethod.trim()}, ${data.transactionId.trim()},
+      ${data.amount}, ${data.notes ?? null}
+    )
+  `;
+  return rows[0] ?? null;
+}
