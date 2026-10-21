@@ -24,6 +24,11 @@ router.post(
   MembershipController.createFlexibleDraft
 );
 router.post(
+  "/dev/flexible-pass-payment",
+  requireRole("admin", "superadmin"),
+  MembershipController.recordFlexiblePaymentDev
+);
+router.post(
   "/subscribe",
   requireRole("admin", "superadmin"),
   MembershipController.subscribeMember
