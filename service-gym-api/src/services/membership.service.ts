@@ -2,7 +2,8 @@ import { sql } from "../db/neon";
 
 export async function getGymPlans(gymId: number) {
   return await sql`
-    SELECT id, name, price, duration_months, is_active, description
+    SELECT id, name, price, duration_months, is_active, description,
+           access_mode, duration_days, max_entries
     FROM membership_plans
     WHERE gym_id = ${gymId}
     ORDER BY created_at DESC
