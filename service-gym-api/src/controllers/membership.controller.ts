@@ -2,6 +2,7 @@ import { Response } from "express";
 import {
   getGymPlans,
   createGymPlan,
+  createFlexibleGymPlanDraft,
   updateGymPlan,
   deleteGymPlan,
   assignSubscription,
@@ -45,6 +46,23 @@ export class MembershipController {
       return res.json({ success: true, plan });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async createFlexibleDraft(req: AuthenticatedRequest, res: Response) {
+    try {
+      const gymId = resolveGymId(req);
+      if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+      const { name, price, accessMode, durationDays, maxEntries, description } = req.body ?? {};
+      const plan = await createFlexibleGymPlanDraft({
+        gymId, name, price: Number(price), accessMode,
+        durationDays: Number(durationDays),
+        maxEntries: maxEntries == null ? undefined : Number(maxEntries),
+        description,
+      });
+      return res.status(201).json({ success: true, plan, availableForSale: false });
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
     }
   }
 
