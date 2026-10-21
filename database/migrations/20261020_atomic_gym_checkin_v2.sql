@@ -1,7 +1,10 @@
 -- PASO 2: check-in atomico para membresias pagadas y pases por ingresos.
--- DEPENDENCIA: ejecutar primero 20261020_membership_flexible_access_foundation.sql
+-- DEPENDENCIAS: ejecutar primero 20261020_membership_flexible_access_foundation.sql
+-- y 20261020_attendance_subscription_link.sql
 -- NO EJECUTAR NI ACTIVAR EN PRODUCCION SIN PRUEBAS EN NEON DE DESARROLLO.
 -- La API actual aun utiliza registerCheckIn: este procedimiento NO esta conectado.
+-- Se debe impedir la venta de pases superpuestos o definir una prioridad
+-- explicita de consumo. Los check-ins legacy no se contabilizan como cupos.
 
 BEGIN;
 
@@ -81,13 +84,12 @@ BEGIN
                                 'message', 'Pase sin cantidad de ingresos valida');
     END IF;
 
-    -- Los pases se cuentan por periodo de suscripcion, no por toda la vida
-    -- del socio. Evitar solapamientos entre pases al habilitar su venta.
+    -- Cada ingreso se carga a la suscripcion que autorizo el acceso.
+    -- Los check-ins historicos con subscription_id NULL no se descuentan.
     SELECT count(*) INTO v_used
     FROM public.attendance a
     WHERE a.member_id = v_member.id
-      AND a.check_in >= v_sub.start_date::timestamp
-      AND a.check_in < v_sub.end_date::timestamp;
+      AND a.subscription_id = v_sub.id;
 
     IF v_used >= v_sub.max_entries THEN
       RETURN jsonb_build_object('success', false, 'code', 'ENTRY_LIMIT_REACHED',
@@ -96,8 +98,8 @@ BEGIN
     END IF;
   END IF;
 
-  INSERT INTO public.attendance (member_id, check_in)
-  VALUES (v_member.id, now())
+  INSERT INTO public.attendance (member_id, subscription_id, check_in)
+  VALUES (v_member.id, v_sub.id, now())
   RETURNING id, check_in INTO v_attendance_id, v_check_in;
 
   RETURN jsonb_build_object(
@@ -110,6 +112,7 @@ BEGIN
       'endDate', v_sub.end_date
     ),
     'attendance_id', v_attendance_id,
+    'subscription_id', v_sub.id,
     'checkInTime', v_check_in,
     'entries_remaining', CASE
       WHEN v_sub.access_mode = 'entry_pack'
