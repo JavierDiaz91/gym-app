@@ -92,6 +92,7 @@ export async function updateGymPlan(
       updated_at = NOW()
     WHERE id = ${id}
       AND gym_id = ${gymId}
+      AND (${data.isActive === true} = false OR COALESCE(access_mode, 'monthly') NOT IN ('entry_pack', 'fixed_days'))
     RETURNING *
   `;
   return updated;
