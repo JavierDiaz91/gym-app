@@ -257,9 +257,12 @@ export default function MembresiasAdminPage() {
                     defaultValue={editingPlan.is_active ? "true" : "false"}
                     className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
-                    <option value="true">Activo</option>
+                    <option value="true" disabled={planMode !== "monthly" && !editingPlan.is_active}>Activo</option>
                     <option value="false">Inactivo</option>
                   </select>
+                  {planMode !== "monthly" && !editingPlan.is_active && (
+                    <p className="mt-1 text-xs text-amber-700">La activación de pases flexibles está bloqueada hasta habilitar su venta de forma segura.</p>
+                  )}
                 </div>
               )}
 
