@@ -17,6 +17,9 @@ interface Plan {
   name: string;
   price: number;
   duration_months: number;
+  access_mode?: "monthly" | "fixed_days" | "entry_pack";
+  duration_days?: number | null;
+  max_entries?: number | null;
   description?: string;
   is_active: boolean;
 }
@@ -118,7 +121,9 @@ export default function MembresiasAdminPage() {
                     <CardTitle className="text-lg">{plan.name}</CardTitle>
                     <p className="text-2xl font-bold mt-2">
                       ${Number(plan.price).toLocaleString()}
-                      <span className="text-sm font-normal text-muted-foreground">/mes</span>
+                      <span className="text-sm font-normal text-muted-foreground">
+                        {plan.access_mode === "entry_pack" ? " / pack" : plan.access_mode === "fixed_days" ? " / pase" : " / mes"}
+                      </span>
                     </p>
                   </div>
                   <div className="flex gap-1">
@@ -147,7 +152,11 @@ export default function MembresiasAdminPage() {
                       {plan.is_active ? "Activo" : "Inactivo"}
                     </Badge>
                     <Badge variant="outline">
-                      {plan.duration_months} {plan.duration_months === 1 ? "mes" : "meses"}
+                      {plan.access_mode === "entry_pack"
+                        ? `${plan.duration_days ?? 0} días · ${plan.max_entries ?? 0} ingresos`
+                        : plan.access_mode === "fixed_days"
+                          ? `${plan.duration_days ?? 0} ${plan.duration_days === 1 ? "día" : "días"}`
+                          : `${plan.duration_months} ${plan.duration_months === 1 ? "mes" : "meses"}`}
                     </Badge>
                   </div>
                 </CardContent>
