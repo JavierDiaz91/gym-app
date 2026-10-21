@@ -2405,123 +2405,137 @@ if (existingMember.length > 0) {
 
 
 
-//Funcion para registrar asistencia de alumnos
-export async function registerAttendanceAction(memberIdentifier: string) {
+
+// Función para registrar asistencia de alumnos.
+// La búsqueda identifica al socio, pero el control de acceso
+// y el registro definitivo se realizan mediante la API.
+export async function registerAttendanceAction(
+  memberIdentifier: string
+) {
   try {
     const session = await getSession();
     const gymId = session?.gymId;
-    if (!gymId) return { success: false, error: "Sesión inválida o sin gimnasio asociado" };
-    const cleanInput = memberIdentifier.trim();
+
+    if (!gymId) {
+      return {
+        success: false,
+        error: "Sesión inválida o sin gimnasio asociado",
+      };
+    }
+
+    const cleanInput = memberIdentifier?.trim();
+
+    if (!cleanInput) {
+      return {
+        success: false,
+        error: "Ingresá un ID, email o nombre del socio",
+      };
+    }
+
     const isNumber = /^\d+$/.test(cleanInput);
     const searchTerm = `%${cleanInput.toLowerCase()}%`;
 
-    // 1. Búsqueda inteligente adaptada al tipo de dato
+    // 1. Buscar al socio dentro del gimnasio.
+    // No registrar asistencia directamente en esta función.
     const members = isNumber
       ? await sql`
-          SELECT 
+          SELECT
             m.id,
             m.first_name,
-            m.last_name,
-            m.status,
-            mp.name AS plan_name,
-            s.end_date AS subscription_end,
-            s.status AS subscription_status
+            m.last_name
           FROM members m
-          LEFT JOIN subscriptions s 
-            ON m.id = s.member_id
-               AND s.status IN ('active', 'scheduled')
-               AND s.payment_status = 'paid'
-               AND s.start_date <= CURRENT_DATE
-               AND s.end_date > CURRENT_DATE
-          LEFT JOIN membership_plans mp 
-            ON s.plan_id = mp.id
           WHERE m.gym_id = ${gymId}
-            AND m.id = ${parseInt(cleanInput, 10)}
+            AND m.id = ${Number(cleanInput)}
           LIMIT 1
         `
       : await sql`
-          SELECT 
+          SELECT
             m.id,
             m.first_name,
-            m.last_name,
-            m.status,
-            mp.name AS plan_name,
-            s.end_date AS subscription_end,
-            s.status AS subscription_status
+            m.last_name
           FROM members m
-          LEFT JOIN subscriptions s 
-            ON m.id = s.member_id
-               AND s.status IN ('active', 'scheduled')
-               AND s.payment_status = 'paid'
-               AND s.start_date <= CURRENT_DATE
-               AND s.end_date > CURRENT_DATE
-          LEFT JOIN membership_plans mp 
-            ON s.plan_id = mp.id
+          LEFT JOIN users u ON u.id = m.user_id
           WHERE m.gym_id = ${gymId}
             AND (
               LOWER(m.email) = LOWER(${cleanInput})
+              OR LOWER(u.email) = LOWER(${cleanInput})
               OR LOWER(m.first_name) LIKE ${searchTerm}
               OR LOWER(m.last_name) LIKE ${searchTerm}
-              OR LOWER(m.first_name || ' ' || m.last_name) LIKE ${searchTerm}
+              OR LOWER(
+                m.first_name || ' ' || m.last_name
+              ) LIKE ${searchTerm}
             )
           ORDER BY m.id DESC
           LIMIT 1
         `;
 
     if (members.length === 0) {
-      return { success: false, error: "Miembro no encontrado" };
+      return {
+        success: false,
+        error: "Miembro no encontrado",
+      };
     }
 
     const member = members[0];
-    const isSubscriptionValid = Boolean(member.subscription_end);
 
-    // 2. Determinar estado de acceso
-    let accessGranted = false;
-    let message = "";
+    // 2. Enviar el ID del socio a la API.
+    // La API valida membresía, pago, vencimiento,
+    // estado del socio, cupos y escaneos duplicados.
+    const response = await processCheckInAction(
+      String(member.id)
+    );
 
-    if (member.status !== "active") {
-      const statusTranslation: Record<string, string> = {
-        suspended: "Suspendido",
-        inactive: "Inactivo",
+    if (!response || typeof response.success !== "boolean") {
+      return {
+        success: false,
+        error: "Respuesta inválida del control de acceso",
       };
-      const statusLabel = statusTranslation[member.status] || member.status;
-
-      message = `Acceso Denegado: Miembro ${statusLabel}`;
-    } else if (!isSubscriptionValid) {
-      message = "Acceso Denegado: Membresía vencida o no asignada";
-    } else {
-      accessGranted = true;
-      message = "Acceso Permitido";
     }
 
-    // 3. Registrar únicamente si el acceso es permitido
-    if (accessGranted) {
-      await sql`
-        INSERT INTO attendance (member_id, check_in)
-        VALUES (${member.id}, NOW())
-      `;
-    }
+    // 3. Adaptar el resultado al formato que espera
+    // app/admin/asistencias/page.tsx.
+    const accessGranted = response.success === true;
 
-    revalidatePath("/admin/asistencias");
-
-    return {
+    const result = {
       success: true,
       accessGranted,
-      message,
+      message:
+        response.message ??
+        (accessGranted
+          ? "Acceso Permitido"
+          : "Acceso Denegado"),
       member: {
-        id: member.id,
-        name: `${member.first_name} ${member.last_name}`,
-        plan: member.plan_name ?? "Sin plan",
-        expiration: member.subscription_end
-          ? new Date(member.subscription_end).toLocaleDateString("es-AR")
+        id: Number(response.member?.id ?? member.id),
+        name:
+          response.member?.name ??
+          `${member.first_name} ${member.last_name}`,
+        plan: response.member?.plan ?? "Sin plan vigente",
+        expiration: response.member?.endDate
+          ? new Date(
+              `${String(response.member.endDate).slice(0, 10)}T12:00:00`
+            ).toLocaleDateString("es-AR")
           : "-",
       },
     };
+
+    if (accessGranted) {
+      revalidatePath("/admin/asistencias");
+    }
+
+    return result;
   } catch (error) {
-    console.error("Error al registrar asistencia:", error);
-    return { success: false, error: "Error interno al procesar el ingreso" };
+    console.error(
+      "Error al registrar asistencia:",
+      error
+    );
+
+    return {
+      success: false,
+      error: "Error interno al procesar el ingreso",
+    };
   }
 }
+
 
 //Registrar pagos e historial de pagos
 export async function createPayment(formData: FormData) {

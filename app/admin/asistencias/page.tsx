@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useTransition } from "react";
@@ -26,21 +27,48 @@ export default function AsistenciasPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!identifier.trim()) return;
 
     setErrorMsg("");
+    setResult(null);
+
     startTransition(async () => {
-      const res = await registerAttendanceAction(identifier);
-      if (res.success && res.member) {
-        setResult({
-          accessGranted: res.accessGranted ?? false,
-          message: res.message ?? "",
-          member: res.member,
-        });
-        setIdentifier(""); // Limpiar input para la siguiente persona
-      } else {
+      try {
+        const res = await registerAttendanceAction(identifier);
+
+        if (
+          res.success &&
+          "member" in res &&
+          res.member
+        ) {
+          setResult({
+            accessGranted:
+              "accessGranted" in res
+                ? Boolean(res.accessGranted)
+                : false,
+            message:
+              "message" in res
+                ? String(res.message ?? "")
+                : "",
+            member: res.member,
+          });
+
+          setIdentifier("");
+        } else {
+          setResult(null);
+
+          setErrorMsg(
+            "error" in res
+              ? String(res.error)
+              : "No se encontró el usuario"
+          );
+        }
+      } catch (error) {
+        console.error("Error al registrar asistencia:", error);
+
         setResult(null);
-        setErrorMsg(res.error || "No se encontró el usuario");
+        setErrorMsg("Error interno al procesar el ingreso");
       }
     });
   };
@@ -48,41 +76,58 @@ export default function AsistenciasPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Control de Asistencias</h1>
+        <h1 className="text-3xl font-bold">
+          Control de Asistencias
+        </h1>
+
         <p className="text-muted-foreground">
-          Ingresá el email o nombre del alumno para registrar su ingreso.
+          Ingresá el ID, email o nombre del alumno para registrar su ingreso.
         </p>
       </div>
 
-      {/* Formulario de Búsqueda Rápida */}
+      {/* Formulario de búsqueda rápida */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <UserCheck className="w-5 h-5" /> Registrador de Ingreso
+            <UserCheck className="w-5 h-5" />
+            Registrador de Ingreso
           </CardTitle>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="flex gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+
               <Input
                 type="text"
-                placeholder="ID o Email del Miembro..."
+                placeholder="ID, email o nombre del miembro..."
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 className="pl-10 text-lg h-12"
                 autoFocus
               />
             </div>
-            <Button type="submit" size="lg" disabled={isPending} className="h-12 px-6">
+
+            <Button
+              type="submit"
+              size="lg"
+              disabled={isPending}
+              className="h-12 px-6"
+            >
               {isPending ? "Validando..." : "Ingresar"}
             </Button>
           </form>
-          {errorMsg && <p className="text-destructive mt-2 text-sm font-medium">{errorMsg}</p>}
+
+          {errorMsg && (
+            <p className="text-destructive mt-2 text-sm font-medium">
+              {errorMsg}
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      {/* Resultado Visual de la Validación */}
+      {/* Resultado visual de la validación */}
       {result && (
         <Card
           className={`border-2 transition-all ${
@@ -97,19 +142,27 @@ export default function AsistenciasPage() {
             ) : (
               <XCircle className="w-12 h-12 text-red-500 shrink-0" />
             )}
+
             <div className="space-y-1 flex-1">
               <h2
                 className={`text-2xl font-bold ${
-                  result.accessGranted ? "text-green-500" : "text-red-500"
+                  result.accessGranted
+                    ? "text-green-500"
+                    : "text-red-500"
                 }`}
               >
                 {result.message}
               </h2>
-              <p className="text-xl font-semibold text-foreground">{result.member.name}</p>
+
+              <p className="text-xl font-semibold text-foreground">
+                {result.member.name}
+              </p>
+
               <div className="text-sm text-muted-foreground pt-2 flex justify-between max-w-sm">
                 <span>
                   <strong>Plan:</strong> {result.member.plan}
                 </span>
+
                 <span>
                   <strong>Vencimiento:</strong> {result.member.expiration}
                 </span>
