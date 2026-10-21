@@ -234,6 +234,7 @@ export default function MembresiasAdminPage() {
                     </div>
                   )}
                   {!editingPlan && <p className="text-xs text-amber-700">Los pases flexibles nuevos se guardan inactivos hasta validar su habilitación para venta.</p>}
+                  {editingPlan && <p className="text-xs text-amber-700">La edición de vigencia e ingresos de planes flexibles existentes requiere validación del backend. No se guardarán esos cambios todavía.</p>}
                 </>
               )}
               <div>
