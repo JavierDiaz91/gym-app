@@ -45,6 +45,55 @@ export async function createGymPlan(data: {
   return newPlan;
 }
 
+
+export type FlexibleAccessMode = "fixed_days" | "entry_pack";
+
+// Se guardan como borradores inactivos: la venta y el cobro aun no soportan
+// estas modalidades. Requiere migracion de membership_plans aplicada en dev.
+export async function createFlexibleGymPlanDraft(data: {
+  gymId: number;
+  name: string;
+  price: number;
+  accessMode: FlexibleAccessMode;
+  durationDays: number;
+  maxEntries?: number;
+  description?: string;
+}) {
+  if (!Number.isInteger(data.gymId) || data.gymId <= 0) {
+    throw new Error("Gimnasio invalido.");
+  }
+  if (!data.name?.trim() || !Number.isFinite(data.price) || data.price < 0) {
+    throw new Error("Nombre o precio de plan invalido.");
+  }
+  if (!["fixed_days", "entry_pack"].includes(data.accessMode)) {
+    throw new Error("Modalidad de acceso invalida.");
+  }
+  if (!Number.isInteger(data.durationDays) || data.durationDays < 1) {
+    throw new Error("La vigencia debe ser un numero entero positivo de dias.");
+  }
+  if (data.accessMode === "entry_pack" &&
+      (!Number.isInteger(data.maxEntries) || (data.maxEntries ?? 0) < 1)) {
+    throw new Error("El paquete debe tener una cantidad positiva de ingresos.");
+  }
+  if (data.accessMode === "fixed_days" && data.maxEntries !== undefined) {
+    throw new Error("Un pase por dias no admite limite de ingresos.");
+  }
+
+  const [plan] = await sql`
+    INSERT INTO membership_plans (
+      gym_id, name, price, duration_months, description, is_active,
+      access_mode, duration_days, max_entries
+    ) VALUES (
+      ${data.gymId}, ${data.name.trim()}, ${data.price}, 1,
+      ${data.description ?? ""}, false,
+      ${data.accessMode}, ${data.durationDays},
+      ${data.accessMode === "entry_pack" ? data.maxEntries! : null}
+    )
+    RETURNING *
+  `;
+  return plan;
+}
+
 export async function updateGymPlan(
   gymId: number,
   id: number,
