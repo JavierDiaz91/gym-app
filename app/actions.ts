@@ -2164,30 +2164,31 @@ export async function getPlansAction() {
 
 //Creacion de planes
 export async function createPlanAction(formData: FormData) {
-  const session = await getSession();
-  const gymId = session?.gymId; 
-
-  const name = formData.get("name") as string;
-  const price = formData.get("price");
-  const durationMonths = formData.get("durationMonths");
-  const description = formData.get("description") as string;
-
+  const accessMode = String(formData.get("accessMode") || "monthly");
+  const name = String(formData.get("name") || "").trim();
+  const price = Number(formData.get("price"));
+  const description = String(formData.get("description") || "");
+  const flexible = accessMode !== "monthly";
+  const durationMonths = Number(formData.get("durationMonths"));
+  const durationDays = Number(formData.get("durationDays"));
+  const maxEntries = Number(formData.get("maxEntries"));
+  if (!name || !Number.isFinite(price) || price < 0 ||
+      (flexible && (!["fixed_days", "entry_pack"].includes(accessMode) ||
+      !Number.isInteger(durationDays) || durationDays < 1 ||
+      (accessMode === "entry_pack" && (!Number.isInteger(maxEntries) || maxEntries < 1)))) ||
+      (!flexible && (!Number.isInteger(durationMonths) || durationMonths < 1))) {
+    return { success: false, error: "Datos del plan inválidos." };
+  }
   try {
-    const res = await fetch(apiUrl("/memberships/plans"), {
+    const res = await fetch(apiUrl(flexible ? "/memberships/plans/flexible-drafts" : "/memberships/plans"), {
       method: "POST",
       headers: await getApiAuthHeaders(),
-      body: JSON.stringify({ name, price, durationMonths, description }),
+      body: JSON.stringify(flexible
+        ? { name, price, description, accessMode, durationDays, ...(accessMode === "entry_pack" ? { maxEntries } : {}) }
+        : { name, price, description, durationMonths }),
     });
-
-    const text = await res.text();
-
-    try {
-      const data = JSON.parse(text);
-      return data;
-    } catch {
-      console.error("Respuesta inesperada del servidor (no es JSON):", text);
-      return { success: false, error: "Respuesta no válida del servidor" };
-    }
+    const data = await res.json();
+    return res.ok ? data : { success: false, error: data.error || "No se pudo crear el plan." };
   } catch (error) {
     console.error("Error al crear plan:", error);
     return { success: false, error: "Error de conexión" };
