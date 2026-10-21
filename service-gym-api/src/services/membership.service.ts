@@ -102,23 +102,77 @@ export async function updateGymPlan(
     name?: string;
     price?: number;
     durationMonths?: number;
+    durationDays?: number;
+    maxEntries?: number;
     description?: string;
     isActive?: boolean;
   }
 ) {
   validatePlanFields(data);
+  if (data.durationDays !== undefined &&
+      (!Number.isInteger(data.durationDays) || data.durationDays < 1)) {
+    throw new Error("La vigencia debe ser un numero entero positivo.");
+  }
+  if (data.maxEntries !== undefined &&
+      (!Number.isInteger(data.maxEntries) || data.maxEntries < 1)) {
+    throw new Error("La cantidad de ingresos debe ser positiva.");
+  }
+  const [existing] = await sql`
+    SELECT access_mode, is_active FROM membership_plans
+    WHERE id = ${id} AND gym_id = ${gymId}
+  `;
+  if (!existing) return undefined;
+  const mode = String(existing.access_mode);
+  if (mode === "monthly") {
+    if (data.durationDays !== undefined || data.maxEntries !== undefined) {
+      throw new Error("Un plan mensual no admite campos de pase flexible.");
+    }
+  } else if (mode === "fixed_days" || mode === "entry_pack") {
+    if (data.durationMonths !== undefined) {
+      throw new Error("No se puede cambiar la duracion mensual de un pase flexible.");
+    }
+    if (mode === "fixed_days" && data.maxEntries !== undefined) {
+      throw new Error("El pase por dias no admite limite de ingresos.");
+    }
+    if (data.isActive === true) {
+      throw new Error("La activacion de pases flexibles requiere validacion del flujo de cobro.");
+    }
+    // No cambiar condiciones de pases ya adquiridos: suscripciones referencian el plan.
+    if (data.durationDays !== undefined || data.maxEntries !== undefined) {
+      const [used] = await sql`
+        SELECT 1 FROM subscriptions WHERE plan_id = ${id} LIMIT 1
+      `;
+      if (used) {
+        throw new Error("El plan ya tiene suscripciones. Crea otro plan para cambiar vigencia o ingresos.");
+      }
+    }
+  } else {
+    throw new Error("Modalidad de plan desconocida.");
+  }
   const [updated] = await sql`
     UPDATE membership_plans
     SET
       name = COALESCE(${data.name ?? null}, name),
       price = COALESCE(${data.price ?? null}, price),
       duration_months = COALESCE(${data.durationMonths ?? null}, duration_months),
+      duration_days = COALESCE(${data.durationDays ?? null}, duration_days),
+      max_entries = COALESCE(${data.maxEntries ?? null}, max_entries),
       description = COALESCE(${data.description ?? null}, description),
-      is_active = COALESCE(${data.isActive ?? null}, is_active),
+      is_active = CASE WHEN access_mode = 'monthly'
+        THEN COALESCE(${data.isActive ?? null}, is_active)
+        ELSE false END,
       updated_at = NOW()
-    WHERE id = ${id}
-      AND gym_id = ${gymId}
-      AND (access_mode = 'monthly' OR ${data.isActive !== true})
+    WHERE id = ${id} AND gym_id = ${gymId}
+      AND (access_mode = 'monthly' OR is_active = false)
+      AND (
+        (access_mode = 'monthly' AND ${data.durationDays === undefined} AND ${data.maxEntries === undefined})
+        OR (access_mode = 'fixed_days' AND ${data.durationMonths === undefined} AND ${data.maxEntries === undefined})
+        OR (access_mode = 'entry_pack' AND ${data.durationMonths === undefined})
+      )
+      AND (
+        (${data.durationDays === undefined} AND ${data.maxEntries === undefined})
+        OR NOT EXISTS (SELECT 1 FROM subscriptions WHERE plan_id = ${id})
+      )
     RETURNING *
   `;
   return updated;
