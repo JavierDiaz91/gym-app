@@ -29,6 +29,7 @@ export default function MembresiasAdminPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [planMode, setPlanMode] = useState<"monthly" | "fixed_days" | "entry_pack">("monthly");
   const [isPending, startTransition] = useTransition();
 
   const loadData = async () => {
@@ -44,11 +45,13 @@ export default function MembresiasAdminPage() {
 
   const handleOpenCreate = () => {
     setEditingPlan(null);
+    setPlanMode("monthly");
     setShowModal(true);
   };
 
   const handleOpenEdit = (plan: Plan) => {
     setEditingPlan(plan);
+    setPlanMode(plan.access_mode || "monthly");
     setShowModal(true);
   };
 
@@ -197,15 +200,42 @@ export default function MembresiasAdminPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700">Duración (Meses)</label>
-                <input
-                  name="durationMonths"
-                  type="number"
-                  defaultValue={editingPlan?.duration_months || 1}
-                  required
-                  className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                />
+                <label className="block text-sm font-medium text-slate-700">Modalidad</label>
+                <select name="accessMode" value={planMode} onChange={(e) => setPlanMode(e.target.value as typeof planMode)}
+                  disabled={Boolean(editingPlan)}
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm">
+                  <option value="monthly">Mensual</option>
+                  <option value="fixed_days">Pase por días</option>
+                  <option value="entry_pack">Pack de ingresos</option>
+                </select>
+                {editingPlan && <p className="text-xs text-slate-500 mt-1">La modalidad de un plan existente no puede cambiarse.</p>}
               </div>
+              {planMode === "monthly" ? (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Duración (meses)</label>
+                  <input name="durationMonths" type="number" min="1" step="1" required
+                    defaultValue={editingPlan?.duration_months || 1}
+                    className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm" />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Vigencia (días)</label>
+                    <input name="durationDays" type="number" min="1" step="1" required
+                      defaultValue={editingPlan?.duration_days || (planMode === "fixed_days" ? 1 : 30)}
+                      className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm" />
+                  </div>
+                  {planMode === "entry_pack" && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700">Cantidad de ingresos</label>
+                      <input name="maxEntries" type="number" min="1" step="1" required
+                        defaultValue={editingPlan?.max_entries || 5}
+                        className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm" />
+                    </div>
+                  )}
+                  {!editingPlan && <p className="text-xs text-amber-700">Los pases flexibles nuevos se guardan inactivos hasta validar su habilitación para venta.</p>}
+                </>
+              )}
               <div>
                 <label className="block text-sm font-medium text-slate-700">Descripción</label>
                 <textarea
