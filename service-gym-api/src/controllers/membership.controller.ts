@@ -80,7 +80,7 @@ export class MembershipController {
         durationMonths:
           durationMonths === undefined ? undefined : Number(durationMonths),
         description,
-        isActive: isActive === undefined ? undefined : Boolean(isActive),
+        isActive: isActive === undefined ? undefined : isActive === true,
       });
 
       if (!plan) return res.status(404).json({ error: "Plan no encontrado" });
