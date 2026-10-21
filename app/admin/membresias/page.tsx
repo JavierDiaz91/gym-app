@@ -208,6 +208,7 @@ export default function MembresiasAdminPage() {
                   <option value="fixed_days">Pase por días</option>
                   <option value="entry_pack">Pack de ingresos</option>
                 </select>
+                {editingPlan && <input type="hidden" name="accessMode" value={planMode} />}
                 {editingPlan && <p className="text-xs text-slate-500 mt-1">La modalidad de un plan existente no puede cambiarse.</p>}
               </div>
               {planMode === "monthly" ? (
@@ -234,7 +235,7 @@ export default function MembresiasAdminPage() {
                     </div>
                   )}
                   {!editingPlan && <p className="text-xs text-amber-700">Los pases flexibles nuevos se guardan inactivos hasta validar su habilitación para venta.</p>}
-                  {editingPlan && <p className="text-xs text-amber-700">La edición de vigencia e ingresos de planes flexibles existentes requiere validación del backend. No se guardarán esos cambios todavía.</p>}
+                  {editingPlan && <p className="text-xs text-amber-700">La vigencia y cantidad de ingresos solo pueden modificarse si el borrador no tiene suscripciones. Los pases flexibles no se activan desde este formulario.</p>}
                 </>
               )}
               <div>
