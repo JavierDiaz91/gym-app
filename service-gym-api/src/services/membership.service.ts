@@ -117,6 +117,7 @@ export async function updateGymPlan(
       updated_at = NOW()
     WHERE id = ${id}
       AND gym_id = ${gymId}
+      AND (access_mode = 'monthly' OR ${data.isActive !== true})
     RETURNING *
   `;
   return updated;
