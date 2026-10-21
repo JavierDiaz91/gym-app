@@ -769,10 +769,11 @@ export async function recordAttendance(memberId: number) {
 
     if (!member) return { error: "Miembro no encontrado" };
 
-    await sql`
-      INSERT INTO attendance (member_id, check_in)
-      VALUES (${memberId}, NOW())
-    `;
+    // Centralizar el registro para aplicar vigencia, pago, cupos y anti-duplicados.
+    const result = await processCheckInAction(String(memberId));
+    if (!result || result.success !== true) {
+      return { error: result?.message || "Acceso no permitido" };
+    }
 
     revalidateTag("attendance", "max");
     return { success: true };
