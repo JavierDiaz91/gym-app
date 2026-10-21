@@ -1,52 +1,57 @@
-import { NextRequest, NextResponse } from "next/server"
-import { timingSafeEqual } from "node:crypto"
-import { sql } from "@/lib/db"
+import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
+import { sql } from "@/lib/db";
 
-export const runtime = "nodejs"
-export const dynamic = "force-dynamic"
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function authorized(request: NextRequest): boolean {
-  const expected = process.env.SAAS_RENEWAL_CRON_SECRET
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer /i, "") ?? ""
-  if (!expected || !supplied) return false
-  const a = Buffer.from(expected)
-  const b = Buffer.from(supplied)
-  return a.length === b.length && timingSafeEqual(a, b)
+  const expected = process.env.SAAS_RENEWAL_CRON_SECRET;
+  const supplied = request.headers.get("authorization")?.replace(/^Bearer /i, "") ?? "";
+  if (!expected || !supplied) return false;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(supplied);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
-// Modo observacion: no genera facturas, no cambia planes y no realiza cobros.
+// GET remains strictly observational. POST requires an additional pilot flag.
 export async function GET(request: NextRequest) {
-  if (!authorized(request)) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+  if (!authorized(request)) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const testGymId = Number(process.env.KIVRA_SAAS_ACCESS_TEST_GYM_ID);
+  if (!Number.isSafeInteger(testGymId) || testGymId <= 0) {
+    return NextResponse.json({ mode: "dry-run", executed: false, reason: "test_gym_not_configured" });
   }
+  const invoices = await sql`
+    SELECT i.id, i.period_start, i.period_end, i.status, i.due_date
+    FROM public.saas_invoices i
+    WHERE i.gym_id = ${testGymId}
+    ORDER BY i.period_start DESC, i.id DESC LIMIT 24
+  `;
+  return NextResponse.json({ mode: "dry-run", executed: false, gymId: testGymId, invoices },
+    { headers: { "Cache-Control": "no-store" } });
+}
 
+export async function POST(request: NextRequest) {
+  if (!authorized(request)) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (process.env.KIVRA_SAAS_PILOT_INVOICE_GENERATION !== "true") {
+    return NextResponse.json({ error: "Generación desactivada" }, { status: 403 });
+  }
+  const gymId = Number(process.env.KIVRA_SAAS_ACCESS_TEST_GYM_ID);
+  const actorId = Number(process.env.KIVRA_SAAS_PILOT_SUPERADMIN_ID);
+  if (!Number.isSafeInteger(gymId) || gymId <= 0 ||
+      !Number.isSafeInteger(actorId) || actorId <= 0) {
+    return NextResponse.json({ error: "Piloto no configurado" }, { status: 503 });
+  }
   try {
-    const candidates = await sql`
-      SELECT s.id AS subscription_id, s.gym_id, s.plan_id,
-             s.pending_plan_id, s.current_period_end,
-             EXISTS (
-               SELECT 1 FROM public.saas_invoices i
-               WHERE i.subscription_id = s.id
-                 AND i.period_start = s.current_period_start
-                 AND i.period_end = s.current_period_end
-                 AND i.status = 'paid'
-             ) AS previous_period_paid
-      FROM public.gym_saas_subscriptions s
-      WHERE s.status = 'active'
-        AND s.current_period_end <= CURRENT_DATE
-      ORDER BY s.current_period_end, s.id
-      LIMIT 100
-    `
+    const [result] = await sql`
+      SELECT invoice_id, result
+      FROM public.kivra_generate_monthly_invoice_pilot(${gymId}, CURRENT_DATE, ${actorId})
+    `;
     return NextResponse.json({
-      mode: "dry-run",
-      executed: false,
-      checked_at: new Date().toISOString(),
-      due_count: candidates.length,
-      eligible_count: candidates.filter((row) => row.previous_period_paid).length,
-      candidates,
-    }, { headers: { "Cache-Control": "no-store" } })
+      gymId, invoiceId: result?.invoice_id ?? null, result: result?.result ?? "none"
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    console.error("SaaS renewal preview failed", error)
-    return NextResponse.json({ error: "No se pudo consultar las renovaciones" }, { status: 500 })
+    console.error("Kivra SaaS pilot invoice generation failed", error);
+    return NextResponse.json({ error: "No se pudo generar la cuota piloto" }, { status: 500 });
   }
 }

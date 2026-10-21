@@ -2,6 +2,8 @@ import { Response } from "express";
 import {
   getGymPlans,
   createGymPlan,
+  createFlexibleGymPlanDraft,
+  recordFlexiblePassPaymentInDev,
   updateGymPlan,
   deleteGymPlan,
   assignSubscription,
@@ -48,13 +50,53 @@ export class MembershipController {
     }
   }
 
+  static async createFlexibleDraft(req: AuthenticatedRequest, res: Response) {
+    try {
+      const gymId = resolveGymId(req);
+      if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+      const { name, price, accessMode, durationDays, maxEntries, description } = req.body ?? {};
+      const plan = await createFlexibleGymPlanDraft({
+        gymId,
+        name,
+        price: Number(price),
+        accessMode,
+        durationDays: Number(durationDays),
+        maxEntries: maxEntries == null ? undefined : Number(maxEntries),
+        description,
+      });
+      return res.status(201).json({ success: true, plan, availableForSale: false });
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  static async recordFlexiblePaymentDev(req: AuthenticatedRequest, res: Response) {
+    try {
+      const gymId = resolveGymId(req);
+      if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+      const { memberId, planId, paymentMethod, transactionId, amount, notes } = req.body ?? {};
+      const result = await recordFlexiblePassPaymentInDev({
+        gymId,
+        memberId: Number(memberId),
+        planId: Number(planId),
+        paymentMethod,
+        transactionId,
+        amount: Number(amount),
+        notes,
+      });
+      return res.status(201).json({ success: true, result });
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
   static async updatePlan(req: AuthenticatedRequest, res: Response) {
     try {
       const gymId = resolveGymId(req);
       if (!gymId) return res.status(400).json({ error: "gymId requerido" });
 
       const { id } = req.params;
-      const { name, price, durationMonths, description, isActive } = req.body;
+      const { name, price, durationMonths, durationDays, maxEntries, description, isActive } = req.body;
 
       const plan = await updateGymPlan(gymId, Number(id), {
         name,
@@ -62,7 +104,9 @@ export class MembershipController {
         durationMonths:
           durationMonths === undefined ? undefined : Number(durationMonths),
         description,
-        isActive: isActive === undefined ? undefined : Boolean(isActive),
+        durationDays: durationDays === undefined ? undefined : Number(durationDays),
+        maxEntries: maxEntries === undefined ? undefined : Number(maxEntries),
+        isActive: isActive === undefined ? undefined : isActive === true,
       });
 
       if (!plan) return res.status(404).json({ error: "Plan no encontrado" });

@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySessionToken } from "@/lib/session";
+import { getSaaSAccess, isSaaSAccessGateEnabled } from "@/lib/saas-access";
 
 export async function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get("session");
@@ -68,6 +69,28 @@ export async function middleware(request: NextRequest) {
     session.role !== "superadmin"
   ) {
     return NextResponse.redirect(new URL("/trainer", request.url));
+  }
+
+  // Rollout guard: all gym-admin reachable pages (admin, trainer, member),
+  // except the billing recovery page. Direct APIs require separate guards.
+  // Only the explicitly configured test gym is evaluated.
+  if (
+    isProtectedRoute &&
+    session.role === "admin" &&
+    session.gymId != null &&
+    pathname !== "/admin/mi-suscripcion" &&
+    !pathname.startsWith("/admin/mi-suscripcion/") &&
+    isSaaSAccessGateEnabled(session.gymId)
+  ) {
+    try {
+      const access = await getSaaSAccess(session.gymId);
+      if (!access.allowed) {
+        return NextResponse.redirect(new URL("/admin/mi-suscripcion", request.url));
+      }
+    } catch (error) {
+      console.error("Kivra SaaS access check failed", error);
+      return new NextResponse("No se pudo verificar el acceso SaaS", { status: 503 });
+    }
   }
 
   return NextResponse.next();

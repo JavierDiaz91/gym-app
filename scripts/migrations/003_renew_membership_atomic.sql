@@ -1,3 +1,4 @@
+-- Requires database/migrations/20261020_membership_flexible_access_foundation.sql before applying this version.
 -- Apply AFTER 002_scheduled_membership_renewals.sql.
 -- One renewal at a time per member, with tenant and plan checks.
 CREATE OR REPLACE FUNCTION public.renew_gym_membership(
@@ -24,6 +25,9 @@ BEGIN
   SELECT * INTO v_plan FROM membership_plans
     WHERE id=p_plan_id AND gym_id=p_gym_id AND is_active=true;
   IF NOT FOUND THEN RAISE EXCEPTION 'Plan no encontrado'; END IF;
+  IF v_plan.access_mode <> 'monthly' THEN
+    RAISE EXCEPTION 'Pase flexible no admitido en renovacion mensual';
+  END IF;
   IF v_plan.duration_months IS NULL OR v_plan.duration_months <= 0 THEN
     RAISE EXCEPTION 'Duracion de plan invalida';
   END IF;

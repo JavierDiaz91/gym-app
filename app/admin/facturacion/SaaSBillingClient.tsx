@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import {
   generateSaaSInvoiceAction,
+  createSaaSTestInvoiceAction,
   markSaaSInvoicePaidAction,
 } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
@@ -48,9 +49,20 @@ function formatMoney(value: number | string | null | undefined) {
   return "$" + amount.toLocaleString("es-AR");
 }
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("es-AR");
+function formatDate(value: string | Date | null | undefined) {
+  if (value == null || value === "") return "-";
+  // Neon/Next may serialize SQL DATE and TIMESTAMP values as Date objects
+  // rather than strings. Normalize before using string methods.
+  const text = value instanceof Date
+    ? (Number.isNaN(value.getTime()) ? "" : value.toISOString())
+    : typeof value === "string" ? value : "";
+  if (!text) return "-";
+  // Preserve the calendar date to avoid UTC -> Argentina day shifts.
+  const datePart = text.slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(datePart);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleDateString("es-AR", { timeZone: "UTC" });
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -81,6 +93,11 @@ export default function SaaSBillingClient({
     Array.isArray(initialInvoices) ? initialInvoices : []
   );
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [testSubscriptionId, setTestSubscriptionId] = useState(String(initialSubscriptions[0]?.id ?? ""));
+  const [testAmount, setTestAmount] = useState("1750");
+  const [testDueDate, setTestDueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [showTestForm, setShowTestForm] = useState(false);
+  const [billingMonth, setBillingMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   const totalPending = useMemo(
     () =>
@@ -102,7 +119,7 @@ export default function SaaSBillingClient({
     const key = "subscription-" + subscriptionId;
     setBusyId(key);
 
-    const result = await generateSaaSInvoiceAction(subscriptionId);
+    const result = await generateSaaSInvoiceAction(subscriptionId, billingMonth);
 
     setBusyId(null);
 
@@ -111,7 +128,26 @@ export default function SaaSBillingClient({
       return;
     }
 
-    toast.success("Factura SaaS generada.");
+    toast.success(result.alreadyExists ? `La factura #${result.invoiceId} ya existe; no se duplicó.` : `Factura #${result.invoiceId} generada correctamente.`);
+    router.refresh();
+  }
+
+  async function createTestInvoice() {
+    const amount = Number(testAmount);
+    if (!testSubscriptionId || !Number.isFinite(amount) || amount < 1 || amount > 10000 || !testDueDate) {
+      toast.error("Completá gimnasio, importe de 1 a 10.000 y vencimiento.");
+      return;
+    }
+    if (!window.confirm(`¿Crear factura de PRUEBA por ${amount.toLocaleString("es-AR")} sin modificar las cuotas mensuales?`)) return;
+    setBusyId("test-invoice");
+    const result = await createSaaSTestInvoiceAction(Number(testSubscriptionId), amount, testDueDate);
+    setBusyId(null);
+    if (!result.success) {
+      toast.error(result.error || "No se pudo crear la factura de prueba.");
+      return;
+    }
+    toast.success(`Factura de prueba #${result.invoiceId} creada.`);
+    setShowTestForm(false);
     router.refresh();
   }
 
@@ -119,6 +155,7 @@ export default function SaaSBillingClient({
     const key = "invoice-" + invoiceId;
     setBusyId(key);
 
+    if (!window.confirm(`¿Confirmás que verificaste el ingreso real de la factura #${invoiceId} antes de marcarla como pagada?`)) return;
     const result = await markSaaSInvoicePaidAction(invoiceId);
 
     setBusyId(null);
@@ -167,6 +204,56 @@ export default function SaaSBillingClient({
 
       <Card>
         <CardHeader>
+          <CardTitle>Generación de facturas por mes calendario</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <label htmlFor="billing-month" className="block text-sm font-medium">Mes a facturar</label>
+          <input id="billing-month" type="month" value={billingMonth} max={new Date().toISOString().slice(0, 7)}
+            onChange={(event) => setBillingMonth(event.target.value)}
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm" />
+          <p className="text-xs text-muted-foreground">Seleccioná el mes y presioná Generar factura en el gimnasio correspondiente. El primer mes se prorratea desde el alta y no se duplican facturas existentes. Los meses futuros no están habilitados en el piloto.</p>
+        </CardContent>
+      </Card>
+
+      {process.env.NEXT_PUBLIC_VERCEL_ENV === "preview" && (
+        <Card className="border-blue-500/30">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle>Facturas de prueba</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">Solo Preview. No modifica el plan ni genera un período mensual.</p>
+              </div>
+              <Button variant="outline" onClick={() => setShowTestForm(!showTestForm)}>
+                {showTestForm ? "Cerrar" : "Crear factura de prueba"}
+              </Button>
+            </div>
+          </CardHeader>
+          {showTestForm && (
+            <CardContent className="grid gap-4 sm:grid-cols-3">
+              <label className="text-sm font-medium">Gimnasio
+                <select className="mt-2 w-full rounded-md border border-input bg-background p-2" value={testSubscriptionId} onChange={e => setTestSubscriptionId(e.target.value)}>
+                  {subscriptions.map(s => <option key={s.id} value={s.id}>{s.gym_name} (ID {s.gym_id})</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-medium">Importe (ARS)
+                <input type="number" min="1" max="10000" step="0.01" className="mt-2 w-full rounded-md border border-input bg-background p-2" value={testAmount} onChange={e => setTestAmount(e.target.value)} />
+              </label>
+              <label className="text-sm font-medium">Vencimiento
+                <input type="date" className="mt-2 w-full rounded-md border border-input bg-background p-2" value={testDueDate} onChange={e => setTestDueDate(e.target.value)} />
+              </label>
+              <div className="sm:col-span-3 flex items-center justify-end">
+                <Button onClick={createTestInvoice} disabled={busyId === "test-invoice" || !testSubscriptionId}>
+                  {busyId === "test-invoice" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Confirmar factura de prueba
+                </Button>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
           <CardTitle>Suscripciones de gimnasios</CardTitle>
         </CardHeader>
         <CardContent>
@@ -210,7 +297,7 @@ export default function SaaSBillingClient({
                           ) : (
                             <Receipt className="mr-2 h-4 w-4" />
                           )}
-                          Generar factura
+                          Generar factura del mes
                         </Button>
                       </td>
                     </tr>

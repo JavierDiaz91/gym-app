@@ -1,3 +1,4 @@
+-- Requires database/migrations/20261020_membership_flexible_access_foundation.sql before applying this version.
 -- Execute after migrations 002 and 003. This function is one atomic statement
 -- from the HTTP Neon driver: membership and payment roll back together.
 CREATE OR REPLACE FUNCTION public.record_gym_membership_payment(
@@ -37,6 +38,9 @@ BEGIN
    WHERE id=p_plan_id AND gym_id=p_gym_id AND is_active=true;
  IF NOT FOUND OR v_plan.price IS NULL OR v_plan.price <= 0 THEN
    RAISE EXCEPTION 'Plan inexistente o precio invalido';
+ END IF;
+ IF v_plan.access_mode <> 'monthly' THEN
+   RAISE EXCEPTION 'Pase flexible no admitido en cobro mensual';
  END IF;
  -- Collect payment for an existing unpaid subscription to this plan first.
  SELECT * INTO v_sub FROM subscriptions

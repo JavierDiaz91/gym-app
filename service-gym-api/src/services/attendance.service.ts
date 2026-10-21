@@ -1,76 +1,59 @@
 import { sql } from "../db/neon";
 
-export async function registerCheckIn(gymId: number, identifier: string) {
-  // 1. Buscamos al miembro por DNI, Email o ID haciendo JOIN con users
-  const [member] = await sql`
-    SELECT 
-      m.id AS member_id,
-      m.user_id,
-      m.first_name,
-      m.last_name,
-      m.gym_id,
-      u.email
-    FROM members m
-    LEFT JOIN users u ON m.user_id = u.id
-    WHERE m.gym_id = ${gymId}
-      AND (
-        m.dni = ${identifier} 
-        OR u.email = ${identifier} 
-        OR m.id::text = ${identifier}
-      )
-    LIMIT 1
-  `;
-
-  if (!member) {
-    return { success: false, code: "NOT_FOUND", message: "Usuario no encontrado" };
-  }
-
-  // La vigencia se determina por fechas; una renovacion futura no reemplaza
-  // a la membresia que cubre el dia actual.
-  const [sub] = await sql`
-    SELECT s.status, s.end_date, mp.name AS plan_name
-    FROM subscriptions s
-    JOIN membership_plans mp ON mp.id = s.plan_id AND mp.gym_id = ${gymId}
-    WHERE s.member_id = ${member.member_id}
-      AND s.status IN ('active', 'scheduled')
-      AND s.payment_status = 'paid'
-      AND s.start_date <= CURRENT_DATE
-      AND s.end_date > CURRENT_DATE
-    ORDER BY s.start_date DESC
-    LIMIT 1
-  `;
-
-  const isExpired = !sub;
-
-  if (isExpired) {
+/**
+ * Registra el ingreso de un socio al gimnasio mediante QR.
+ *
+ * La validación y el registro se realizan de forma atómica
+ * en PostgreSQL mediante register_gym_checkin_v2.
+ *
+ * Controla:
+ * - Gimnasio al que pertenece el socio.
+ * - Membresía vigente y pagada.
+ * - Vencimiento de pases diarios y mensuales.
+ * - Cupos disponibles en packs de ingresos.
+ * - Escaneos duplicados dentro de 60 segundos.
+ * - Asociación de asistencia con subscription_id.
+ */
+export async function registerCheckIn(
+  gymId: number,
+  identifier: string
+) {
+  if (!Number.isInteger(gymId) || gymId <= 0) {
     return {
       success: false,
-      code: "SUBSCRIPTION_EXPIRED",
-      message: "Membresía vencida o inactiva",
-      member: {
-        id: member.member_id,
-        name: `${member.first_name} ${member.last_name}`,
-        plan: "Sin plan activo",
-        endDate: null,
-      },
+      code: "INVALID_INPUT",
+      message: "Identificador de gimnasio inválido",
     };
   }
 
-  const [attendance] = await sql`
-  INSERT INTO attendance (member_id, check_in)
-  VALUES (${member.member_id}, NOW())
-  RETURNING id, check_in
-`;
+  if (
+    typeof identifier !== "string" ||
+    identifier.trim().length === 0
+  ) {
+    return {
+      success: false,
+      code: "INVALID_INPUT",
+      message: "Identificador del socio obligatorio",
+    };
+  }
 
-return {
-  success: true,
-  message: "Acceso permitido",
-  member: {
-    id: member.member_id,
-    name: `${member.first_name} ${member.last_name}`,
-    plan: sub.plan_name || "Membresía Activa",
-    endDate: sub.end_date,
-  },
-  checkInTime: attendance.check_in,
-};
+  const [row] = await sql`
+    SELECT public.register_gym_checkin_v2(
+      ${gymId}::bigint,
+      ${identifier.trim()}::text
+    ) AS result
+  `;
+
+  if (!row || !row.result) {
+    throw new Error(
+      "No se obtuvo respuesta del control de acceso"
+    );
+  }
+
+  const result =
+    typeof row.result === "string"
+      ? JSON.parse(row.result)
+      : row.result;
+
+  return result;
 }

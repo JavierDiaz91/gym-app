@@ -1,6 +1,7 @@
 "use server";
 
 import { sql } from "@/lib/db";
+import { requireSaaSOperationalAccess } from "@/lib/saas-access";
 import { revalidateTag, revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
@@ -207,6 +208,9 @@ async function requireTenantSession() {
     throw new Error("Sesión inválida o sin gimnasio asociado.");
   }
 
+  if (session.role === "admin") {
+    await requireSaaSOperationalAccess(session.gymId);
+  }
   return { ...session, gymId: session.gymId };
 }
 
@@ -765,10 +769,11 @@ export async function recordAttendance(memberId: number) {
 
     if (!member) return { error: "Miembro no encontrado" };
 
-    await sql`
-      INSERT INTO attendance (member_id, check_in)
-      VALUES (${memberId}, NOW())
-    `;
+    // Centralizar el registro para aplicar vigencia, pago, cupos y anti-duplicados.
+    const result = await processCheckInAction(String(memberId));
+    if (!result || result.success !== true) {
+      return { error: result?.message || "Acceso no permitido" };
+    }
 
     revalidateTag("attendance", "max");
     return { success: true };
@@ -2159,30 +2164,31 @@ export async function getPlansAction() {
 
 //Creacion de planes
 export async function createPlanAction(formData: FormData) {
-  const session = await getSession();
-  const gymId = session?.gymId; 
-
-  const name = formData.get("name") as string;
-  const price = formData.get("price");
-  const durationMonths = formData.get("durationMonths");
-  const description = formData.get("description") as string;
-
+  const accessMode = String(formData.get("accessMode") || "monthly");
+  const name = String(formData.get("name") || "").trim();
+  const price = Number(formData.get("price"));
+  const description = String(formData.get("description") || "");
+  const flexible = accessMode !== "monthly";
+  const durationMonths = Number(formData.get("durationMonths"));
+  const durationDays = Number(formData.get("durationDays"));
+  const maxEntries = Number(formData.get("maxEntries"));
+  if (!name || !Number.isFinite(price) || price < 0 ||
+      (flexible && (!["fixed_days", "entry_pack"].includes(accessMode) ||
+      !Number.isInteger(durationDays) || durationDays < 1 ||
+      (accessMode === "entry_pack" && (!Number.isInteger(maxEntries) || maxEntries < 1)))) ||
+      (!flexible && (!Number.isInteger(durationMonths) || durationMonths < 1))) {
+    return { success: false, error: "Datos del plan inválidos." };
+  }
   try {
-    const res = await fetch(apiUrl("/memberships/plans"), {
+    const res = await fetch(apiUrl(flexible ? "/memberships/plans/flexible-drafts" : "/memberships/plans"), {
       method: "POST",
       headers: await getApiAuthHeaders(),
-      body: JSON.stringify({ name, price, durationMonths, description }),
+      body: JSON.stringify(flexible
+        ? { name, price, description, accessMode, durationDays, ...(accessMode === "entry_pack" ? { maxEntries } : {}) }
+        : { name, price, description, durationMonths }),
     });
-
-    const text = await res.text();
-
-    try {
-      const data = JSON.parse(text);
-      return data;
-    } catch {
-      console.error("Respuesta inesperada del servidor (no es JSON):", text);
-      return { success: false, error: "Respuesta no válida del servidor" };
-    }
+    const data = await res.json();
+    return res.ok ? data : { success: false, error: data.error || "No se pudo crear el plan." };
   } catch (error) {
     console.error("Error al crear plan:", error);
     return { success: false, error: "Error de conexión" };
@@ -2191,22 +2197,37 @@ export async function createPlanAction(formData: FormData) {
 
 //Editar, eliminar y actualizar planes
 export async function updatePlanAction(id: number, formData: FormData) {
-  const name = formData.get("name") as string;
-  const price = formData.get("price");
-  const durationMonths = formData.get("durationMonths");
-  const description = formData.get("description") as string;
+  const accessMode = String(formData.get("accessMode") || "monthly");
+  const name = String(formData.get("name") || "").trim();
+  const price = Number(formData.get("price"));
+  const description = String(formData.get("description") || "");
   const isActive = formData.get("isActive") === "true";
-
+  const durationMonths = Number(formData.get("durationMonths"));
+  const durationDays = Number(formData.get("durationDays"));
+  const maxEntries = Number(formData.get("maxEntries"));
+  if (!name || !Number.isFinite(price) || price < 0 ||
+      !["monthly", "fixed_days", "entry_pack"].includes(accessMode) ||
+      (accessMode === "monthly" && (!Number.isInteger(durationMonths) || durationMonths < 1)) ||
+      (accessMode !== "monthly" && (!Number.isInteger(durationDays) || durationDays < 1)) ||
+      (accessMode === "entry_pack" && (!Number.isInteger(maxEntries) || maxEntries < 1))) {
+    return { success: false, error: "Datos del plan invalidos." };
+  }
   try {
     const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "PUT",
       headers: await getApiAuthHeaders(),
-      body: JSON.stringify({ name, price, durationMonths, description, isActive }),
+      body: JSON.stringify({
+        name, price, description, isActive,
+        ...(accessMode === "monthly" ? { durationMonths } : {
+          durationDays, ...(accessMode === "entry_pack" ? { maxEntries } : {})
+        })
+      }),
     });
-    return await res.json();
+    const data = await res.json();
+    return res.ok ? data : { success: false, error: data.error || "No se pudo actualizar el plan." };
   } catch (error) {
     console.error("Error al actualizar plan:", error);
-    return { success: false, error: "Error de conexión" };
+    return { success: false, error: "Error de conexion" };
   }
 }
 
@@ -2401,123 +2422,137 @@ if (existingMember.length > 0) {
 
 
 
-//Funcion para registrar asistencia de alumnos
-export async function registerAttendanceAction(memberIdentifier: string) {
+
+// Función para registrar asistencia de alumnos.
+// La búsqueda identifica al socio, pero el control de acceso
+// y el registro definitivo se realizan mediante la API.
+export async function registerAttendanceAction(
+  memberIdentifier: string
+) {
   try {
     const session = await getSession();
     const gymId = session?.gymId;
-    if (!gymId) return { success: false, error: "Sesión inválida o sin gimnasio asociado" };
-    const cleanInput = memberIdentifier.trim();
+
+    if (!gymId) {
+      return {
+        success: false,
+        error: "Sesión inválida o sin gimnasio asociado",
+      };
+    }
+
+    const cleanInput = memberIdentifier?.trim();
+
+    if (!cleanInput) {
+      return {
+        success: false,
+        error: "Ingresá un ID, email o nombre del socio",
+      };
+    }
+
     const isNumber = /^\d+$/.test(cleanInput);
     const searchTerm = `%${cleanInput.toLowerCase()}%`;
 
-    // 1. Búsqueda inteligente adaptada al tipo de dato
+    // 1. Buscar al socio dentro del gimnasio.
+    // No registrar asistencia directamente en esta función.
     const members = isNumber
       ? await sql`
-          SELECT 
+          SELECT
             m.id,
             m.first_name,
-            m.last_name,
-            m.status,
-            mp.name AS plan_name,
-            s.end_date AS subscription_end,
-            s.status AS subscription_status
+            m.last_name
           FROM members m
-          LEFT JOIN subscriptions s 
-            ON m.id = s.member_id
-               AND s.status IN ('active', 'scheduled')
-               AND s.payment_status = 'paid'
-               AND s.start_date <= CURRENT_DATE
-               AND s.end_date > CURRENT_DATE
-          LEFT JOIN membership_plans mp 
-            ON s.plan_id = mp.id
           WHERE m.gym_id = ${gymId}
-            AND m.id = ${parseInt(cleanInput, 10)}
+            AND m.id = ${Number(cleanInput)}
           LIMIT 1
         `
       : await sql`
-          SELECT 
+          SELECT
             m.id,
             m.first_name,
-            m.last_name,
-            m.status,
-            mp.name AS plan_name,
-            s.end_date AS subscription_end,
-            s.status AS subscription_status
+            m.last_name
           FROM members m
-          LEFT JOIN subscriptions s 
-            ON m.id = s.member_id
-               AND s.status IN ('active', 'scheduled')
-               AND s.payment_status = 'paid'
-               AND s.start_date <= CURRENT_DATE
-               AND s.end_date > CURRENT_DATE
-          LEFT JOIN membership_plans mp 
-            ON s.plan_id = mp.id
+          LEFT JOIN users u ON u.id = m.user_id
           WHERE m.gym_id = ${gymId}
             AND (
               LOWER(m.email) = LOWER(${cleanInput})
+              OR LOWER(u.email) = LOWER(${cleanInput})
               OR LOWER(m.first_name) LIKE ${searchTerm}
               OR LOWER(m.last_name) LIKE ${searchTerm}
-              OR LOWER(m.first_name || ' ' || m.last_name) LIKE ${searchTerm}
+              OR LOWER(
+                m.first_name || ' ' || m.last_name
+              ) LIKE ${searchTerm}
             )
           ORDER BY m.id DESC
           LIMIT 1
         `;
 
     if (members.length === 0) {
-      return { success: false, error: "Miembro no encontrado" };
+      return {
+        success: false,
+        error: "Miembro no encontrado",
+      };
     }
 
     const member = members[0];
-    const isSubscriptionValid = Boolean(member.subscription_end);
 
-    // 2. Determinar estado de acceso
-    let accessGranted = false;
-    let message = "";
+    // 2. Enviar el ID del socio a la API.
+    // La API valida membresía, pago, vencimiento,
+    // estado del socio, cupos y escaneos duplicados.
+    const response = await processCheckInAction(
+      String(member.id)
+    );
 
-    if (member.status !== "active") {
-      const statusTranslation: Record<string, string> = {
-        suspended: "Suspendido",
-        inactive: "Inactivo",
+    if (!response || typeof response.success !== "boolean") {
+      return {
+        success: false,
+        error: "Respuesta inválida del control de acceso",
       };
-      const statusLabel = statusTranslation[member.status] || member.status;
-
-      message = `Acceso Denegado: Miembro ${statusLabel}`;
-    } else if (!isSubscriptionValid) {
-      message = "Acceso Denegado: Membresía vencida o no asignada";
-    } else {
-      accessGranted = true;
-      message = "Acceso Permitido";
     }
 
-    // 3. Registrar únicamente si el acceso es permitido
-    if (accessGranted) {
-      await sql`
-        INSERT INTO attendance (member_id, check_in)
-        VALUES (${member.id}, NOW())
-      `;
-    }
+    // 3. Adaptar el resultado al formato que espera
+    // app/admin/asistencias/page.tsx.
+    const accessGranted = response.success === true;
 
-    revalidatePath("/admin/asistencias");
-
-    return {
+    const result = {
       success: true,
       accessGranted,
-      message,
+      message:
+        response.message ??
+        (accessGranted
+          ? "Acceso Permitido"
+          : "Acceso Denegado"),
       member: {
-        id: member.id,
-        name: `${member.first_name} ${member.last_name}`,
-        plan: member.plan_name ?? "Sin plan",
-        expiration: member.subscription_end
-          ? new Date(member.subscription_end).toLocaleDateString("es-AR")
+        id: Number(response.member?.id ?? member.id),
+        name:
+          response.member?.name ??
+          `${member.first_name} ${member.last_name}`,
+        plan: response.member?.plan ?? "Sin plan vigente",
+        expiration: response.member?.endDate
+          ? new Date(
+              `${String(response.member.endDate).slice(0, 10)}T12:00:00`
+            ).toLocaleDateString("es-AR")
           : "-",
       },
     };
+
+    if (accessGranted) {
+      revalidatePath("/admin/asistencias");
+    }
+
+    return result;
   } catch (error) {
-    console.error("Error al registrar asistencia:", error);
-    return { success: false, error: "Error interno al procesar el ingreso" };
+    console.error(
+      "Error al registrar asistencia:",
+      error
+    );
+
+    return {
+      success: false,
+      error: "Error interno al procesar el ingreso",
+    };
   }
 }
+
 
 //Registrar pagos e historial de pagos
 export async function createPayment(formData: FormData) {
@@ -3144,9 +3179,9 @@ export async function getSaaSBillingOverviewAction() {
           sp.name AS plan_name,
           COALESCE(gss.price_override, sp.monthly_price) AS effective_price,
           gss.status,
-          gss.current_period_start,
-          gss.current_period_end,
-          gss.next_billing_date
+          to_char(gss.current_period_start, 'YYYY-MM-DD') AS current_period_start,
+          to_char(gss.current_period_end, 'YYYY-MM-DD') AS current_period_end,
+          to_char(gss.next_billing_date, 'YYYY-MM-DD') AS next_billing_date
         FROM gym_saas_subscriptions gss
         JOIN gyms g ON g.id = gss.gym_id
         JOIN saas_plans sp ON sp.id = gss.plan_id
@@ -3159,11 +3194,11 @@ export async function getSaaSBillingOverviewAction() {
           g.name AS gym_name,
           i.subscription_id,
           sp.name AS plan_name,
-          i.period_start,
-          i.period_end,
+          to_char(i.period_start, 'YYYY-MM-DD') AS period_start,
+          to_char(i.period_end, 'YYYY-MM-DD') AS period_end,
           i.amount,
           i.status,
-          i.due_date,
+          to_char(i.due_date, 'YYYY-MM-DD') AS due_date,
           i.paid_at,
           i.external_reference,
           i.created_at
@@ -3187,115 +3222,106 @@ export async function getSaaSBillingOverviewAction() {
   }
 }
 
-export async function generateSaaSInvoiceAction(subscriptionId: number) {
+export async function generateSaaSInvoiceAction(subscriptionId: number, month: string) {
   try {
     const session = await requireSuperAdminSession();
-
-    if (!Number.isFinite(subscriptionId) || subscriptionId <= 0) {
-      return { success: false, error: "Suscripción inválida." };
+    if (!Number.isSafeInteger(subscriptionId) || subscriptionId <= 0 ||
+        !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+      return { success: false, error: "Suscripción o mes inválidos." };
     }
 
     const [subscription] = await sql`
-      SELECT
-        gss.id,
-        gss.gym_id,
-        g.name AS gym_name,
-        gss.current_period_start,
-        gss.current_period_end,
-        gss.next_billing_date,
-        COALESCE(gss.price_override, sp.monthly_price) AS effective_price,
-        sp.name AS plan_name
-      FROM gym_saas_subscriptions gss
-      JOIN gyms g ON g.id = gss.gym_id
-      JOIN saas_plans sp ON sp.id = gss.plan_id
-      WHERE gss.id = ${subscriptionId}
-      LIMIT 1
+      SELECT id, gym_id FROM public.gym_saas_subscriptions
+      WHERE id = ${subscriptionId} LIMIT 1
     `;
-
     if (!subscription) {
       return { success: false, error: "Suscripción SaaS no encontrada." };
     }
 
-    const amount = Number(subscription.effective_price);
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return {
-        success: false,
-        error: "El plan no tiene un precio mensual válido para facturar.",
-      };
+    // Atomic, audited, duplicate-safe calendar invoice creation in PostgreSQL.
+    // Requires scripts/saas-calendar-renewal-pilot.sql installed in Neon.
+    const [result] = await sql`
+      SELECT invoice_id, result
+      FROM public.kivra_generate_monthly_invoice_pilot(
+        ${Number(subscription.gym_id)},
+        ${month + "-01"}::date,
+        ${session.id}
+      )
+    `;
+    if (!result) {
+      return { success: false, error: "No se obtuvo respuesta al generar la factura." };
     }
-
-    const existing = await sql`
-      SELECT id
-      FROM saas_invoices
-      WHERE subscription_id = ${subscriptionId}
-        AND period_start = ${subscription.current_period_start}
-        AND period_end = ${subscription.current_period_end}
-        AND status <> 'cancelled'
-      LIMIT 1
-    `;
-
-    if (existing.length > 0) {
-      return {
-        success: false,
-        error: "Ya existe una factura para el período actual.",
-      };
+    if (result.result === "before_onboarding") {
+      return { success: false, error: "La suscripción todavía no había comenzado en ese mes." };
     }
-
-    const [invoice] = await sql`
-      INSERT INTO saas_invoices (
-        gym_id,
-        subscription_id,
-        period_start,
-        period_end,
-        amount,
-        status,
-        due_date,
-        created_at
-      )
-      VALUES (
-        ${subscription.gym_id},
-        ${subscriptionId},
-        ${subscription.current_period_start},
-        ${subscription.current_period_end},
-        ${amount},
-        'pending',
-        COALESCE(${subscription.next_billing_date}::date, ${subscription.current_period_end}::date),
-        NOW()
-      )
-      RETURNING *
-    `;
-
-    await sql`
-      INSERT INTO saas_audit_log (
-        actor_user_id,
-        action,
-        entity_type,
-        entity_id,
-        gym_id,
-        details
-      )
-      VALUES (
-        ${session.id},
-        'saas_invoice_generated',
-        'saas_invoice',
-        ${String(invoice.id)},
-        ${subscription.gym_id},
-        ${JSON.stringify({
-          gymName: subscription.gym_name,
-          planName: subscription.plan_name,
-          amount,
-        })}::jsonb
-      )
-    `;
 
     revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/mi-suscripcion");
     revalidatePath("/admin/actividad");
-
-    return { success: true, data: invoice };
-  } catch (error) {
-    console.error("Error al generar factura SaaS:", error);
+    return {
+      success: true,
+      invoiceId: result.invoice_id == null ? null : Number(result.invoice_id),
+      alreadyExists: result.result === "already_exists",
+    };
+  } catch (error: any) {
+    console.error("Error al generar factura SaaS de calendario:", error);
+    const message = String(error?.message || "");
+    if (message.includes("factura histórica superpuesta")) {
+      return { success: false, error: "Ya existe una factura con un período superpuesto. Revisala antes de continuar." };
+    }
+    if (message.includes("No se permite facturar meses futuros")) {
+      return { success: false, error: "No se pueden generar facturas de meses futuros." };
+    }
+    if (error?.code === "42883") {
+      return { success: false, error: "Falta instalar el generador de facturas de calendario en Neon." };
+    }
     return { success: false, error: "No se pudo generar la factura SaaS." };
+  }
+}
+
+// Test-only invoices are separate from monthly billing and cannot be created in production.
+export async function createSaaSTestInvoiceAction(subscriptionId: number, amount: number, dueDate: string) {
+  try {
+    const session = await requireSuperAdminSession();
+    if (process.env.VERCEL_ENV !== "preview") {
+      return { success: false, error: "Las facturas de prueba solo están habilitadas en Preview." };
+    }
+    if (!Number.isSafeInteger(subscriptionId) || subscriptionId <= 0 ||
+        !Number.isFinite(amount) || amount < 1 || amount > 10000 ||
+        Math.round(amount * 100) !== amount * 100 ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) ||
+        Number.isNaN(Date.parse(dueDate + "T00:00:00Z"))) {
+      return { success: false, error: "Revisá el gimnasio, importe (1 a 10.000) y vencimiento." };
+    }
+    const [subscription] = await sql`
+      SELECT id, gym_id FROM public.gym_saas_subscriptions
+      WHERE id = ${subscriptionId} AND status = 'active' LIMIT 1
+    `;
+    if (!subscription) return { success: false, error: "No se encontró una suscripción SaaS activa." };
+
+    const reference = "KIVRA-TEST-UI-" + crypto.randomUUID();
+    const [invoice] = await sql`
+      INSERT INTO public.saas_invoices
+        (gym_id, subscription_id, period_start, period_end, amount, status, due_date, external_reference)
+      VALUES
+        (${Number(subscription.gym_id)}, ${subscriptionId}, NULL, NULL, ${amount}, 'pending',
+         ${dueDate}::date, ${reference})
+      RETURNING id
+    `;
+    await sql`
+      INSERT INTO public.saas_audit_log
+        (actor_user_id, action, entity_type, entity_id, gym_id, details)
+      VALUES
+        (${session.id}, 'saas_test_invoice_created', 'saas_invoice', ${String(invoice.id)},
+         ${Number(subscription.gym_id)}, ${JSON.stringify({ amount, dueDate, test: true })}::jsonb)
+    `;
+    revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/mi-suscripcion");
+    revalidatePath("/admin/actividad");
+    return { success: true, invoiceId: Number(invoice.id) };
+  } catch (error) {
+    console.error("Error al crear factura SaaS de prueba:", error);
+    return { success: false, error: "No se pudo crear la factura de prueba." };
   }
 }
 
