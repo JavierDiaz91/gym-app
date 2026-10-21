@@ -3,6 +3,7 @@ import {
   getGymPlans,
   createGymPlan,
   createFlexibleGymPlanDraft,
+  recordFlexiblePassPaymentInDev,
   updateGymPlan,
   deleteGymPlan,
   assignSubscription,
@@ -64,6 +65,26 @@ export class MembershipController {
         description,
       });
       return res.status(201).json({ success: true, plan, availableForSale: false });
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  static async recordFlexiblePaymentDev(req: AuthenticatedRequest, res: Response) {
+    try {
+      const gymId = resolveGymId(req);
+      if (!gymId) return res.status(400).json({ error: "gymId requerido" });
+      const { memberId, planId, paymentMethod, transactionId, amount, notes } = req.body ?? {};
+      const result = await recordFlexiblePassPaymentInDev({
+        gymId,
+        memberId: Number(memberId),
+        planId: Number(planId),
+        paymentMethod,
+        transactionId,
+        amount: Number(amount),
+        notes,
+      });
+      return res.status(201).json({ success: true, result });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });
     }
