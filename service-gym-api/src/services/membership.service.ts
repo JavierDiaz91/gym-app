@@ -9,6 +9,19 @@ export async function getGymPlans(gymId: number) {
   `;
 }
 
+function validatePlanFields(data: { name?: string; price?: number; durationMonths?: number }) {
+  if (data.name !== undefined && !data.name.trim()) {
+    throw new Error("El nombre del plan es obligatorio.");
+  }
+  if (data.price !== undefined && (!Number.isFinite(data.price) || data.price < 0)) {
+    throw new Error("El precio del plan debe ser un numero valido no negativo.");
+  }
+  if (data.durationMonths !== undefined &&
+      (!Number.isInteger(data.durationMonths) || data.durationMonths < 1)) {
+    throw new Error("La duracion del plan debe ser un numero entero de meses mayor a cero.");
+  }
+}
+
 export async function createGymPlan(data: {
   gymId: number;
   name: string;
@@ -16,6 +29,7 @@ export async function createGymPlan(data: {
   durationMonths: number;
   description?: string;
 }) {
+  validatePlanFields(data);
   const [newPlan] = await sql`
     INSERT INTO membership_plans (gym_id, name, price, duration_months, description, is_active)
     VALUES (
@@ -42,6 +56,7 @@ export async function updateGymPlan(
     isActive?: boolean;
   }
 ) {
+  validatePlanFields(data);
   const [updated] = await sql`
     UPDATE membership_plans
     SET
