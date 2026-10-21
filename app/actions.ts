@@ -2197,22 +2197,37 @@ export async function createPlanAction(formData: FormData) {
 
 //Editar, eliminar y actualizar planes
 export async function updatePlanAction(id: number, formData: FormData) {
-  const name = formData.get("name") as string;
-  const price = formData.get("price");
-  const durationMonths = formData.get("durationMonths");
-  const description = formData.get("description") as string;
+  const accessMode = String(formData.get("accessMode") || "monthly");
+  const name = String(formData.get("name") || "").trim();
+  const price = Number(formData.get("price"));
+  const description = String(formData.get("description") || "");
   const isActive = formData.get("isActive") === "true";
-
+  const durationMonths = Number(formData.get("durationMonths"));
+  const durationDays = Number(formData.get("durationDays"));
+  const maxEntries = Number(formData.get("maxEntries"));
+  if (!name || !Number.isFinite(price) || price < 0 ||
+      !["monthly", "fixed_days", "entry_pack"].includes(accessMode) ||
+      (accessMode === "monthly" && (!Number.isInteger(durationMonths) || durationMonths < 1)) ||
+      (accessMode !== "monthly" && (!Number.isInteger(durationDays) || durationDays < 1)) ||
+      (accessMode === "entry_pack" && (!Number.isInteger(maxEntries) || maxEntries < 1))) {
+    return { success: false, error: "Datos del plan invalidos." };
+  }
   try {
     const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "PUT",
       headers: await getApiAuthHeaders(),
-      body: JSON.stringify({ name, price, durationMonths, description, isActive }),
+      body: JSON.stringify({
+        name, price, description, isActive,
+        ...(accessMode === "monthly" ? { durationMonths } : {
+          durationDays, ...(accessMode === "entry_pack" ? { maxEntries } : {})
+        })
+      }),
     });
-    return await res.json();
+    const data = await res.json();
+    return res.ok ? data : { success: false, error: data.error || "No se pudo actualizar el plan." };
   } catch (error) {
     console.error("Error al actualizar plan:", error);
-    return { success: false, error: "Error de conexión" };
+    return { success: false, error: "Error de conexion" };
   }
 }
 
