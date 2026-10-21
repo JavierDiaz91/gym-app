@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev -r dotenv/config src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npm run build && node --test tests/*.test.cjs",
     "build": "tsc",
     "start": "node dist/index.js"
   },
