@@ -94,3 +94,115 @@ export async function createTrainingPlan(input: PlanInput): Promise<{ success: b
     return { success: false, error: "No se pudo crear el plan. Comprobá que la migración esté aplicada." };
   }
 }
+
+export type Prescription = {
+  sets?: number; reps?: string; rir?: string; restSeconds?: number; tempo?: string;
+  distanceMeters?: number; durationSeconds?: number; pace?: string; notes?: string;
+};
+export type PlanItem = { key: string; title: string; imageUrl?: string; instructions?: string; prescriptions: Prescription[] };
+export type PlanBlock = { title: string; type: "warmup" | "main" | "circuit" | "cooldown" | "custom"; items: PlanItem[] };
+export type PlanDay = { title: string; modality: "strength" | "running" | "mixed" | "mobility" | "other"; blocks: PlanBlock[] };
+export type PlanDraft = { days: PlanDay[] };
+
+function validDraft(draft: PlanDraft, weeks: number) {
+  if (!draft || !Array.isArray(draft.days) || draft.days.length > 7) return false;
+  return draft.days.every((day) =>
+    typeof day.title === "string" && day.title.length <= 150 &&
+    ["strength","running","mixed","mobility","other"].includes(day.modality) &&
+    Array.isArray(day.blocks) && day.blocks.length <= 20 &&
+    day.blocks.every((block) => typeof block.title === "string" && block.title.length <= 150 &&
+      ["warmup","main","circuit","cooldown","custom"].includes(block.type) &&
+      Array.isArray(block.items) && block.items.length <= 60 &&
+      block.items.every((item) =>
+        typeof item.key === "string" && item.key.length <= 100 &&
+        typeof item.title === "string" && item.title.trim().length > 0 && item.title.length <= 150 &&
+        (!item.imageUrl || (/^https:\/\//.test(item.imageUrl) && item.imageUrl.length <= 2000)) &&
+        (!item.instructions || item.instructions.length <= 2000) &&
+        Array.isArray(item.prescriptions) && item.prescriptions.length === weeks &&
+        item.prescriptions.every((p) =>
+          (!p.sets || (Number.isInteger(p.sets) && p.sets > 0 && p.sets <= 100)) &&
+          (!p.restSeconds || (Number.isInteger(p.restSeconds) && p.restSeconds >= 0)) &&
+          (!p.distanceMeters || (Number.isInteger(p.distanceMeters) && p.distanceMeters >= 0)) &&
+          (!p.durationSeconds || (Number.isInteger(p.durationSeconds) && p.durationSeconds >= 0))
+        )
+      )
+    )
+  );
+}
+export async function getTrainingPlan(id: number) {
+  const { gymId, trainerId } = await trainerContext();
+  const rows = await sql`
+    SELECT id, title, duration_weeks, status, draft_jsonb
+    FROM training_plans WHERE id = ${id} AND gym_id = ${gymId} AND trainer_id = ${trainerId}
+    LIMIT 1
+  `;
+  if (!rows.length) throw new Error("Plan no encontrado");
+  return { id: Number(rows[0].id), title: String(rows[0].title), durationWeeks: Number(rows[0].duration_weeks),
+    status: String(rows[0].status), draft: rows[0].draft_jsonb as PlanDraft };
+}
+export async function saveTrainingPlanDraft(id: number, draft: PlanDraft) {
+  try {
+    const { gymId, trainerId } = await trainerContext();
+    const rows = await sql`SELECT duration_weeks FROM training_plans WHERE id = ${id}
+      AND gym_id = ${gymId} AND trainer_id = ${trainerId} AND status = 'draft' LIMIT 1`;
+    if (!rows.length) return { success: false, error: "Sólo se editan borradores propios" };
+    if (!validDraft(draft, Number(rows[0].duration_weeks))) return { success: false, error: "Plan inválido" };
+    await sql`UPDATE training_plans SET draft_jsonb = ${JSON.stringify(draft)}::jsonb, updated_at = NOW()
+      WHERE id = ${id} AND gym_id = ${gymId} AND trainer_id = ${trainerId} AND status = 'draft'`;
+    revalidatePath("/trainer/rutinas/planes");
+    return { success: true };
+  } catch { return { success: false, error: "No se pudo guardar" }; }
+}
+export async function publishTrainingPlan(id: number) {
+  try {
+    const { gymId, trainerId } = await trainerContext();
+    const rows = await sql`SELECT duration_weeks, draft_jsonb FROM training_plans
+      WHERE id = ${id} AND gym_id = ${gymId} AND trainer_id = ${trainerId} AND status = 'draft'`;
+    if (!rows.length) return { success: false, error: "Plan no encontrado" };
+    const draft = rows[0].draft_jsonb as PlanDraft;
+    if (!validDraft(draft, Number(rows[0].duration_weeks)) || draft.days.length === 0 ||
+        draft.days.every((d) => d.blocks.every((b) => b.items.length === 0)))
+      return { success: false, error: "Agregá al menos un ejercicio antes de publicar" };
+    await sql`UPDATE training_plans SET status = 'published', updated_at = NOW()
+      WHERE id = ${id} AND gym_id = ${gymId} AND trainer_id = ${trainerId} AND status = 'draft'`;
+    revalidatePath("/trainer/rutinas/planes");
+    return { success: true };
+  } catch { return { success: false, error: "No se pudo publicar" }; }
+}
+export async function duplicateTrainingPlan(id: number) {
+  try {
+    const { gymId, trainerId } = await trainerContext();
+    const rows = await sql`
+      INSERT INTO training_plans (gym_id, trainer_id, title, description, duration_weeks, draft_jsonb, source_plan_id, version)
+      SELECT gym_id, trainer_id, title || ' (copia)', description, duration_weeks, draft_jsonb, id, version + 1
+      FROM training_plans WHERE id = ${id} AND gym_id = ${gymId} AND trainer_id = ${trainerId}
+      RETURNING id`;
+    if (!rows.length) return { success: false, error: "Plan no encontrado" };
+    revalidatePath("/trainer/rutinas/planes");
+    return { success: true, id: Number(rows[0].id) };
+  } catch { return { success: false, error: "No se pudo duplicar" }; }
+}
+export async function listTrainerPlanMembers() {
+  const { gymId, trainerId } = await trainerContext();
+  const rows = await sql`SELECT id, first_name, last_name FROM members
+    WHERE gym_id = ${gymId} AND trainer_id = ${trainerId} ORDER BY first_name, last_name`;
+  return rows.map((m) => ({ id: Number(m.id), name: String(m.first_name) + " " + String(m.last_name) }));
+}
+export async function assignTrainingPlan(planId: number, memberId: number, customization?: PlanDraft) {
+  try {
+    const { gymId, trainerId } = await trainerContext();
+    const plans = await sql`SELECT id, version, duration_weeks, draft_jsonb FROM training_plans
+      WHERE id = ${planId} AND gym_id = ${gymId} AND trainer_id = ${trainerId} AND status = 'published'`;
+    const members = await sql`SELECT id FROM members WHERE id = ${memberId} AND gym_id = ${gymId}
+      AND trainer_id = ${trainerId} LIMIT 1`;
+    if (!plans.length || !members.length) return { success: false, error: "Plan o alumno no autorizado" };
+    const snapshot = customization ?? (plans[0].draft_jsonb as PlanDraft);
+    if (!validDraft(snapshot, Number(plans[0].duration_weeks))) return { success: false, error: "Personalización inválida" };
+    await sql`INSERT INTO member_training_plans
+      (gym_id, member_id, trainer_id, source_plan_id, source_version, start_date, snapshot_jsonb)
+      VALUES (${gymId}, ${memberId}, ${trainerId}, ${planId}, ${Number(plans[0].version)},
+      CURRENT_DATE, ${JSON.stringify(snapshot)}::jsonb)`;
+    revalidatePath("/miembro/rutina");
+    return { success: true };
+  } catch { return { success: false, error: "No se pudo asignar" }; }
+}
