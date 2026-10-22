@@ -31,16 +31,16 @@ export default function AsistenciasPage() {
     setErrorMsg("");
     startTransition(async () => {
       const res = await registerAttendanceAction(identifier);
-      if (res.success && res.member) {
+      if (res.success && "member" in res && res.member) {
         setResult({
-          accessGranted: res.accessGranted ?? false,
-          message: res.message ?? "",
+          accessGranted: "accessGranted" in res ? Boolean(res.accessGranted) : false,
+          message: "message" in res ? String(res.message ?? "") : "",
           member: res.member,
         });
         setIdentifier(""); // Limpiar input para la siguiente persona
       } else {
         setResult(null);
-        setErrorMsg(res.error || "No se encontró el usuario");
+        setErrorMsg("error" in res ? String(res.error) : "No se encontró el usuario");
       }
     });
   };
