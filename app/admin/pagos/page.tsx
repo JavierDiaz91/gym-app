@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { RegistrarPagoDialog } from "./RegistrarPagoDialog";
+import { RegistrarPaseFlexibleDialog } from "./RegistrarPaseFlexibleDialog";
 import { PrintReceiptButton } from "./PrintReceiptButton";
 
 interface PagosPageProps {
@@ -34,7 +35,7 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
   `;
 
   const plansData = await sql`
-    SELECT id, name, price
+    SELECT id, name, price, access_mode, duration_days, max_entries
     FROM membership_plans
     WHERE gym_id = ${gymId}
       AND is_active = true
@@ -54,7 +55,10 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
   const plans = (plansData as unknown as any[]).map(p => ({
     id: Number(p.id),
     name: String(p.name),
-    price: Number(p.price)
+    price: Number(p.price),
+    access_mode: String(p.access_mode ?? "monthly"),
+    duration_days: p.duration_days == null ? null : Number(p.duration_days),
+    max_entries: p.max_entries == null ? null : Number(p.max_entries)
   }));
 
   const getMethodBadge = (method: string) => {
@@ -97,7 +101,12 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
           <h1 className="text-3xl font-bold">Historial de Pagos</h1>
           <p className="text-muted-foreground">Gestión de cobros y emisión de recibos</p>
         </div>
-        <RegistrarPagoDialog members={members} plans={plans} />
+        <div className="flex gap-2 flex-wrap">
+          {process.env.ENABLE_FLEXIBLE_PASS_SALES === "true" && (
+            <RegistrarPaseFlexibleDialog members={members} plans={plans.filter(p => ["fixed_days", "entry_pack"].includes(p.access_mode))} />
+          )}
+          <RegistrarPagoDialog members={members} plans={plans.filter(p => !["fixed_days", "entry_pack"].includes(p.access_mode))} />
+        </div>
       </div>
 
       <Card>
