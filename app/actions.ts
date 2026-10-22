@@ -2588,7 +2588,7 @@ export async function createFlexibleInPersonPayment(formData: FormData) {
     const method = String(formData.get("paymentMethod") ?? "");
     const transactionId = String(formData.get("transactionId") ?? "").trim();
     const notes = String(formData.get("notes") ?? "").trim();
-    if (!/^[1-9]\\d*$/.test(memberIdRaw) || !/^[1-9]\\d*$/.test(planIdRaw) ||
+    if (!/^[1-9]\d*$/.test(memberIdRaw) || !/^[1-9]\d*$/.test(planIdRaw) ||
         !Number.isSafeInteger(Number(memberIdRaw)) || !Number.isSafeInteger(Number(planIdRaw)) ||
         !["cash", "transfer"].includes(method) ||
         !transactionId || transactionId.length > 120 || notes.length > 1000) {
