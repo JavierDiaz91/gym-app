@@ -2575,6 +2575,63 @@ export async function createPayment(formData: FormData) {
 }
 
 
+// Flexible in-person payments use the authenticated API; monthly payments remain separate.
+export async function createFlexibleInPersonPayment(formData: FormData) {
+  try {
+    const session = await requireGymAdminSession();
+    if (process.env.ENABLE_FLEXIBLE_PASS_SALES !== "true") {
+      return { success: false, error: "La venta de pases flexibles está deshabilitada." };
+    }
+
+    const memberIdRaw = String(formData.get("memberId") ?? "");
+    const planIdRaw = String(formData.get("planId") ?? "");
+    const method = String(formData.get("paymentMethod") ?? "");
+    const transactionId = String(formData.get("transactionId") ?? "").trim();
+    const notes = String(formData.get("notes") ?? "").trim();
+    if (!/^[1-9]\\d*$/.test(memberIdRaw) || !/^[1-9]\\d*$/.test(planIdRaw) ||
+        !Number.isSafeInteger(Number(memberIdRaw)) || !Number.isSafeInteger(Number(planIdRaw)) ||
+        !["cash", "transfer"].includes(method) ||
+        !transactionId || transactionId.length > 120 || notes.length > 1000) {
+      return { success: false, error: "Completá correctamente socio, pack, método y referencia única." };
+    }
+
+    // Read the price from the authenticated tenant's database, not from the browser.
+    const [plan] = await sql`
+      SELECT price FROM membership_plans
+      WHERE id = ${Number(planIdRaw)} AND gym_id = ${session.gymId}
+        AND is_active = true AND access_mode IN ('entry_pack', 'fixed_days')
+    `;
+    if (!plan || !Number.isFinite(Number(plan.price)) || Number(plan.price) <= 0) {
+      return { success: false, error: "El pase no está disponible para venta." };
+    }
+
+    const response = await fetch(apiUrl("/memberships/payments/flexible-in-person"), {
+      method: "POST",
+      headers: await getApiAuthHeaders(),
+      body: JSON.stringify({
+        gymId: session.gymId,
+        memberId: Number(memberIdRaw),
+        planId: Number(planIdRaw),
+        paymentMethod: method,
+        transactionId,
+        amount: Number(plan.price),
+        notes,
+      }),
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+      return { success: false, error: data.error || "No se pudo registrar el cobro." };
+    }
+    revalidatePath("/admin/pagos");
+    revalidatePath("/admin/miembros");
+    return { success: true, paymentId: String(data.payment_id), subscriptionId: String(data.subscription_id) };
+  } catch (error) {
+    console.error("Error al registrar pase flexible:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Error al registrar el pase." };
+  }
+}
+
 export async function createMercadoPagoPreferenceAction(
   memberId: number,
   planId: number
