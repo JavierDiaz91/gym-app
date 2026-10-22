@@ -5,6 +5,15 @@ import { CreditCard, Calendar, CheckCircle2, AlertTriangle, Clock, History, Lock
 import { PayButton } from "./PayButton"; // Creamos este cliente para el botón de pago
 
 // Helper para formatear y traducir estados de pago
+function formatPaymentMethod(method: string | null | undefined) {
+  const value = (method || "").toLowerCase();
+  if (["cash", "efectivo"].includes(value)) return "Efectivo";
+  if (["transfer", "transferencia", "bank_transfer"].includes(value)) return "Transferencia";
+  if (["card", "tarjeta", "credit_card", "debit_card"].includes(value)) return "Tarjeta";
+  if (["mercadopago", "mercado_pago", "mp"].includes(value)) return "Mercado Pago";
+  return method || "Sin especificar";
+}
+
 function formatStatus(status: string) {
   const normalized = status?.toLowerCase() || "";
   
@@ -48,6 +57,10 @@ interface SubscriptionData {
   price: number;
   description: string;
   payment_status?: string;
+  subscription_id: number;
+  access_mode: string | null;
+  max_entries: number | null;
+  duration_days: number | null;
 }
 
 interface PaymentData {
@@ -67,6 +80,7 @@ export default async function MembershipPage() {
   let subscription: SubscriptionData | null = null;
   let payments: PaymentData[] = [];
   let upcoming: SubscriptionData | null = null;
+  let usedEntries: number | null = null;
 
   try {
     // 1. Obtener datos de la membresía + estado del socio (m.status)
@@ -74,8 +88,8 @@ export default async function MembershipPage() {
 const subResult = await sql`
   SELECT
     m.id AS member_id, m.status AS member_status,
-    s.plan_id, s.start_date, s.end_date, s.status AS subscription_status,
-    s.payment_status, p.name AS plan_name, p.price, p.description
+    s.id AS subscription_id, s.plan_id, s.start_date, s.end_date, s.status AS subscription_status,
+    s.payment_status, p.name AS plan_name, p.price, p.description, p.access_mode, p.max_entries, p.duration_days
   FROM members m
   JOIN subscriptions s ON s.member_id = m.id
   JOIN membership_plans p ON p.id = s.plan_id AND p.gym_id = m.gym_id
@@ -90,10 +104,20 @@ const subResult = await sql`
 
 const subRows = Array.isArray(subResult) ? subResult : (subResult as any).rows || [];
 subscription = (subRows[0] as SubscriptionData) || null;
+if (subscription?.access_mode === "entry_pack" && Number.isSafeInteger(Number(subscription.subscription_id))) {
+  const attendanceResult = await sql`
+    SELECT COUNT(*)::int AS used
+    FROM attendance
+    WHERE subscription_id = ${subscription.subscription_id}
+      AND member_id = ${subscription.member_id}
+  `;
+  const attendanceRows = Array.isArray(attendanceResult) ? attendanceResult : (attendanceResult as any).rows || [];
+  usedEntries = Number(attendanceRows[0]?.used ?? 0);
+}
 
     const futureRows = await sql`
       SELECT m.id AS member_id, m.status AS member_status,
-        s.plan_id, s.start_date, s.end_date, s.status,
+        s.id AS subscription_id, s.plan_id, s.start_date, s.end_date, s.status,
         s.payment_status, p.name AS plan_name, p.price, p.description
       FROM members m
       JOIN subscriptions s ON s.member_id = m.id
@@ -130,6 +154,10 @@ subscription = (subRows[0] as SubscriptionData) || null;
   const isDateExpired = !subscription || subscription.payment_status !== "paid";
 
   const isBlocked = isSuspended || isDateExpired;
+  const isFlexible = subscription?.access_mode === "entry_pack" || subscription?.access_mode === "fixed_days";
+  const maxEntries = Number(subscription?.max_entries ?? 0);
+  const remainingEntries = subscription?.access_mode === "entry_pack" && usedEntries !== null && maxEntries > 0
+    ? Math.max(0, maxEntries - usedEntries) : null;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 p-6">
@@ -165,7 +193,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
             {isBlocked ? (
               <span className="px-3 py-1 bg-red-500/10 text-red-600 border border-red-500/20 rounded-full text-xs font-semibold flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4" /> 
-                {isSuspended ? "Cuenta Suspendida" : "Sin cuota pagada vigente"}
+                {isSuspended ? "Cuenta suspendida" : "Sin membresía pagada vigente"}
               </span>
             ) : (
               <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-full text-xs font-semibold flex items-center gap-1.5">
@@ -176,7 +204,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
         </div>
 
         {/* Banner de Regularización / Pagar con Mercado Pago */}
-        {isBlocked && subscription?.payment_status === "pending" && !upcoming && (
+        {isBlocked && !isFlexible && subscription?.payment_status === "pending" && !upcoming && (
           <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-red-500/10 text-red-600 rounded-lg shrink-0">
@@ -201,7 +229,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
           </div>
         )}
 
-        {!isBlocked && !upcoming && subscription?.member_id && subscription?.plan_id && Number(subscription?.price || 0) > 0 && (
+        {!isBlocked && !isFlexible && !upcoming && subscription?.member_id && subscription?.plan_id && Number(subscription?.price || 0) > 0 && (
           <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
               <h4 className="font-bold text-foreground text-sm">
@@ -219,6 +247,33 @@ subscription = (subRows[0] as SubscriptionData) || null;
               label="Renovar ahora"
             />
           </div>
+        )}
+
+        {subscription?.access_mode === "entry_pack" && (
+          <div className="rounded-xl border bg-background p-5 space-y-3">
+            <h3 className="font-semibold">Ingresos de tu pack</h3>
+            {remainingEntries === null ? (
+              <p className="text-sm text-muted-foreground">No se pudo calcular el saldo de ingresos.</p>
+            ) : (
+              <>
+                <p className="text-2xl font-bold">{remainingEntries} de {maxEntries} disponibles</p>
+                <p className="text-sm text-muted-foreground">{usedEntries} ingreso(s) utilizado(s)</p>
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full bg-emerald-500" style={{ width: `${remainingEntries / maxEntries * 100}%` }} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        {subscription?.access_mode === "fixed_days" && (
+          <p className="rounded-lg border bg-background p-4 text-sm text-muted-foreground">
+            Pase por días: válido hasta el vencimiento indicado. La renovación se gestiona desde el gimnasio.
+          </p>
+        )}
+        {isFlexible && (
+          <p className="text-sm text-muted-foreground">
+            Para adquirir otro pase o pack, consultá en recepción. La renovación automática no está habilitada para este tipo de plan.
+          </p>
         )}
 
         {/* Detalles de Fechas */}
@@ -259,7 +314,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
             <p>Vencimiento: {formatDate(upcoming.end_date)}</p>
             <p>Precio del plan: ${Number(upcoming.price).toLocaleString("es-AR")}</p>
           </div>
-          {upcoming.payment_status === "pending" && (
+          {upcoming.payment_status === "pending" && upcoming.access_mode !== "entry_pack" && upcoming.access_mode !== "fixed_days" && (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
               <p className="text-sm text-muted-foreground">
                 Tu renovación está pendiente de pago. Podés abonarla en el gimnasio
@@ -288,8 +343,8 @@ subscription = (subRows[0] as SubscriptionData) || null;
             No hay registros de pagos recientes.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[540px] text-sm text-left">
               <thead className="text-xs uppercase bg-muted/50 border-b">
                 <tr>
                   <th className="px-4 py-3">Fecha</th>
@@ -307,7 +362,7 @@ subscription = (subRows[0] as SubscriptionData) || null;
                         {formatDate(p.payment_date)}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {p.payment_method || "Efectivo"}
+                        {formatPaymentMethod(p.payment_method)}
                       </td>
                       <td className="px-4 py-3 font-semibold">
                         ${Number(p.amount || 0).toLocaleString("es-AR")}
