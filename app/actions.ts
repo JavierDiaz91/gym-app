@@ -2548,6 +2548,21 @@ export async function createPayment(formData: FormData) {
       return { success: false, error: "Datos de pago inválidos." };
     }
 
+    // Enforce tenant ownership and plan type server-side, independently of the UI.
+    // The monthly payment procedure must never process flexible passes or packs.
+    const [monthlyPlan] = await sql`
+      SELECT id
+      FROM public.membership_plans
+      WHERE id = ${planId}
+        AND gym_id = ${session.gymId}
+        AND is_active = true
+        AND access_mode = 'monthly'
+      LIMIT 1
+    `;
+    if (!monthlyPlan) {
+      return { success: false, error: "El plan no es mensual, no está activo o no pertenece al gimnasio." };
+    }
+
     // A single PostgreSQL function records the payment and subscription atomically.
     // It settles an existing pending period or creates a new renewal.
     await sql`
