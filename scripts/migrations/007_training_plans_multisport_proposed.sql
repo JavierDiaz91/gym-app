@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS training_plans (
   trainer_id INTEGER NOT NULL,
   title TEXT NOT NULL CHECK (length(trim(title)) > 0),
   description TEXT,
+  draft_jsonb JSONB NOT NULL DEFAULT '{"days":[]}'::jsonb CHECK (jsonb_typeof(draft_jsonb) = 'object'),
   duration_weeks INTEGER NOT NULL DEFAULT 4 CHECK (duration_weeks BETWEEN 1 AND 52),
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','archived')),
   version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
