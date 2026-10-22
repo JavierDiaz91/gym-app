@@ -2620,6 +2620,26 @@ export async function createFlexibleInPersonPayment(formData: FormData) {
       return { success: false, error: "El pase no está disponible para venta." };
     }
 
+    // Inform the cashier before charging; the database function remains the
+    // authoritative concurrency guard against overlapping subscriptions.
+    const [existing] = await sql`
+      SELECT s.id, s.status, s.end_date
+      FROM subscriptions s
+      JOIN members m ON m.id = s.member_id
+      WHERE s.member_id = ${Number(memberIdRaw)}
+        AND m.gym_id = ${session.gymId}
+        AND s.status IN ('active', 'scheduled')
+      ORDER BY s.end_date DESC
+      LIMIT 1
+    `;
+    if (existing) {
+      const endDate = String(existing.end_date ?? "").slice(0, 10);
+      return {
+        success: false,
+        error: `El socio ya tiene una suscripción ${existing.status === "scheduled" ? "programada" : "activa"} (N.º ${existing.id}, vence ${endDate}). No registres otro cobro. Si el pase ya venció, verificá primero la actualización de estados.`,
+      };
+    }
+
     const response = await fetch(apiUrl("/memberships/payments/flexible-in-person"), {
       method: "POST",
       headers: await getApiAuthHeaders(),
