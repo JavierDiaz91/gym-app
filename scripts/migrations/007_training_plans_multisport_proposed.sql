@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS workout_sessions (
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   finished_at TIMESTAMPTZ,
   status TEXT NOT NULL DEFAULT 'in_progress' CHECK(status IN ('in_progress','completed','cancelled')),
+  UNIQUE(member_training_plan_id, day_index, week_number),
   FOREIGN KEY(member_training_plan_id,member_id)
     REFERENCES member_training_plans(id,member_id)
 );
