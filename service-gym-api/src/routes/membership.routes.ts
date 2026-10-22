@@ -29,6 +29,11 @@ router.post(
   MembershipController.recordFlexibleInPersonPayment
 );
 router.post(
+  "/plans/:id/activate-flexible",
+  requireRole("admin", "superadmin"),
+  MembershipController.activateFlexiblePlan
+);
+router.post(
   "/subscribe",
   requireRole("admin", "superadmin"),
   MembershipController.subscribeMember
