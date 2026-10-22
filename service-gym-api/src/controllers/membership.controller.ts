@@ -3,6 +3,7 @@ import {
   getGymPlans,
   createGymPlan,
   createFlexibleGymPlanDraft,
+  activateFlexibleGymPlan,
   updateGymPlan,
   deleteGymPlan,
   assignSubscription,
@@ -63,6 +64,20 @@ export class MembershipController {
       return res.status(201).json({ success: true, plan, availableForSale: false });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });
+    }
+  }
+
+  static async activateFlexiblePlan(req: AuthenticatedRequest, res: Response) {
+    try {
+      const gymId = resolveGymId(req);
+      const planId = Number(req.params.id);
+      if (!gymId || !Number.isSafeInteger(planId) || planId <= 0) {
+        return res.status(400).json({ success: false, error: "Identificadores invalidos." });
+      }
+      const plan = await activateFlexibleGymPlan(gymId, planId);
+      return res.json({ success: true, plan });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
     }
   }
 
