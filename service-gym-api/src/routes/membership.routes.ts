@@ -24,6 +24,11 @@ router.post(
   MembershipController.createFlexibleDraft
 );
 router.post(
+  "/payments/flexible-in-person",
+  requireRole("admin", "superadmin"),
+  MembershipController.recordFlexibleInPersonPayment
+);
+router.post(
   "/subscribe",
   requireRole("admin", "superadmin"),
   MembershipController.subscribeMember
