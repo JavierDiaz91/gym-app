@@ -11,7 +11,7 @@ const blank = (weeks: number): PlanItem => ({
   key: "item-" + crypto.randomUUID(), title: "", imageUrl: "", instructions: "",
   prescriptions: Array.from({ length: weeks }, () => ({ sets: 3, reps: "10", rir: "2", restSeconds: 60 }))
 });
-export default function PlanEditor({ plan, members }: { plan: Plan; members: { id: number; name: string }[] }) {
+export default function PlanEditor({ plan, members, exercises }: { plan: Plan; members: { id: number; name: string }[]; exercises: { id: number; name: string; imageUrl: string }[] }) {
   const router = useRouter();
   const [draft, setDraft] = useState<PlanDraft>(plan.draft || { days: [] });
   const [week, setWeek] = useState(0);
@@ -74,6 +74,10 @@ export default function PlanEditor({ plan, members }: { plan: Plan; members: { i
           <div className="flex flex-wrap gap-2 items-start">
             {item.imageUrl && <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-24 w-24 rounded-lg object-cover" />}
             <div className="flex-1 space-y-2">
+              <select aria-label="Seleccionar ejercicio del catálogo" className={field} disabled={!editable} value="" onChange={(e) => { const ex = exercises.find((x) => x.id === Number(e.target.value)); if (ex) updateItem(di, bi, ii, (x) => ({ ...x, title: ex.name, imageUrl: ex.imageUrl || x.imageUrl })); }}>
+                <option value="">Elegir ejercicio del catálogo (opcional)</option>
+                {exercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+              </select>
               <input aria-label="Ejercicio" placeholder="Ej. Sentadilla o intervalos 400 m" className={field} disabled={!editable} value={item.title} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, title: e.target.value }))}/>
               <input aria-label="URL de imagen" placeholder="https://... imagen demostrativa" className={field} disabled={!editable} value={item.imageUrl || ""} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, imageUrl: e.target.value }))}/>
               <textarea aria-label="Instrucciones" placeholder="Indicaciones técnicas" className={field} disabled={!editable} value={item.instructions || ""} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, instructions: e.target.value }))}/>
