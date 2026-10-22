@@ -24,6 +24,11 @@ router.post(
   MembershipController.createFlexibleDraft
 );
 router.post(
+  "/plans/:id/activate-flexible",
+  requireRole("admin", "superadmin"),
+  MembershipController.activateFlexiblePlan
+);
+router.post(
   "/subscribe",
   requireRole("admin", "superadmin"),
   MembershipController.subscribeMember

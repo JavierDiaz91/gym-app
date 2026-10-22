@@ -98,6 +98,42 @@ export async function updateGymPlan(
   return updated;
 }
 
+
+/**
+ * Explicit, fail-closed activation for flexible plans.
+ * This feature must remain disabled until the dedicated sale flow is approved.
+ */
+export async function activateFlexibleGymPlan(gymId: number, planId: number) {
+  if (process.env.ENABLE_FLEXIBLE_PASS_ACTIVATION !== "true") {
+    throw new Error("Activacion de pases flexibles no habilitada.");
+  }
+  if (!Number.isSafeInteger(gymId) || gymId <= 0 ||
+      !Number.isSafeInteger(planId) || planId <= 0) {
+    throw new Error("Identificadores invalidos.");
+  }
+  // One SQL statement: validate eligibility and change state atomically.
+  const [plan] = await sql`
+    UPDATE public.membership_plans AS p
+    SET is_active = true, updated_at = NOW()
+    WHERE p.id = ${planId}
+      AND p.gym_id = ${gymId}
+      AND p.is_active = false
+      AND p.access_mode IN ('fixed_days', 'entry_pack')
+      AND p.duration_days IS NOT NULL AND p.duration_days > 0
+      AND p.price IS NOT NULL AND p.price > 0
+      AND (
+        (p.access_mode = 'fixed_days' AND p.max_entries IS NULL)
+        OR (p.access_mode = 'entry_pack' AND p.max_entries IS NOT NULL AND p.max_entries > 0)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.subscriptions AS s WHERE s.plan_id = p.id
+      )
+    RETURNING p.*
+  `;
+  if (!plan) throw new Error("Plan no apto para activacion o no encontrado.");
+  return plan;
+}
+
 export async function deleteGymPlan(gymId: number, id: number) {
   const [disabled] = await sql`
     UPDATE membership_plans
