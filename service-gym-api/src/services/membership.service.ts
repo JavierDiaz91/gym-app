@@ -92,10 +92,48 @@ export async function updateGymPlan(
       updated_at = NOW()
     WHERE id = ${id}
       AND gym_id = ${gymId}
-      AND (${data.isActive === true} = false OR COALESCE(access_mode, 'monthly') NOT IN ('entry_pack', 'fixed_days'))
+      AND (
+        COALESCE(access_mode, 'monthly') NOT IN ('entry_pack', 'fixed_days')
+        OR (
+          is_active = false
+          AND NOT EXISTS (
+            SELECT 1 FROM subscriptions AS sub WHERE sub.plan_id = membership_plans.id
+          )
+        )
+      )
     RETURNING *
   `;
   return updated;
+}
+
+export async function activateFlexibleGymPlan(gymId: number, planId: number) {
+  if (process.env.ENABLE_FLEXIBLE_PASS_ACTIVATION !== "true") {
+    throw new Error("Activacion de pases flexibles no habilitada.");
+  }
+  if (!Number.isSafeInteger(gymId) || gymId <= 0 ||
+      !Number.isSafeInteger(planId) || planId <= 0) {
+    throw new Error("Identificadores invalidos.");
+  }
+  const [plan] = await sql`
+    UPDATE public.membership_plans AS p
+    SET is_active = true, updated_at = NOW()
+    WHERE p.id = ${planId}
+      AND p.gym_id = ${gymId}
+      AND p.is_active = false
+      AND p.access_mode IN ('fixed_days', 'entry_pack')
+      AND p.duration_days IS NOT NULL AND p.duration_days > 0
+      AND p.price IS NOT NULL AND p.price > 0
+      AND (
+        (p.access_mode = 'fixed_days' AND p.max_entries IS NULL)
+        OR (p.access_mode = 'entry_pack' AND p.max_entries IS NOT NULL AND p.max_entries > 0)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.subscriptions AS s WHERE s.plan_id = p.id
+      )
+    RETURNING p.*
+  `;
+  if (!plan) throw new Error("Plan no apto para activacion o no encontrado.");
+  return plan;
 }
 
 export async function deleteGymPlan(gymId: number, id: number) {
@@ -104,6 +142,12 @@ export async function deleteGymPlan(gymId: number, id: number) {
     SET is_active = false, updated_at = NOW()
     WHERE id = ${id}
       AND gym_id = ${gymId}
+      AND (
+        COALESCE(access_mode, 'monthly') NOT IN ('entry_pack', 'fixed_days')
+        OR NOT EXISTS (
+          SELECT 1 FROM subscriptions AS sub WHERE sub.plan_id = membership_plans.id
+        )
+      )
     RETURNING *
   `;
   return disabled;
@@ -123,4 +167,53 @@ export async function assignSubscription(data: {
     )
   `;
   return sub;
+}
+
+/**
+ * Record an already-confirmed in-person payment for a flexible pass.
+ * The PostgreSQL function owns locking, tenant validation, plan price,
+ * idempotency, subscription creation and payment insertion.
+ */
+export async function recordFlexibleInPersonPayment(data: {
+  gymId: number;
+  memberId: number;
+  planId: number;
+  paymentMethod: "cash" | "transfer";
+  transactionId: string;
+  amount: number;
+  notes?: string;
+}) {
+  // Fail closed until the complete rollout is explicitly approved.
+  if (process.env.ENABLE_FLEXIBLE_PASS_SALES !== "true") {
+    throw new Error("Venta presencial de pases flexibles deshabilitada.");
+  }
+  if (![data.gymId, data.memberId, data.planId].every(
+    (value) => Number.isSafeInteger(value) && value > 0
+  )) {
+    throw new Error("Identificadores invalidos.");
+  }
+  if (data.paymentMethod !== "cash" && data.paymentMethod !== "transfer") {
+    throw new Error("Solo se admite efectivo o transferencia confirmada.");
+  }
+  if (typeof data.transactionId !== "string" ||
+      !data.transactionId.trim() || data.transactionId.trim().length > 120) {
+    throw new Error("Referencia unica del pago obligatoria (maximo 120 caracteres).");
+  }
+  if (!Number.isFinite(data.amount) || data.amount <= 0) {
+    throw new Error("Monto invalido.");
+  }
+  if (data.notes !== undefined &&
+      (typeof data.notes !== "string" || data.notes.length > 1000)) {
+    throw new Error("Notas invalidas.");
+  }
+  const [result] = await sql`
+    SELECT payment_id, subscription_id
+    FROM public.record_flexible_gym_pass_payment_draft(
+      ${data.gymId}, ${data.memberId}, ${data.planId},
+      ${data.paymentMethod}, ${data.transactionId.trim()},
+      ${data.amount}, ${data.notes?.trim() || null}
+    )
+  `;
+  if (!result) throw new Error("No se pudo registrar el pago.");
+  return result;
 }

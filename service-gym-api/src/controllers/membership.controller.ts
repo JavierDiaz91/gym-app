@@ -3,6 +3,8 @@ import {
   getGymPlans,
   createGymPlan,
   createFlexibleGymPlanDraft,
+  recordFlexibleInPersonPayment,
+  activateFlexibleGymPlan,
   updateGymPlan,
   deleteGymPlan,
   assignSubscription,
@@ -63,6 +65,44 @@ export class MembershipController {
       return res.status(201).json({ success: true, plan, availableForSale: false });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });
+    }
+  }
+
+  static async recordFlexibleInPersonPayment(req: AuthenticatedRequest, res: Response) {
+    try {
+      const gymId = resolveGymId(req);
+      if (!gymId) return res.status(400).json({ success: false, error: "gymId requerido" });
+      const { memberId, planId, paymentMethod, transactionId, amount, notes } = req.body ?? {};
+      // Do not coerce missing, null or empty amounts into a valid payment.
+      if (typeof amount !== "number" || !Number.isFinite(amount)) {
+        return res.status(400).json({ success: false, error: "Monto numerico requerido." });
+      }
+      const result = await recordFlexibleInPersonPayment({
+        gymId,
+        memberId: Number(memberId),
+        planId: Number(planId),
+        paymentMethod,
+        transactionId,
+        amount,
+        notes,
+      });
+      return res.status(201).json({ success: true, ...result });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  static async activateFlexiblePlan(req: AuthenticatedRequest, res: Response) {
+    try {
+      const gymId = resolveGymId(req);
+      const planId = Number(req.params.id);
+      if (!gymId || !Number.isSafeInteger(planId) || planId <= 0) {
+        return res.status(400).json({ success: false, error: "Identificadores invalidos." });
+      }
+      const plan = await activateFlexibleGymPlan(gymId, planId);
+      return res.json({ success: true, plan });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
     }
   }
 
