@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS workout_set_logs (
 
 -- Enforce category scope: a gym-specific category cannot be attached to another gym.
 CREATE OR REPLACE FUNCTION validate_training_plan_category_scope()
-RETURNS TRIGGER LANGUAGE plpgsql AS $
+RETURNS TRIGGER LANGUAGE plpgsql AS $kivra_body$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM training_plans p JOIN training_categories c ON c.id = NEW.category_id
@@ -162,14 +162,14 @@ BEGIN
     RAISE EXCEPTION 'Category is not available to this gym';
   END IF;
   RETURN NEW;
-END $;
+END $kivra_body$;
 CREATE TRIGGER trg_training_plan_category_scope
 BEFORE INSERT OR UPDATE ON training_plan_categories
 FOR EACH ROW EXECUTE FUNCTION validate_training_plan_category_scope();
 
 -- Validate media ownership when an item references a trainer-uploaded image.
 CREATE OR REPLACE FUNCTION validate_training_item_media_scope()
-RETURNS TRIGGER LANGUAGE plpgsql AS $
+RETURNS TRIGGER LANGUAGE plpgsql AS $kivra_body$
 BEGIN
   IF NEW.media_asset_id IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM training_media_assets m
@@ -181,7 +181,7 @@ BEGIN
     RAISE EXCEPTION 'Image is not available to this gym';
   END IF;
   RETURN NEW;
-END $;
+END $kivra_body$;
 CREATE TRIGGER trg_training_item_media_scope
 BEFORE INSERT OR UPDATE ON training_plan_items
 FOR EACH ROW EXECUTE FUNCTION validate_training_item_media_scope();
