@@ -142,6 +142,12 @@ export async function deleteGymPlan(gymId: number, id: number) {
     SET is_active = false, updated_at = NOW()
     WHERE id = ${id}
       AND gym_id = ${gymId}
+      AND (
+        COALESCE(access_mode, 'monthly') NOT IN ('entry_pack', 'fixed_days')
+        OR NOT EXISTS (
+          SELECT 1 FROM subscriptions AS sub WHERE sub.plan_id = membership_plans.id
+        )
+      )
     RETURNING *
   `;
   return disabled;
