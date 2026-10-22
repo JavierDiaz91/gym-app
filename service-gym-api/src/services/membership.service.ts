@@ -124,3 +124,52 @@ export async function assignSubscription(data: {
   `;
   return sub;
 }
+
+/**
+ * Record an already-confirmed in-person payment for a flexible pass.
+ * The PostgreSQL function owns locking, tenant validation, plan price,
+ * idempotency, subscription creation and payment insertion.
+ */
+export async function recordFlexibleInPersonPayment(data: {
+  gymId: number;
+  memberId: number;
+  planId: number;
+  paymentMethod: "cash" | "transfer";
+  transactionId: string;
+  amount: number;
+  notes?: string;
+}) {
+  // Fail closed until the complete rollout is explicitly approved.
+  if (process.env.ENABLE_FLEXIBLE_PASS_SALES !== "true") {
+    throw new Error("Venta presencial de pases flexibles deshabilitada.");
+  }
+  if (![data.gymId, data.memberId, data.planId].every(
+    (value) => Number.isSafeInteger(value) && value > 0
+  )) {
+    throw new Error("Identificadores invalidos.");
+  }
+  if (data.paymentMethod !== "cash" && data.paymentMethod !== "transfer") {
+    throw new Error("Solo se admite efectivo o transferencia confirmada.");
+  }
+  if (typeof data.transactionId !== "string" ||
+      !data.transactionId.trim() || data.transactionId.trim().length > 120) {
+    throw new Error("Referencia unica del pago obligatoria (maximo 120 caracteres).");
+  }
+  if (!Number.isFinite(data.amount) || data.amount <= 0) {
+    throw new Error("Monto invalido.");
+  }
+  if (data.notes !== undefined &&
+      (typeof data.notes !== "string" || data.notes.length > 1000)) {
+    throw new Error("Notas invalidas.");
+  }
+  const [result] = await sql`
+    SELECT payment_id, subscription_id
+    FROM public.record_flexible_gym_pass_payment_draft(
+      ${data.gymId}, ${data.memberId}, ${data.planId},
+      ${data.paymentMethod}, ${data.transactionId.trim()},
+      ${data.amount}, ${data.notes?.trim() || null}
+    )
+  `;
+  if (!result) throw new Error("No se pudo registrar el pago.");
+  return result;
+}
