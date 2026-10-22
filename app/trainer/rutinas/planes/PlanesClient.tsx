@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createTrainingPlan, type PlanInput } from "./actions";
 
 type Plan = { id: number; title: string; description: string; durationWeeks: number; status: string; version: number };
@@ -50,7 +51,7 @@ export default function PlanesClient({ plans, setupError }: { plans: Plan[]; set
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {plans.length === 0 && <p className="text-muted-foreground">Todavía no hay plantillas creadas.</p>}
         {plans.map((p) => <article key={p.id} className="rounded-xl border p-5 space-y-2">
-          <h2 className="font-semibold">{p.title}</h2><p className="text-sm text-muted-foreground">{p.description}</p>
+          <h2 className="font-semibold">{p.title}</h2><Link className="inline-block rounded-lg border px-3 py-2 text-sm text-cyan-500" href={"/trainer/rutinas/planes/" + p.id}>Abrir constructor</Link><p className="text-sm text-muted-foreground">{p.description}</p>
           <p className="text-xs text-muted-foreground">{p.durationWeeks} semanas · Versión {p.version} · {p.status === "draft" ? "Borrador" : p.status}</p>
         </article>)}
       </section>
