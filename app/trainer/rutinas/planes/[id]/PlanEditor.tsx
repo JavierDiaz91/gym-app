@@ -8,7 +8,7 @@ type Plan = { id: number; title: string; durationWeeks: number; status: string; 
 const field = "w-full rounded-lg border bg-background px-3 py-2 text-sm";
 const button = "rounded-lg border px-3 py-2 text-sm disabled:opacity-50";
 const blank = (weeks: number): PlanItem => ({
-  key: "item-" + Math.random().toString(36).slice(2), title: "", imageUrl: "", instructions: "",
+  key: "item-" + crypto.randomUUID(), title: "", imageUrl: "", instructions: "",
   prescriptions: Array.from({ length: weeks }, () => ({ sets: 3, reps: "10", rir: "2", restSeconds: 60 }))
 });
 export default function PlanEditor({ plan, members }: { plan: Plan; members: { id: number; name: string }[] }) {
