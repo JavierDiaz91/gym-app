@@ -206,3 +206,9 @@ export async function assignTrainingPlan(planId: number, memberId: number, custo
     return { success: true };
   } catch { return { success: false, error: "No se pudo asignar" }; }
 }
+
+export async function listExerciseImages() {
+  await trainerContext();
+  const rows = await sql`SELECT id, name, image_url FROM exercises ORDER BY name LIMIT 500`;
+  return rows.map((x) => ({ id: Number(x.id), name: String(x.name), imageUrl: String(x.image_url || "") }));
+}
