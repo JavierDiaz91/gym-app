@@ -16,9 +16,10 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
   const [draft, setDraft] = useState<PlanDraft>(plan.draft || { days: [] });
   const [week, setWeek] = useState(0);
   const [memberId, setMemberId] = useState(members[0]?.id || 0);
+  const [personalize, setPersonalize] = useState(false);
   const [message, setMessage] = useState("");
   const [pending, start] = useTransition();
-  const editable = plan.status === "draft";
+  const editable = plan.status === "draft" || personalize;
   const change = (next: PlanDraft) => setDraft(next);
   const updateDay = (di: number, fn: (day: PlanDay) => PlanDay) =>
     change({ days: draft.days.map((d, i) => i === di ? fn(d) : d) });
@@ -41,7 +42,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       <div><h1 className="text-2xl font-bold">{plan.title}</h1><p className="text-sm text-muted-foreground">{plan.durationWeeks} semanas · {editable ? "Borrador" : "Publicado"}</p></div>
       <div className="flex flex-wrap gap-2">
         <button className={button} disabled={pending} onClick={() => run(() => duplicateTrainingPlan(plan.id), (id) => id && router.push("/trainer/rutinas/planes/" + id))}>Duplicar plantilla</button>
-        {editable && <><button className={button} disabled={pending} onClick={() => run(() => saveTrainingPlanDraft(plan.id, draft))}>Guardar borrador</button>
+        {plan.status === "draft" && <><button className={button} disabled={pending} onClick={() => run(() => saveTrainingPlanDraft(plan.id, draft))}>Guardar borrador</button>
         <button className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={() => run(async () => {
           const saved = await saveTrainingPlanDraft(plan.id, draft);
           return saved.success ? publishTrainingPlan(plan.id) : saved;
@@ -96,9 +97,10 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     </section>)}
     {plan.status === "published" && <section className="rounded-xl border p-4 space-y-3">
       <h2 className="font-semibold">Asignar al alumno</h2>
-      <p className="text-sm text-muted-foreground">Se guarda una copia independiente. Para personalizarla, duplicá la plantilla y editá el borrador antes de publicar.</p>
+      <p className="text-sm text-muted-foreground">La asignación conserva una copia independiente de la plantilla.</p>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={personalize} onChange={(e) => { setPersonalize(e.target.checked); setDraft(structuredClone(plan.draft)); }}/> Personalizar ejercicios y cargas para este alumno antes de asignar</label>
       <select aria-label="Alumno" className={field} value={memberId} onChange={(e) => setMemberId(Number(e.target.value))}>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-      <button className={button} disabled={pending || !memberId} onClick={() => run(() => assignTrainingPlan(plan.id, memberId))}>Asignar planificación</button>
+      <button className={button} disabled={pending || !memberId} onClick={() => run(() => assignTrainingPlan(plan.id, memberId, personalize ? draft : undefined))}>Asignar planificación</button>
     </section>}
   </main>;
 }
