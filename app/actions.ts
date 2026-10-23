@@ -3528,3 +3528,23 @@ export async function setMemberTrainerFromAdmin(memberId: number, trainerId: num
     return { success: false, error: "No se pudo asignar el entrenador" };
   }
 }
+
+
+export async function getMemberAssignedTrainer(memberId: number) {
+  const session = await requireTenantSession();
+  const rows = await sql`
+    SELECT t.id, t.first_name, t.last_name, t.specialization, t.is_active
+    FROM members m
+    JOIN trainers t ON t.id = m.trainer_id AND t.gym_id = m.gym_id
+    WHERE m.id = ${memberId} AND m.gym_id = ${session.gymId}
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  return {
+    id: Number(rows[0].id),
+    first_name: String(rows[0].first_name),
+    last_name: String(rows[0].last_name),
+    specialization: rows[0].specialization ? String(rows[0].specialization) : null,
+    is_active: rows[0].is_active !== false,
+  };
+}
