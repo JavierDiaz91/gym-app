@@ -14,12 +14,8 @@ export type PlanInput = {
   audience: string;
 };
 
-const allowed: Record<string, string[]> = {
-  discipline: ["musculacion", "running", "funcional", "movilidad", "preparacion_fisica"],
-  objective: ["fuerza", "hipertrofia", "resistencia", "potencia", "movilidad"],
-  level: ["principiante", "intermedio", "avanzado"],
-  audience: ["todos", "mujeres", "hombres"],
-};
+const dimensions = ["discipline", "objective", "level", "audience"] as const;
+
 
 async function trainerContext() {
   const session = await getSession();
@@ -61,14 +57,14 @@ export async function createTrainingPlan(input: PlanInput): Promise<{ success: b
       ["discipline", input.discipline], ["objective", input.objective],
       ["level", input.level], ["audience", input.audience],
     ];
-    if (choices.some(([dim, value]) => !allowed[dim].includes(value))) {
+    if (choices.some(([dim, value]) => !dimensions.includes(dim as typeof dimensions[number]) || !value || value.length > 100)) {
       return { success: false, error: "Categoría inválida" };
     }
     // A single SQL statement guarantees atomic plan+category insertion.
     // Categories must already exist in training_categories (global or gym-local).
     const categoryRows = await sql`
       SELECT id, dimension, slug FROM training_categories
-      WHERE is_active = TRUE AND (gym_id IS NULL OR gym_id = ${gymId})
+      WHERE is_active = TRUE AND (gym_id = ${gymId} OR (gym_id IS NULL AND EXISTS (SELECT 1 FROM training_category_preferences pref WHERE pref.gym_id = ${gymId} AND pref.category_id = training_categories.id AND pref.is_enabled = TRUE)))
     `;
     const categoryIds = choices.map(([dim, slug]) =>
       categoryRows.find((c) => c.dimension === dim && c.slug === slug)?.id
