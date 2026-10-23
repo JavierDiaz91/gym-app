@@ -47,6 +47,7 @@ const navItems = [
   { href: "/admin/membresias", label: "Membresías", icon: CreditCard, roles: ["admin"] },
   { href: "/admin/clases", label: "Clases", icon: Calendar, roles: ["admin"] },
   { href: "/admin/entrenadores", label: "Entrenadores", icon: UserCheck, roles: ["admin"] },
+  { href: "/admin/categorias", label: "Categorías deportivas", icon: Dumbbell, roles: ["admin"] },
   { href: "/admin/reportes", label: "Reportes", icon: BarChart3, roles: ["admin"] },
   { href: "/admin/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
 ];
