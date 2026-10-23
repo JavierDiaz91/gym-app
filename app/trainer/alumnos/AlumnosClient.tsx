@@ -140,12 +140,12 @@ export default function AlumnosClient({
             if (m.id === selectedMember.id) {
               if (kind === "plan") return { ...m, training_plan_title: trainingPlans.find((p) => p.id === Number(id))?.title };
               const updatedRoutines = m.routines ? [...m.routines] : [];
-              if (!updatedRoutines.some((r) => Number(r.id) === Number(selectedRoutineId))) {
-                updatedRoutines.push({ id: selectedRoutineId, title: routineTitle });
+              if (!updatedRoutines.some((r) => Number(r.id) === Number(id))) {
+                updatedRoutines.push({ id: Number(id), title: routineTitle });
               }
               return {
                 ...m,
-                routine_id: selectedRoutineId,
+                routine_id: Number(id),
                 routine_name: routineTitle,
                 routines: updatedRoutines,
               };
