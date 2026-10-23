@@ -208,3 +208,18 @@ export async function listExerciseImages() {
   const rows = await sql`SELECT id, name, image_url FROM exercises ORDER BY name LIMIT 500`;
   return rows.map((x) => ({ id: Number(x.id), name: String(x.name), imageUrl: String(x.image_url || "") }));
 }
+
+
+export async function listEnabledTrainingCategories() {
+ const {gymId}=await trainerContext();
+ const rows=await sql`
+ SELECT c.dimension,c.slug,c.label
+ FROM training_categories c
+ WHERE c.is_active=TRUE AND
+ (c.gym_id=${gymId} OR (c.gym_id IS NULL AND EXISTS (
+ SELECT 1 FROM training_category_preferences p
+ WHERE p.gym_id=${gymId} AND p.category_id=c.id AND p.is_enabled=TRUE)))
+ ORDER BY c.dimension,c.label
+ `;
+ return rows.map(r=>({dimension:String(r.dimension),slug:String(r.slug),label:String(r.label)}));
+}
