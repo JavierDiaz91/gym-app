@@ -11,6 +11,26 @@ const blank = (weeks: number): PlanItem => ({
   key: "item-" + crypto.randomUUID(), title: "", imageUrl: "", instructions: "",
   prescriptions: Array.from({ length: weeks }, () => ({ sets: 3, reps: "10", rir: "2", restSeconds: 60 }))
 });
+
+type ProgressScope = "all" | "main";
+const numeric = (value: unknown): number | null => {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+const bounded = (value: number, minimum: number, maximum: number) => Math.min(maximum, Math.max(minimum, value));
+function transformWeeks(draft: PlanDraft, fromWeek: number, toWeeks: number[], transform: (rx: Prescription, targetWeek: number) => Prescription, scope: ProgressScope): PlanDraft {
+  return { days: draft.days.map(day => ({ ...day, blocks: day.blocks.map(block => ({
+    ...block, items: block.items.map(item => {
+      if (scope === "main" && block.type !== "main") return item;
+      const prescriptions = [...item.prescriptions];
+      const source = prescriptions[fromWeek] || {};
+      for (const targetWeek of toWeeks) prescriptions[targetWeek] = transform({ ...source }, targetWeek);
+      return { ...item, prescriptions };
+    })
+  })) })) };
+}
+
 export default function PlanEditor({ plan, members, exercises }: { plan: Plan; members: { id: number; name: string }[]; exercises: { id: number; name: string; imageUrl: string }[] }) {
   const router = useRouter();
   const [draft, setDraft] = useState<PlanDraft>(plan.draft || { days: [] });
@@ -18,6 +38,11 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
   const [memberId, setMemberId] = useState(members[0]?.id || 0);
   const [personalize, setPersonalize] = useState(false);
   const [message, setMessage] = useState("");
+  const [scope, setScope] = useState<ProgressScope>("main");
+  const [repIncrement, setRepIncrement] = useState(2);
+  const [rirIncrement, setRirIncrement] = useState(-1);
+  const [deload, setDeload] = useState(true);
+  const [preview, setPreview] = useState<PlanDraft | null>(null);
   const [pending, start] = useTransition();
   const editable = plan.status === "draft" || personalize;
   const change = (next: PlanDraft) => setDraft(next);
@@ -29,6 +54,30 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     updateBlock(di, bi, (b) => ({ ...b, items: b.items.map((x, i) => i === ii ? fn(x) : x) }));
   const updateRx = (di: number, bi: number, ii: number, patch: Partial<Prescription>) =>
     updateItem(di, bi, ii, (x) => ({ ...x, prescriptions: x.prescriptions.map((p, i) => i === week ? { ...p, ...patch } : p) }));
+  const copyPrevious = () => {
+    if (week < 1) return;
+    if (!window.confirm("¿Copiar los parámetros de la semana " + week + " a la semana " + (week + 1) + "? Se reemplazarán los parámetros actuales de los ejercicios seleccionados.")) return;
+    change(transformWeeks(draft, week - 1, [week], (rx) => ({ ...rx }), scope));
+    setPreview(null);
+    setMessage("Parámetros copiados. Presioná Guardar borrador para persistirlos.");
+  };
+  const makeProgression = () => transformWeeks(draft, 0, Array.from({ length: plan.durationWeeks - 1 }, (_, i) => i + 1), (rx, targetWeek) => {
+    const isDeload = deload && targetWeek === plan.durationWeeks - 1 && plan.durationWeeks > 2;
+    const result = { ...rx };
+    const reps = numeric(rx.reps);
+    const rir = numeric(rx.rir);
+    if (reps !== null) result.reps = String(Math.max(1, Math.round(reps + (isDeload ? 0 : targetWeek * repIncrement))));
+    if (rir !== null) result.rir = String(bounded(rir + (isDeload ? 1 : targetWeek * rirIncrement), 0, 10));
+    if (isDeload && numeric(rx.sets) !== null) result.sets = Math.max(1, Math.round(Number(rx.sets) * 0.7));
+    return result;
+  }, scope);
+  const applyProgression = () => {
+    if (!preview) return;
+    if (!window.confirm("¿Aplicar la progresión a las semanas 2 a " + plan.durationWeeks + "? Se reemplazarán los parámetros existentes del alcance seleccionado.")) return;
+    change(preview);
+    setPreview(null);
+    setMessage("Progresión aplicada localmente. Revisá las semanas y presioná Guardar borrador.");
+  };
   function run(fn: () => Promise<{ success: boolean; error?: string; id?: number }>, onSuccess?: (id?: number) => void) {
     setMessage(""); start(async () => {
       const result = await fn();
@@ -54,6 +103,42 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       <span className="text-sm font-semibold">Semana:</span>
       {Array.from({ length: plan.durationWeeks }, (_, i) => <button key={i} type="button" className={button + (week === i ? " border-cyan-500 text-cyan-500" : "")} onClick={() => setWeek(i)}>{i + 1}</button>)}
     </div>
+    {editable && <section className="rounded-xl border p-4 space-y-3">
+      <h2 className="font-semibold">Automatización semanal</h2>
+      <p className="text-sm text-muted-foreground">Las semanas mantienen parámetros independientes. Los cambios se guardan al presionar Guardar borrador.</p>
+      <label className="block text-sm">Aplicar a
+        <select className={field} value={scope} onChange={(e) => { setScope(e.target.value as ProgressScope); setPreview(null); }}>
+          <option value="main">Solo bloques principales (recomendado)</option>
+          <option value="all">Todos los ejercicios e intervalos</option>
+        </select>
+      </label>
+      <button type="button" className={button} disabled={week === 0 || pending} onClick={copyPrevious}>Copiar semana anterior a semana {week + 1}</button>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="text-sm">Repeticiones adicionales por semana
+          <input type="number" className={field} step={1} min={-20} max={20} value={repIncrement} onChange={e => { setRepIncrement(bounded(Number(e.target.value) || 0, -20, 20)); setPreview(null); }} />
+        </label>
+        <label className="text-sm">Cambio de RIR por semana (negativo = mayor esfuerzo)
+          <input type="number" className={field} step={1} min={-5} max={5} value={rirIncrement} onChange={e => { setRirIncrement(bounded(Number(e.target.value) || 0, -5, 5)); setPreview(null); }} />
+        </label>
+      </div>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={deload} onChange={e => { setDeload(e.target.checked); setPreview(null); }} />Última semana de descarga (series -30%, RIR +1 respecto de semana 1)</label>
+      <p className="text-xs text-muted-foreground">La progresión parte de la Semana 1. Ajusta repeticiones numéricas y RIR; conserva tiempos, distancias y descansos.</p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={button} disabled={pending || plan.durationWeeks < 2} onClick={() => setPreview(makeProgression())}>Vista previa de progresión</button>
+        {preview && <button type="button" className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-black" onClick={applyProgression}>Aplicar progresión</button>}
+        {preview && <button type="button" className={button} onClick={() => setPreview(null)}>Cancelar</button>}
+      </div>
+      {preview && <div className="max-h-80 overflow-auto rounded-lg border p-3 text-sm">
+        <p className="font-semibold mb-2">Vista previa (sin guardar)</p>
+        {preview.days.map((day, di) => <div key={di} className="mb-3">
+          <p className="font-medium">{day.title}</p>
+          {day.blocks.filter(block => scope === "all" || block.type === "main").flatMap(block => block.items).map(item => <div key={item.key} className="border-b py-1">
+            <span>{item.title}: </span>
+            {item.prescriptions.map((rx, wi) => <span key={wi} className="mr-2 whitespace-nowrap">S{wi + 1}: {rx.sets ?? "—"}×{rx.reps ?? "—"} · RIR {rx.rir ?? "—"}</span>)}
+          </div>)}
+        </div>)}
+      </div>}
+    </section>}
     {editable && <button className={button} disabled={draft.days.length >= 7} onClick={() => change({ days: [...draft.days, { title: "Día " + (draft.days.length + 1), modality: "strength", blocks: [] }] })}>+ Agregar día</button>}
     {draft.days.map((day, di) => <section key={di} className="rounded-xl border p-4 space-y-4">
       <div className="flex flex-wrap gap-2 items-center">
