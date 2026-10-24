@@ -58,6 +58,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
 
   let memberData: MemberDashboardData | null = null;
   let assignedRoutines: RoutineData[] = [];
+  let assignedPlans: { id: number; title: string; weeks: number }[] = [];
 
   try {
     // 1. Obtener datos del miembro y su suscripción más reciente
@@ -96,6 +97,16 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
 
     // 2. Si se encontró el miembro, obtenemos las rutinas y entrenamientos completados HOY
     if (memberData) {
+      const planRows = await sql`
+        SELECT mtp.id, COALESCE(tp.title, 'Plan de entrenamiento') AS title,
+               COALESCE(tp.duration_weeks, jsonb_array_length(mtp.snapshot_jsonb->'days')) AS weeks
+        FROM member_training_plans mtp
+        LEFT JOIN training_plans tp ON tp.id = mtp.source_plan_id AND tp.gym_id = mtp.gym_id
+        WHERE mtp.member_id = ${memberData.id} AND mtp.gym_id = ${session.gymId}
+          AND mtp.status = 'active'
+        ORDER BY mtp.assigned_at DESC, mtp.id DESC
+      `;
+      assignedPlans = planRows.map((p) => ({ id: Number(p.id), title: String(p.title), weeks: Number(p.weeks) }));
       const [routineResult, completedTodayLogs] = await Promise.all([
         sql`
           SELECT r.id, COALESCE(r.title, 'Rutina Asignada') as name, r.notes as description
@@ -336,8 +347,20 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
               Pagar Cuota
             </Link>
           </div>
-        ) : assignedRoutines.length > 0 ? (
+        ) : assignedPlans.length > 0 || assignedRoutines.length > 0 ? (
           <div className="space-y-3 pt-1">
+            {assignedPlans.map((plan) => (
+              <div key={`plan-${plan.id}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-muted/20 border border-border">
+                <div>
+                  <span className="text-xs text-primary font-semibold">Plan multisemana</span>
+                  <h3 className="font-bold text-foreground">{plan.title}</h3>
+                  <p className="text-xs text-muted-foreground">{plan.weeks} semanas de entrenamiento</p>
+                </div>
+                <Link href={`/miembro/rutina?plan=${plan.id}`} className="inline-flex items-center justify-center px-5 py-2.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg">
+                  Ver mi plan
+                </Link>
+              </div>
+            ))}
             {assignedRoutines.map((routine) => {
               const nameLower = routine.name.toLowerCase();
               const isWarmup = nameLower.includes("calor") || nameLower.includes("entrada") || nameLower.includes("calentamiento");
