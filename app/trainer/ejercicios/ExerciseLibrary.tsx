@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { archiveTrainerExercise, saveTrainerExercise, type ExerciseInput, type TrainerExercise } from "./actions";
+import { archiveTrainerExercise, listTrainerExercises, saveTrainerExercise, type ExerciseInput, type TrainerExercise } from "./actions";
 
 const empty: ExerciseInput = { name: "", instructions: "", imageUrl: "", muscleGroup: "", equipment: "" };
 const inputClass = "w-full rounded-lg border border-slate-300 bg-background px-3 py-2 text-sm dark:border-slate-700";
@@ -15,7 +15,7 @@ export default function ExerciseLibrary({ initial }: {initial: TrainerExercise[]
   const [pending, startTransition] = useTransition();
   const edit = (x: TrainerExercise) => { setEditingId(x.id); setForm({name:x.name,instructions:x.instructions,imageUrl:x.imageUrl,muscleGroup:x.muscleGroup,equipment:x.equipment}); window.scrollTo({top:0,behavior:"smooth"}); };
   const reset = () => { setEditingId(null); setForm(empty); };
-  const refresh = async () => { const {listTrainerExercises} = await import("./actions"); setItems(await listTrainerExercises()); };
+  const refresh = async () => { setItems(await listTrainerExercises()); };
   const save = (e: React.FormEvent) => {
     e.preventDefault(); setMessage("");
     startTransition(async () => {
