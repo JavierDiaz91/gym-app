@@ -190,26 +190,40 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           </details>
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
             <summary className="cursor-pointer text-sm font-semibold">Ver y editar cargas · {plan.durationWeeks} semanas</summary>
-          <div className="mt-3">
-            <summary className="cursor-pointer text-sm font-semibold">Comparar las {plan.durationWeeks} semanas (tabla de progresión)</summary>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[520px] border-collapse text-left text-xs sm:text-sm">
-                <thead><tr className="border-b border-slate-300 dark:border-slate-600"><th className="p-2">Parámetro</th>{Array.from({ length: plan.durationWeeks }, (_, wi) => <th key={wi} className={`p-2 ${wi === week ? "bg-primary/10 text-primary" : ""}`}>Semana {wi + 1}</th>)}</tr></thead>
+          <div className="mt-3 space-y-3">
+            <p className="text-xs text-muted-foreground">Editá directamente cada celda para configurar las cargas por semana. Los cambios quedan en el borrador hasta guardar.</p>
+            <div className="overflow-x-auto rounded-xl border border-slate-300 bg-background dark:border-slate-700">
+              <table className="w-full min-w-[600px] border-collapse text-left text-xs sm:text-sm">
+                <thead className="bg-slate-100 dark:bg-slate-800">
+                  <tr><th scope="col" className="sticky left-0 z-10 bg-slate-100 p-3 font-semibold dark:bg-slate-800">Parámetro</th>{Array.from({ length: plan.durationWeeks }, (_, wi) => <th scope="col" key={wi} className={`p-3 text-center font-semibold ${wi === week ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-200" : ""}`}>Semana {wi + 1}</th>)}</tr>
+                </thead>
                 <tbody>
-                  {([["sets","Series"],["reps","Repeticiones"],["rir","RIR"],["restSeconds","Descanso (seg)"],["durationSeconds","Duración (seg)"],["tempo","Tempo"],["distanceMeters","Distancia (m)"],["pace","Ritmo"]] as const).map(([key, label]) => {
-                    if (!item.prescriptions.some(p => p[key] !== undefined && p[key] !== null && String(p[key]).trim() !== "")) return null;
-                    return <tr key={key} className="border-b border-slate-200 dark:border-slate-700"><th className="p-2 font-medium">{label}</th>{Array.from({ length: plan.durationWeeks }, (_, wi) => <td key={wi} className={`p-2 ${wi === week ? "bg-primary/10 font-semibold" : ""}`}>{item.prescriptions[wi]?.[key] ?? "—"}</td>)}</tr>;
+                  {([["sets","Series"],["reps","Repeticiones"],["rir","RIR"],["restSeconds","Descanso (seg)"],["tempo","Tempo"],["distanceMeters","Distancia (m)"],["durationSeconds","Duración (seg)"],["pace","Ritmo"]] as const).map(([key, label]) => {
+                    const show = ["sets","reps","rir","restSeconds"].includes(key) || item.prescriptions.some(p => p[key] !== undefined && p[key] !== null && String(p[key]).trim() !== "");
+                    if (!show) return null;
+                    const isNumeric = ["sets","restSeconds","distanceMeters","durationSeconds"].includes(key);
+                    return <tr key={key} className="border-t border-slate-200 dark:border-slate-700">
+                      <th scope="row" className="sticky left-0 z-10 bg-background p-3 font-medium">{label}</th>
+                      {Array.from({ length: plan.durationWeeks }, (_, wi) => <td key={wi} className={`p-1.5 ${wi === week ? "bg-cyan-50 dark:bg-cyan-950/40" : ""}`}>
+                        <input aria-label={`${label}, semana ${wi + 1}, ${item.title || "ejercicio"}`} className="w-full min-w-20 rounded-md border border-slate-300 bg-background px-2 py-2 text-center text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-cyan-500 disabled:opacity-70 dark:border-slate-600" disabled={!editable} type={isNumeric ? "number" : "text"} min={isNumeric ? 0 : undefined} value={item.prescriptions[wi]?.[key] ?? ""} onChange={(e) => {
+                          const value = isNumeric ? (e.target.value === "" ? undefined : Number(e.target.value)) : e.target.value;
+                          updateItem(di, bi, ii, (current) => ({ ...current, prescriptions: Array.from({ length: plan.durationWeeks }, (_, index) => index === wi ? { ...(current.prescriptions[index] || {}), [key]: value } : (current.prescriptions[index] || {})) }));
+                        }}/>
+                      </td>)}
+                    </tr>;
                   })}
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">Comparación de semanas del mismo ejercicio. Los campos de edición de abajo corresponden solo a la semana seleccionada.</p>
+            <details className="rounded-lg border border-slate-300 p-3 dark:border-slate-700">
+              <summary className="cursor-pointer text-sm font-medium">Notas por semana</summary>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {Array.from({ length: plan.durationWeeks }, (_, wi) => <label key={wi} className="space-y-1 text-xs font-medium">Semana {wi + 1}
+                  <textarea className={field} disabled={!editable} rows={2} value={item.prescriptions[wi]?.notes || ""} placeholder="Observaciones para esta semana" onChange={(e) => updateItem(di, bi, ii, (current) => ({ ...current, prescriptions: Array.from({ length: plan.durationWeeks }, (_, index) => index === wi ? { ...(current.prescriptions[index] || {}), notes: e.target.value } : (current.prescriptions[index] || {})) }))}/>
+                </label>)}
+              </div>
+            </details>
           </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            {([["sets","Series"],["reps","Repeticiones"],["rir","RIR"],["restSeconds","Descanso (seg)"],["tempo","Tempo"],["distanceMeters","Distancia (m)"],["durationSeconds","Duración (seg)"],["pace","Ritmo"]] as const).map(([key,label]) =>
-              <label key={key} className="text-xs">{label}<input className={field} disabled={!editable} type={["sets","restSeconds","distanceMeters","durationSeconds"].includes(key) ? "number" : "text"} min={0} value={rx[key] ?? ""} onChange={(e) => updateRx(di, bi, ii, { [key]: ["sets","restSeconds","distanceMeters","durationSeconds"].includes(key) ? (e.target.value === "" ? undefined : Number(e.target.value)) : e.target.value })}/></label>)}
-          </div>
-          <textarea aria-label="Notas de la semana" className={field} disabled={!editable} placeholder="Notas de esta semana" value={rx.notes || ""} onChange={(e) => updateRx(di, bi, ii, { notes: e.target.value })}/>
           </details>
         </div>; })}
         {editable && <button className={button} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio / intervalo</button>}
