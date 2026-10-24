@@ -3,6 +3,7 @@
 import { sql } from "@/lib/db";
 import { getSession } from "@/app/actions";
 import { revalidatePath } from "next/cache";
+import { put } from "@vercel/blob";
 
 export type TrainerExercise = {
   id: number; name: string; instructions: string; imageUrl: string;
@@ -73,4 +74,37 @@ export async function archiveTrainerExercise(id: number): Promise<{success: bool
     revalidatePath("/trainer/rutinas/planes");
     return {success:true};
   } catch { return {success:false,error:"No se pudo archivar"}; }
+}
+
+/** Public demonstration images, scoped to the authenticated trainer. */
+export async function uploadTrainerExerciseImage(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const { gymId, trainerId } = await owner();
+    const file = formData.get("image");
+    if (!(file instanceof File)) return { success: false, error: "Seleccioná una imagen." };
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type))
+      return { success: false, error: "Usá JPG, PNG, WebP o GIF." };
+    if (!file.size || file.size > 5 * 1024 * 1024)
+      return { success: false, error: "La imagen debe pesar como máximo 5 MB." };
+    const bytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    const isPng = bytes.slice(0, 8).every((b, i) => b === [137,80,78,71,13,10,26,10][i]);
+    const isGif = String.fromCharCode(...bytes.slice(0, 6)).match(/^GIF8[79]a$/);
+    const isWebp = String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
+      String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+    const valid = file.type === "image/jpeg" ? isJpeg : file.type === "image/png" ? isPng :
+      file.type === "image/gif" ? Boolean(isGif) : isWebp;
+    if (!valid) return { success: false, error: "El contenido del archivo no corresponde a una imagen válida." };
+    if (!process.env.BLOB_READ_WRITE_TOKEN)
+      return { success: false, error: "Falta configurar BLOB_READ_WRITE_TOKEN en el proyecto." };
+    const extension = file.type === "image/jpeg" ? "jpg" : file.type === "image/png" ? "png" :
+      file.type === "image/webp" ? "webp" : "gif";
+    const blob = await put(`trainer-exercises/gym-${gymId}/trainer-${trainerId}/${crypto.randomUUID()}.${extension}`, file, {
+      access: "public", contentType: file.type, addRandomSuffix: false,
+    });
+    return { success: true, url: blob.url };
+  } catch (error) {
+    console.error("Error subiendo imagen del ejercicio", error);
+    return { success: false, error: "No se pudo subir la imagen. Revisá el almacenamiento Blob." };
+  }
 }
