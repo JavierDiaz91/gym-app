@@ -31,7 +31,7 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
     `;
     const memberId = members[0]?.id;
     const assignments = memberId ? await sql`
-      SELECT mtp.id, mtp.snapshot_jsonb, tp.title, tp.duration_weeks
+      SELECT mtp.id, mtp.trainer_id, mtp.snapshot_jsonb, tp.title, tp.duration_weeks
       FROM member_training_plans mtp
       LEFT JOIN training_plans tp ON tp.id = mtp.source_plan_id AND tp.gym_id = mtp.gym_id
       WHERE mtp.id = ${planAssignmentId} AND mtp.member_id = ${memberId}
@@ -42,7 +42,7 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
       return <div className="max-w-4xl mx-auto p-6">Plan no encontrado o no asignado a tu cuenta.</div>;
     }
     type WeekPrescription = { sets?: number; reps?: string; rir?: string; restSeconds?: number; durationSeconds?: number; distanceMeters?: number; tempo?: string; notes?: string };
-    type WeekItem = { key: string; title: string; imageUrl?: string; instructions?: string; prescriptions: WeekPrescription[] };
+    type WeekItem = { key: string; title: string; imageUrl?: string; imageVerified?: boolean; instructions?: string; prescriptions: WeekPrescription[] };
     type WeekBlock = { title: string; items: WeekItem[] };
     type WeekDay = { title: string; blocks: WeekBlock[] };
     const snapshot = assignments[0].snapshot_jsonb as { days?: WeekDay[] };
@@ -53,6 +53,23 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
     const dayParam = typeof resolvedParams?.day === "string" ? Number(resolvedParams.day) : 1;
     const day = Number.isInteger(dayParam) ? Math.max(1, Math.min(Math.max(1, days.length), dayParam)) : 1;
     const selectedDay = days[day - 1];
+    // Validate image URLs against this assignment's trainer and gym.
+    const imageRows = selectedDay ? await sql`
+      SELECT image_url FROM trainer_exercise_library
+      WHERE gym_id = ${session.gymId}
+        AND trainer_id = ${assignments[0].trainer_id}
+        AND is_active = true AND image_url IS NOT NULL
+    ` : [];
+    const allowedImages = new Set(imageRows.map((row) => String(row.image_url)));
+    const verifiedBlocks = selectedDay?.blocks.map((block) => ({
+      ...block,
+      items: block.items.map((item) => ({
+        ...item,
+        imageVerified: typeof item.imageUrl === "string"
+          && item.imageUrl.startsWith("https://")
+          && allowedImages.has(item.imageUrl),
+      })),
+    })) ?? [];
     const planUrl = `/miembro/rutina?plan=${planAssignmentId}`;
     const sessions = await sql`
       SELECT id, status, started_at, finished_at
@@ -102,7 +119,7 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
           <PlanSessionClient
             key={`${planAssignmentId}-${week}-${day}`}
             assignmentId={planAssignmentId} week={week} day={day}
-            title={selectedDay.title} blocks={selectedDay.blocks}
+            title={selectedDay.title} blocks={verifiedBlocks}
             status={String(workoutSession?.status || "not_started")}
             initialCompleted={completedRows.map((r) => String(r.item_snapshot_key))}
             startedAt={workoutSession?.started_at ? String(workoutSession.started_at) : null}
