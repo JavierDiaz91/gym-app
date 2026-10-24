@@ -22,6 +22,103 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
   const resolvedParams = await searchParams;
   const targetRoutineId = resolvedParams?.id ? Number(resolvedParams.id) : null;
 
+  // Los planes multisemana se leen desde la asignación del alumno, no desde routines.
+  const planAssignmentId = typeof resolvedParams?.plan === "string" ? Number(resolvedParams.plan) : NaN;
+  if (Number.isSafeInteger(planAssignmentId) && planAssignmentId > 0) {
+    const members = await sql`
+      SELECT id FROM members WHERE user_id = ${userId} AND gym_id = ${session.gymId} LIMIT 1
+    `;
+    const memberId = members[0]?.id;
+    const assignments = memberId ? await sql`
+      SELECT mtp.id, mtp.snapshot_jsonb, tp.title, tp.duration_weeks
+      FROM member_training_plans mtp
+      LEFT JOIN training_plans tp ON tp.id = mtp.source_plan_id AND tp.gym_id = mtp.gym_id
+      WHERE mtp.id = ${planAssignmentId} AND mtp.member_id = ${memberId}
+        AND mtp.gym_id = ${session.gymId} AND mtp.status = 'active'
+      LIMIT 1
+    ` : [];
+    if (!assignments.length) {
+      return <div className="max-w-4xl mx-auto p-6">Plan no encontrado o no asignado a tu cuenta.</div>;
+    }
+    type WeekPrescription = { sets?: number; reps?: string; rir?: string; restSeconds?: number; durationSeconds?: number; distanceMeters?: number; tempo?: string; notes?: string };
+    type WeekItem = { key: string; title: string; instructions?: string; prescriptions: WeekPrescription[] };
+    type WeekBlock = { title: string; items: WeekItem[] };
+    type WeekDay = { title: string; blocks: WeekBlock[] };
+    const snapshot = assignments[0].snapshot_jsonb as { days?: WeekDay[] };
+    const days = Array.isArray(snapshot?.days) ? snapshot.days : [];
+    const duration = Math.max(1, Math.min(52, Number(assignments[0].duration_weeks) || 4));
+    const weekParam = typeof resolvedParams?.week === "string" ? Number(resolvedParams.week) : 1;
+    const week = Number.isInteger(weekParam) ? Math.max(1, Math.min(duration, weekParam)) : 1;
+    const dayParam = typeof resolvedParams?.day === "string" ? Number(resolvedParams.day) : 1;
+    const day = Number.isInteger(dayParam) ? Math.max(1, Math.min(Math.max(1, days.length), dayParam)) : 1;
+    const selectedDay = days[day - 1];
+    const planUrl = `/miembro/rutina?plan=${planAssignmentId}`;
+    return (
+      <div className="max-w-4xl mx-auto p-6 space-y-6">
+        <Link href="/miembro" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft className="w-4 h-4" /> Volver al panel</Link>
+        <div>
+          <p className="text-xs font-semibold text-primary">Plan de entrenamiento · {duration} semanas</p>
+          <h1 className="text-2xl font-bold">{String(assignments[0].title || "Mi plan de entrenamiento")}</h1>
+        </div>
+        <section className="space-y-2">
+          <h2 className="font-semibold">Seleccionar semana</h2>
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: duration }, (_, index) => index + 1).map((n) => (
+              <Link key={n} href={`${planUrl}&week=${n}&day=${day}`}
+                aria-current={n === week ? "page" : undefined}
+                className={`px-4 py-2 rounded-lg border text-sm ${n === week ? "bg-primary text-primary-foreground" : "bg-card"}`}>
+                Semana {n}
+              </Link>
+            ))}
+          </div>
+        </section>
+        <section className="space-y-2">
+          <h2 className="font-semibold">Días de entrenamiento</h2>
+          <div className="flex flex-wrap gap-2">
+            {days.map((d, index) => (
+              <Link key={index} href={`${planUrl}&week=${week}&day=${index + 1}`}
+                aria-current={index + 1 === day ? "page" : undefined}
+                className={`px-4 py-2 rounded-lg border text-sm ${index + 1 === day ? "bg-primary text-primary-foreground" : "bg-card"}`}>
+                Día {index + 1}: {d.title}
+              </Link>
+            ))}
+          </div>
+        </section>
+        {selectedDay ? (
+          <div className="space-y-5">
+            <h2 className="text-xl font-bold">{selectedDay.title} · Semana {week}</h2>
+            {selectedDay.blocks.map((block, blockIndex) => (
+              <section key={blockIndex} className="border rounded-xl bg-card p-4 space-y-3">
+                <h3 className="font-semibold">{block.title}</h3>
+                {block.items.map((item, itemIndex) => {
+                  const p = item.prescriptions?.[week - 1] || {};
+                  return (
+                    <article key={item.key || itemIndex} className="border rounded-lg p-4 space-y-2">
+                      <h4 className="font-semibold">{item.title}</h4>
+                      {item.instructions && <p className="text-sm text-muted-foreground">{item.instructions}</p>}
+                      <div className="flex flex-wrap gap-3 text-sm">
+                        {p.sets != null && <span>Series: <strong>{p.sets}</strong></span>}
+                        {p.reps && <span>Repeticiones: <strong>{p.reps}</strong></span>}
+                        {p.rir && <span>RIR: <strong>{p.rir}</strong></span>}
+                        {p.restSeconds != null && <span>Descanso: <strong>{p.restSeconds} seg</strong></span>}
+                        {p.durationSeconds != null && <span>Duración: <strong>{p.durationSeconds} seg</strong></span>}
+                        {p.distanceMeters != null && <span>Distancia: <strong>{p.distanceMeters} m</strong></span>}
+                        {p.tempo && <span>Tempo: <strong>{p.tempo}</strong></span>}
+                      </div>
+                      {p.notes && <p className="text-sm text-muted-foreground">{p.notes}</p>}
+                    </article>
+                  );
+                })}
+              </section>
+            ))}
+            <p className="text-xs text-muted-foreground">Vista de consulta. El registro de sesiones multisemana se incorporará por separado.</p>
+          </div>
+        ) : <p>Este plan todavía no tiene días configurados.</p>}
+      </div>
+    );
+  }
+
+
   let routineData: {
     id: number;
     title: string;
