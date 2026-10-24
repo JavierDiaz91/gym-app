@@ -161,6 +161,18 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           {editable && <button className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: d.blocks.filter((_, i) => i !== bi) }))}>Eliminar bloque</button>}
         </div>
         {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <div key={item.key} className="rounded-xl border-2 border-slate-200 bg-background p-3 space-y-3 shadow-sm dark:border-slate-700">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><p className="text-xs font-semibold text-cyan-600 dark:text-cyan-400">Ejercicio {ii + 1}</p><h3 className="text-base font-bold">{item.title || "Ejercicio sin nombre"}</h3></div>
+            <div className="flex flex-wrap gap-2 text-xs font-semibold">
+              {rx.sets !== undefined && <span className="rounded-lg bg-muted px-3 py-2">{rx.sets} series</span>}
+              {rx.reps && <span className="rounded-lg bg-muted px-3 py-2">{rx.reps} rep.</span>}
+              {rx.rir && <span className="rounded-lg bg-muted px-3 py-2">RIR {rx.rir}</span>}
+              {rx.restSeconds !== undefined && <span className="rounded-lg bg-muted px-3 py-2">{rx.restSeconds}s descanso</span>}
+            </div>
+          </div>
+          <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
+            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-cyan-300">Editar ejercicio, instrucciones e imagen</summary>
+            <div className="mt-3">
           <div className="flex flex-wrap gap-2 items-start">
             {item.imageUrl && <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-24 w-24 rounded-lg object-cover" />}
             <div className="flex-1 space-y-2">
@@ -174,7 +186,11 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </div>
             {editable && <button className={button} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar</button>}
           </div>
-          <details className="rounded-lg border border-slate-300 bg-muted/20 p-3 dark:border-slate-600">
+            </div>
+          </details>
+          <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
+            <summary className="cursor-pointer text-sm font-semibold">Ver y editar cargas · {plan.durationWeeks} semanas</summary>
+          <div className="mt-3">
             <summary className="cursor-pointer text-sm font-semibold">Comparar las {plan.durationWeeks} semanas (tabla de progresión)</summary>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[520px] border-collapse text-left text-xs sm:text-sm">
@@ -188,12 +204,13 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
               </table>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Comparación de semanas del mismo ejercicio. Los campos de edición de abajo corresponden solo a la semana seleccionada.</p>
-          </details>
+          </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             {([["sets","Series"],["reps","Repeticiones"],["rir","RIR"],["restSeconds","Descanso (seg)"],["tempo","Tempo"],["distanceMeters","Distancia (m)"],["durationSeconds","Duración (seg)"],["pace","Ritmo"]] as const).map(([key,label]) =>
               <label key={key} className="text-xs">{label}<input className={field} disabled={!editable} type={["sets","restSeconds","distanceMeters","durationSeconds"].includes(key) ? "number" : "text"} min={0} value={rx[key] ?? ""} onChange={(e) => updateRx(di, bi, ii, { [key]: ["sets","restSeconds","distanceMeters","durationSeconds"].includes(key) ? (e.target.value === "" ? undefined : Number(e.target.value)) : e.target.value })}/></label>)}
           </div>
           <textarea aria-label="Notas de la semana" className={field} disabled={!editable} placeholder="Notas de esta semana" value={rx.notes || ""} onChange={(e) => updateRx(di, bi, ii, { notes: e.target.value })}/>
+          </details>
         </div>; })}
         {editable && <button className={button} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio / intervalo</button>}
       </div>)}
