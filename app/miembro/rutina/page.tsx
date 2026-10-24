@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import Link from "next/link";
 import { ArrowLeft, Dumbbell, CheckCircle2 } from "lucide-react";
 import ExerciseCard from "./ExerciseCard";
+import PlanSessionClient from "./PlanSessionClient";
 import { FinishWorkoutButton } from "./FinishWorkoutButton";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
       return <div className="max-w-4xl mx-auto p-6">Plan no encontrado o no asignado a tu cuenta.</div>;
     }
     type WeekPrescription = { sets?: number; reps?: string; rir?: string; restSeconds?: number; durationSeconds?: number; distanceMeters?: number; tempo?: string; notes?: string };
-    type WeekItem = { key: string; title: string; instructions?: string; prescriptions: WeekPrescription[] };
+    type WeekItem = { key: string; title: string; imageUrl?: string; instructions?: string; prescriptions: WeekPrescription[] };
     type WeekBlock = { title: string; items: WeekItem[] };
     type WeekDay = { title: string; blocks: WeekBlock[] };
     const snapshot = assignments[0].snapshot_jsonb as { days?: WeekDay[] };
@@ -53,6 +54,19 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
     const day = Number.isInteger(dayParam) ? Math.max(1, Math.min(Math.max(1, days.length), dayParam)) : 1;
     const selectedDay = days[day - 1];
     const planUrl = `/miembro/rutina?plan=${planAssignmentId}`;
+    const sessions = await sql`
+      SELECT id, status, started_at, finished_at
+      FROM workout_sessions
+      WHERE member_training_plan_id = ${planAssignmentId} AND member_id = ${memberId}
+        AND week_number = ${week} AND day_index = ${day}
+      LIMIT 1
+    `;
+    const workoutSession = sessions[0];
+    const completedRows = workoutSession ? await sql`
+      SELECT item_snapshot_key FROM workout_set_logs
+      WHERE workout_session_id = ${workoutSession.id} AND set_index = 1 AND notes = 'completed'
+    ` : [];
+
     return (
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         <Link href="/miembro" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft className="w-4 h-4" /> Volver al panel</Link>
@@ -85,34 +99,15 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
           </div>
         </section>
         {selectedDay ? (
-          <div className="space-y-5">
-            <h2 className="text-xl font-bold">{selectedDay.title} · Semana {week}</h2>
-            {selectedDay.blocks.map((block, blockIndex) => (
-              <section key={blockIndex} className="border rounded-xl bg-card p-4 space-y-3">
-                <h3 className="font-semibold">{block.title}</h3>
-                {block.items.map((item, itemIndex) => {
-                  const p = item.prescriptions?.[week - 1] || {};
-                  return (
-                    <article key={item.key || itemIndex} className="border rounded-lg p-4 space-y-2">
-                      <h4 className="font-semibold">{item.title}</h4>
-                      {item.instructions && <p className="text-sm text-muted-foreground">{item.instructions}</p>}
-                      <div className="flex flex-wrap gap-3 text-sm">
-                        {p.sets != null && <span>Series: <strong>{p.sets}</strong></span>}
-                        {p.reps && <span>Repeticiones: <strong>{p.reps}</strong></span>}
-                        {p.rir && <span>RIR: <strong>{p.rir}</strong></span>}
-                        {p.restSeconds != null && <span>Descanso: <strong>{p.restSeconds} seg</strong></span>}
-                        {p.durationSeconds != null && <span>Duración: <strong>{p.durationSeconds} seg</strong></span>}
-                        {p.distanceMeters != null && <span>Distancia: <strong>{p.distanceMeters} m</strong></span>}
-                        {p.tempo && <span>Tempo: <strong>{p.tempo}</strong></span>}
-                      </div>
-                      {p.notes && <p className="text-sm text-muted-foreground">{p.notes}</p>}
-                    </article>
-                  );
-                })}
-              </section>
-            ))}
-            <p className="text-xs text-muted-foreground">Vista de consulta. El registro de sesiones multisemana se incorporará por separado.</p>
-          </div>
+          <PlanSessionClient
+            key={`${planAssignmentId}-${week}-${day}`}
+            assignmentId={planAssignmentId} week={week} day={day}
+            title={selectedDay.title} blocks={selectedDay.blocks}
+            status={String(workoutSession?.status || "not_started")}
+            initialCompleted={completedRows.map((r) => String(r.item_snapshot_key))}
+            startedAt={workoutSession?.started_at ? String(workoutSession.started_at) : null}
+            finishedAt={workoutSession?.finished_at ? String(workoutSession.finished_at) : null}
+          />
         ) : <p>Este plan todavía no tiene días configurados.</p>}
       </div>
     );
