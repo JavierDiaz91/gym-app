@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { assignMemberToTrainer, removeMemberFromTrainer, assignRoutineToMember } from "@/app/actions";
 import WorkoutHistoryModal from "./WorkoutHistoryModal";
+import { assignTrainingPlan } from "../rutinas/planes/actions";
 
 interface RoutineItem {
   id: number;
@@ -32,6 +33,7 @@ interface Member {
   routines?: RoutineItem[];
   last_workout_at?: string;
   last_workout?: string;
+  training_plan_title?: string;
 }
 
 interface Routine {
@@ -46,12 +48,14 @@ interface Routine {
 interface AlumnosClientProps {
   initialMembers: Member[];
   routines: Routine[];
+  trainingPlans: { id: number; title: string; durationWeeks: number }[];
   sessionUserId: number | string;
 }
 
 export default function AlumnosClient({
   initialMembers,
   routines,
+  trainingPlans,
   sessionUserId,
 }: AlumnosClientProps) {
   const router = useRouter();
@@ -70,6 +74,7 @@ export default function AlumnosClient({
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [selectedRoutineId, setSelectedRoutineId] = useState<number | null>(null);
   const [assignLoading, setAssignLoading] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState("");
   const [assignError, setAssignError] = useState("");
 
   useEffect(() => {
@@ -112,31 +117,35 @@ export default function AlumnosClient({
 
   const handleAssignRoutine = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedMember || !selectedRoutineId) return;
+    if (!selectedMember || !selectedAssignment) return;
 
     setAssignLoading(true);
     setAssignError("");
 
     try {
-      const res = await assignRoutineToMember(selectedMember.id, selectedRoutineId);
+      const [kind, id] = selectedAssignment.split(":");
+      const res = kind === "plan"
+        ? await assignTrainingPlan(Number(id), selectedMember.id)
+        : await assignRoutineToMember(selectedMember.id, Number(id));
       setAssignLoading(false);
 
       if (res?.error) {
         setAssignError(res.error);
       } else {
-        const foundRoutine = routines.find((r) => Number(r.id) === Number(selectedRoutineId));
+        const foundRoutine = routines.find((r) => kind === "routine" && Number(r.id) === Number(id));
         const routineTitle = foundRoutine?.title || foundRoutine?.name || foundRoutine?.nombre || "Rutina";
 
         setMembersList((prev) =>
           prev.map((m) => {
             if (m.id === selectedMember.id) {
+              if (kind === "plan") return { ...m, training_plan_title: trainingPlans.find((p) => p.id === Number(id))?.title };
               const updatedRoutines = m.routines ? [...m.routines] : [];
-              if (!updatedRoutines.some((r) => Number(r.id) === Number(selectedRoutineId))) {
-                updatedRoutines.push({ id: selectedRoutineId, title: routineTitle });
+              if (!updatedRoutines.some((r) => Number(r.id) === Number(id))) {
+                updatedRoutines.push({ id: Number(id), title: routineTitle });
               }
               return {
                 ...m,
-                routine_id: selectedRoutineId,
+                routine_id: Number(id),
                 routine_name: routineTitle,
                 routines: updatedRoutines,
               };
@@ -147,6 +156,7 @@ export default function AlumnosClient({
 
         setSelectedMember(null);
         setSelectedRoutineId(null);
+        setSelectedAssignment("");
         router.refresh();
       }
     } catch (err: any) {
@@ -268,6 +278,7 @@ export default function AlumnosClient({
                       </span>
 
                       <div className="flex flex-wrap gap-1.5">
+                        {member.training_plan_title && <span className="inline-flex items-center text-xs font-semibold text-[#00aeef] px-2.5 py-1 rounded-lg border border-[#00aeef]/20">Plan: {member.training_plan_title}</span>}
                         {hasRoutinesArray ? (
                           member.routines!.map((r) => (
                             <span 
@@ -284,7 +295,7 @@ export default function AlumnosClient({
                             {member.routine_name}
                           </span>
                         ) : (
-                          <span className="text-xs text-muted-foreground italic">Sin rutina asignada</span>
+                          !member.training_plan_title && <span className="text-xs text-muted-foreground italic">Sin rutina asignada</span>
                         )}
                       </div>
                     </div>
@@ -318,6 +329,7 @@ export default function AlumnosClient({
                   onClick={() => {
                     setSelectedMember(member);
                     setSelectedRoutineId(member.routine_id || (routines[0]?.id ? Number(routines[0].id) : null));
+                    setSelectedAssignment(trainingPlans.length ? `plan:${trainingPlans[0].id}` : routines.length ? `routine:${routines[0].id}` : "");
                     setAssignError("");
                   }}
                   className="w-full flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border hover:border-[#00aeef]/40 font-semibold py-2 rounded-xl text-xs transition-all"
@@ -363,21 +375,14 @@ export default function AlumnosClient({
                 <label className="block text-xs font-semibold text-foreground mb-1.5">
                   Rutina
                 </label>
-                {routines.length === 0 ? (
-                  <p className="text-xs text-amber-500 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
-                    No tenés rutinas creadas. Creá una rutina primero desde la sección Rutinas.
-                  </p>
+                {routines.length === 0 && trainingPlans.length === 0 ? (
+                  <p className="text-xs text-amber-500 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">No hay rutinas ni planes publicados disponibles.</p>
                 ) : (
-                  <select
-                    value={selectedRoutineId || ""}
-                    onChange={(e) => setSelectedRoutineId(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 focus:border-[#00aeef] text-foreground"
-                  >
-                    {routines.map((r) => (
-                      <option key={r.id} value={r.id} className="bg-card text-card-foreground">
-                        {r.title || r.nombre || r.name || `Rutina #${r.id}`}
-                      </option>
-                    ))}
+                  <select value={selectedAssignment} onChange={(e) => setSelectedAssignment(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm bg-background border border-border rounded-xl text-foreground">
+                    <option value="">Seleccioná una rutina o plan</option>
+                    {trainingPlans.map((p) => <option key={`plan:${p.id}`} value={`plan:${p.id}`}>{p.title} · {p.durationWeeks} semanas (plan)</option>)}
+                    {routines.map((r) => <option key={`routine:${r.id}`} value={`routine:${r.id}`}>{r.title || r.nombre || r.name || `Rutina #${r.id}`} (rutina)</option>)}
                   </select>
                 )}
               </div>
@@ -398,7 +403,7 @@ export default function AlumnosClient({
                 </button>
                 <button
                   type="submit"
-                  disabled={assignLoading || routines.length === 0 || !selectedRoutineId}
+                  disabled={assignLoading || !selectedAssignment}
                   className="px-4 py-2 text-xs font-extrabold bg-[#00aeef] hover:bg-[#0098d4] text-black rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {assignLoading ? "Asignando..." : "Confirmar Asignación"}

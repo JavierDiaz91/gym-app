@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Mail, CreditCard } from "lucide-react";
-import { getMemberById } from "@/app/actions";
+import { ArrowLeft, Mail, CreditCard, Dumbbell } from "lucide-react";
+import { getMemberById, getMemberAssignedTrainer } from "@/app/actions";
 import { MemberActions } from "./member-actions";
 
 interface PageProps {
@@ -24,6 +24,8 @@ export default async function DetalleMiembroPage({ params }: PageProps) {
   if (!member) {
     notFound();
   }
+
+  const assignedTrainer = await getMemberAssignedTrainer(memberId);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -128,6 +130,31 @@ export default async function DetalleMiembroPage({ params }: PageProps) {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Dumbbell className="w-4 h-4 text-primary" /> Entrenador asignado
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {assignedTrainer ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <p className="font-semibold">{assignedTrainer.first_name} {assignedTrainer.last_name}</p>
+                <p className="text-sm text-muted-foreground">{assignedTrainer.specialization || "Sin especialización registrada"}</p>
+              </div>
+              <Badge variant={assignedTrainer.is_active ? "default" : "secondary"}>
+                {assignedTrainer.is_active ? "Activo" : "Inactivo"}
+              </Badge>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Sin entrenador asignado. Podés asignar uno desde Editar.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

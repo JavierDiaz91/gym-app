@@ -3485,3 +3485,66 @@ export async function getSaaSAuditLogAction(limit: number = 100) {
     };
   }
 }
+
+
+export async function setMemberTrainerFromAdmin(memberId: number, trainerId: number | null) {
+  try {
+    const session = await requireGymAdminSession();
+    if (!Number.isSafeInteger(memberId) || memberId <= 0 ||
+      (trainerId !== null && (!Number.isSafeInteger(trainerId) || trainerId <= 0))) {
+      return { success: false, error: "Datos de asignación inválidos" };
+    }
+    if (trainerId !== null) {
+      const matches = await sql`
+        SELECT id FROM trainers WHERE id = ${trainerId}
+          AND gym_id = ${session.gymId} AND is_active IS DISTINCT FROM FALSE LIMIT 1`;
+      if (!matches.length) return { success: false, error: "Entrenador no disponible en este gimnasio" };
+    }
+    const result = await sql`
+      WITH updated AS (
+        UPDATE members SET trainer_id = ${trainerId}, updated_at = NOW()
+        WHERE id = ${memberId} AND gym_id = ${session.gymId}
+        RETURNING id
+      ),
+      removed AS (
+        DELETE FROM trainer_members tm USING updated u
+        WHERE tm.member_id = u.id AND (${trainerId}::integer IS NULL OR tm.trainer_id <> ${trainerId})
+        RETURNING tm.member_id
+      ),
+      assigned AS (
+        INSERT INTO trainer_members (trainer_id, member_id)
+        SELECT ${trainerId}::integer, u.id FROM updated u WHERE ${trainerId}::integer IS NOT NULL
+        ON CONFLICT (trainer_id, member_id) DO NOTHING
+        RETURNING member_id
+      )
+      SELECT id FROM updated
+    `;
+    if (!result.length) return { success: false, error: "Alumno no encontrado en este gimnasio" };
+    revalidatePath(`/admin/miembros/${memberId}`);
+    revalidatePath("/trainer/alumnos");
+    return { success: true };
+  } catch (error) {
+    console.error("Error assigning trainer to member:", error);
+    return { success: false, error: "No se pudo asignar el entrenador" };
+  }
+}
+
+
+export async function getMemberAssignedTrainer(memberId: number) {
+  const session = await requireTenantSession();
+  const rows = await sql`
+    SELECT t.id, t.first_name, t.last_name, t.specialization, t.is_active
+    FROM members m
+    JOIN trainers t ON t.id = m.trainer_id AND t.gym_id = m.gym_id
+    WHERE m.id = ${memberId} AND m.gym_id = ${session.gymId}
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  return {
+    id: Number(rows[0].id),
+    first_name: String(rows[0].first_name),
+    last_name: String(rows[0].last_name),
+    specialization: rows[0].specialization ? String(rows[0].specialization) : null,
+    is_active: rows[0].is_active !== false,
+  };
+}
