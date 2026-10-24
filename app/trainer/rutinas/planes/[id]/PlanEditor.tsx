@@ -31,7 +31,7 @@ function transformWeeks(draft: PlanDraft, fromWeek: number, toWeeks: number[], t
   })) })) };
 }
 
-export default function PlanEditor({ plan, members, exercises }: { plan: Plan; members: { id: number; name: string }[]; exercises: { id: number; name: string; imageUrl: string }[] }) {
+export default function PlanEditor({ plan, members, exercises }: { plan: Plan; members: { id: number; name: string }[]; exercises: { id: number; name: string; imageUrl: string; instructions: string }[] }) {
   const router = useRouter();
   const [draft, setDraft] = useState<PlanDraft>(plan.draft || { days: [] });
   const [week, setWeek] = useState(0);
@@ -176,10 +176,11 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           <div className="flex flex-wrap gap-2 items-start">
             {item.imageUrl && <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-24 w-24 rounded-lg object-cover" />}
             <div className="flex-1 space-y-2">
-              <select aria-label="Seleccionar ejercicio del catálogo" className={field} disabled={!editable} value="" onChange={(e) => { const ex = exercises.find((x) => x.id === Number(e.target.value)); if (ex) updateItem(di, bi, ii, (x) => ({ ...x, title: ex.name, imageUrl: ex.imageUrl || x.imageUrl })); }}>
-                <option value="">Elegir ejercicio del catálogo (opcional)</option>
+              <select aria-label="Seleccionar ejercicio del catálogo" className={field} disabled={!editable} value="" onChange={(e) => { const ex = exercises.find((x) => x.id === Number(e.target.value)); if (ex) updateItem(di, bi, ii, (x) => ({ ...x, title: ex.name, imageUrl: ex.imageUrl, instructions: ex.instructions })); }}>
+                <option value="">Elegir de Mis Ejercicios (biblioteca personal)</option>
                 {exercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
               </select>
+              <Link href="/trainer/ejercicios" className="inline-block text-xs font-semibold text-cyan-600 underline dark:text-cyan-400">+ Crear o administrar mis ejercicios</Link>
               <input aria-label="Ejercicio" placeholder="Ej. Sentadilla o intervalos 400 m" className={field} disabled={!editable} value={item.title} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, title: e.target.value }))}/>
               <input aria-label="URL de imagen" placeholder="https://... imagen demostrativa" className={field} disabled={!editable} value={item.imageUrl || ""} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, imageUrl: e.target.value }))}/>
               <textarea aria-label="Instrucciones" placeholder="Indicaciones técnicas" className={field} disabled={!editable} value={item.instructions || ""} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, instructions: e.target.value }))}/>
