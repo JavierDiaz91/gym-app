@@ -170,6 +170,21 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </div>
             {editable && <button className={button} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar</button>}
           </div>
+          <details className="rounded-lg border border-slate-300 bg-muted/20 p-3 dark:border-slate-600" open={!editable}>
+            <summary className="cursor-pointer text-sm font-semibold">Tabla de progresión · semanas 1 a {plan.durationWeeks}</summary>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[520px] border-collapse text-left text-xs sm:text-sm">
+                <thead><tr className="border-b border-slate-300 dark:border-slate-600"><th className="p-2">Parámetro</th>{Array.from({ length: plan.durationWeeks }, (_, wi) => <th key={wi} className={`p-2 ${wi === week ? "bg-primary/10 text-primary" : ""}`}>Semana {wi + 1}</th>)}</tr></thead>
+                <tbody>
+                  {([["sets","Series"],["reps","Repeticiones"],["rir","RIR"],["restSeconds","Descanso (seg)"],["durationSeconds","Duración (seg)"],["tempo","Tempo"],["distanceMeters","Distancia (m)"],["pace","Ritmo"]] as const).map(([key, label]) => {
+                    if (!item.prescriptions.some(p => p[key] !== undefined && p[key] !== null && String(p[key]).trim() !== "")) return null;
+                    return <tr key={key} className="border-b border-slate-200 dark:border-slate-700"><th className="p-2 font-medium">{label}</th>{Array.from({ length: plan.durationWeeks }, (_, wi) => <td key={wi} className={`p-2 ${wi === week ? "bg-primary/10 font-semibold" : ""}`}>{item.prescriptions[wi]?.[key] ?? "—"}</td>)}</tr>;
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">Comparación de semanas del mismo ejercicio. Los campos de edición de abajo corresponden solo a la semana seleccionada.</p>
+          </details>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             {([["sets","Series"],["reps","Repeticiones"],["rir","RIR"],["restSeconds","Descanso (seg)"],["tempo","Tempo"],["distanceMeters","Distancia (m)"],["durationSeconds","Duración (seg)"],["pace","Ritmo"]] as const).map(([key,label]) =>
               <label key={key} className="text-xs">{label}<input className={field} disabled={!editable} type={["sets","restSeconds","distanceMeters","durationSeconds"].includes(key) ? "number" : "text"} min={0} value={rx[key] ?? ""} onChange={(e) => updateRx(di, bi, ii, { [key]: ["sets","restSeconds","distanceMeters","durationSeconds"].includes(key) ? (e.target.value === "" ? undefined : Number(e.target.value)) : e.target.value })}/></label>)}
