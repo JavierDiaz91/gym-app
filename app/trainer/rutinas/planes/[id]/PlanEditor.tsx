@@ -102,7 +102,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
   return <main className="mx-auto max-w-6xl space-y-5 p-4 md:p-8 text-foreground">
     <Link href="/trainer/rutinas/planes" className="text-sm text-cyan-500">← Volver a plantillas</Link>
     <div className="flex flex-wrap justify-between gap-3">
-      <div><h1 className="text-2xl font-bold">{plan.title}</h1><p className="text-sm text-muted-foreground">{plan.durationWeeks} semanas · {editable ? "Borrador" : "Publicado"}</p></div>
+      <div><h1 className="text-2xl font-bold">{plan.title}</h1><p className="text-sm text-muted-foreground">{plan.durationWeeks} semanas · {plan.status === "draft" ? "Borrador" : "Publicado"}{plan.status === "published" && personalize ? " · Personalización para alumno (sin modificar plantilla)" : ""}</p></div>
       <div className="flex flex-wrap gap-2">
         <button className={button} disabled={pending} onClick={() => run(() => duplicateTrainingPlan(plan.id), (id) => id && router.push("/trainer/rutinas/planes/" + id))}>Duplicar plantilla</button>
 
@@ -115,6 +115,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         <button type="button" className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={saveAndPublish}>Guardar y publicar</button>
       </div>
     </div>}
+    {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta plantilla ya está publicada. Para modificar la plantilla y guardar una nueva versión, usá «Duplicar plantilla»; para ajustar únicamente la rutina de un alumno, activá «Personalizar ejercicios y cargas» antes de asignarla. Esos ajustes se guardan al asignar y no cambian la plantilla original.</p>}
     {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
     <div className="flex flex-wrap gap-2 items-center">
       <span className="text-sm font-semibold">Semana:</span>
