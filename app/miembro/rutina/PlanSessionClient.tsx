@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { startPlanSession, finishPlanSession, markPlanExercise } from "./plan-session-actions";
 
 type Prescription = { sets?: number; reps?: string; rir?: string; restSeconds?: number; durationSeconds?: number; distanceMeters?: number; tempo?: string; notes?: string };
-type Item = { key: string; title: string; imageUrl?: string; instructions?: string; prescriptions: Prescription[] };
+type Item = { key: string; title: string; imageUrl?: string; imageVerified?: boolean; instructions?: string; prescriptions: Prescription[] };
 type Block = { title: string; type?: string; items: Item[] };
 type Props = { assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; startedAt?: string | null; finishedAt?: string | null };
 
@@ -57,7 +57,7 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
             const checked = completed.includes(item.key);
             return (
               <article key={item.key || itemIndex} className={`overflow-hidden rounded-2xl border bg-card shadow-sm ${checked ? "border-emerald-500/40" : ""}`}>
-                {item.imageUrl && /^https:\/\//.test(item.imageUrl) && <img src={item.imageUrl} alt={`Demostración de ${item.title}`} loading="lazy" className="w-full max-h-64 object-contain bg-muted" />}
+                {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className="border-b p-3"><details className="group"><summary className="cursor-pointer text-sm font-semibold text-primary">Ver demostración del ejercicio</summary><img src={item.imageUrl} alt={`Demostración verificada de ${item.title}`} loading="lazy" className="mt-3 h-36 w-48 max-w-full rounded-lg border bg-muted object-contain" /></details></div>}
                 <div className="p-4 sm:p-5 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div><p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p><h4 className="text-lg font-bold">{item.title}</h4></div>
@@ -77,7 +77,7 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
                   </div>
                   {item.instructions && <p className="text-sm leading-relaxed text-muted-foreground"><strong className="text-foreground">Cómo hacerlo:</strong> {item.instructions}</p>}
                   {p.notes && <p className="text-sm text-muted-foreground">{p.notes}</p>}
-                  {!item.imageUrl && <p className="text-xs text-muted-foreground italic">Demostración visual no cargada por el entrenador.</p>}
+                  {(!item.imageUrl || item.imageVerified !== true) && <p className="text-xs text-muted-foreground italic">Demostración visual pendiente de verificación por el entrenador.</p>}
                 </div>
               </article>
             );
