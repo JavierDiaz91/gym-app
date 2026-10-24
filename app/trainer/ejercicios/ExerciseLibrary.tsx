@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { archiveTrainerExercise, listTrainerExercises, saveTrainerExercise, type ExerciseInput, type TrainerExercise } from "./actions";
+import { archiveTrainerExercise, listTrainerExercises, saveTrainerExercise, uploadTrainerExerciseImage, type ExerciseInput, type TrainerExercise } from "./actions";
 
 const empty: ExerciseInput = { name: "", instructions: "", imageUrl: "", muscleGroup: "", equipment: "" };
 const inputClass = "w-full rounded-lg border border-slate-300 bg-background px-3 py-2 text-sm dark:border-slate-700";
@@ -13,6 +13,19 @@ export default function ExerciseLibrary({ initial }: {initial: TrainerExercise[]
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
+  const [uploading, setUploading] = useState(false);
+  const uploadImage = async (file?: File) => {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) || file.size > 5 * 1024 * 1024) { setMessage("Seleccioná una imagen JPG, PNG, WebP o GIF de hasta 5 MB."); return; }
+    setUploading(true); setMessage("");
+    try {
+      const data = new FormData(); data.append("image", file);
+      const result = await uploadTrainerExerciseImage(data);
+      if (result.success && result.url) { setForm(current => ({ ...current, imageUrl: result.url! })); setMessage("Imagen subida. Guardá el ejercicio para asociarla."); }
+      else setMessage(result.error || "No se pudo subir la imagen.");
+    } catch { setMessage("No se pudo subir la imagen."); }
+    finally { setUploading(false); }
+  };
   const edit = (x: TrainerExercise) => { setEditingId(x.id); setForm({name:x.name,instructions:x.instructions,imageUrl:x.imageUrl,muscleGroup:x.muscleGroup,equipment:x.equipment}); window.scrollTo({top:0,behavior:"smooth"}); };
   const reset = () => { setEditingId(null); setForm(empty); };
   const refresh = async () => { setItems(await listTrainerExercises()); };
@@ -44,12 +57,12 @@ export default function ExerciseLibrary({ initial }: {initial: TrainerExercise[]
         <label className="space-y-1 text-sm font-medium">Nombre del ejercicio *<input required maxLength={150} className={inputClass} value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Ej. Sentadilla goblet" /></label>
         <label className="space-y-1 text-sm font-medium">Grupo muscular<input maxLength={100} className={inputClass} value={form.muscleGroup} onChange={e=>setForm({...form,muscleGroup:e.target.value})} placeholder="Ej. Piernas" /></label>
         <label className="space-y-1 text-sm font-medium">Equipamiento<input maxLength={100} className={inputClass} value={form.equipment} onChange={e=>setForm({...form,equipment:e.target.value})} placeholder="Ej. Mancuerna" /></label>
-        <label className="space-y-1 text-sm font-medium">Imagen demostrativa (URL HTTPS)<input type="url" className={inputClass} value={form.imageUrl} onChange={e=>setForm({...form,imageUrl:e.target.value})} placeholder="https://..." /></label>
+        <label className="space-y-1 text-sm font-medium">Imagen demostrativa (desde tu computadora)<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" disabled={uploading || pending} className={inputClass} onChange={e => { void uploadImage(e.target.files?.[0]); e.target.value = ""; }} /><span className="block text-xs text-muted-foreground">{uploading ? "Subiendo imagen..." : "JPG, PNG, WebP o GIF · máximo 5 MB"}</span></label>
       </div>
       <label className="block space-y-1 text-sm font-medium">Cómo realizarlo<textarea rows={3} maxLength={2000} className={inputClass} value={form.instructions} onChange={e=>setForm({...form,instructions:e.target.value})} placeholder="Instrucciones y técnica para el alumno" /></label>
       {form.imageUrl && <div className="flex items-center gap-3"><img src={form.imageUrl} alt="Vista previa" className="h-24 w-24 rounded-xl border object-contain" /><span className="text-xs text-muted-foreground">Vista previa de la imagen</span></div>}
-      <p className="text-xs text-muted-foreground">Primera etapa: enlace HTTPS a una imagen propia. La carga directa de archivos se habilitará al configurar almacenamiento de imágenes.</p>
-      <div className="flex gap-2"><button disabled={pending} type="submit" className="rounded-lg bg-cyan-500 px-5 py-2 font-semibold text-black disabled:opacity-50">{pending?"Guardando...":editingId?"Guardar cambios":"Crear ejercicio"}</button>{editingId && <button type="button" onClick={reset} className="rounded-lg border px-4 py-2">Cancelar</button>}</div>
+      <p className="text-xs text-muted-foreground">La imagen se almacena en Vercel Blob. Una vez subida, guardá el ejercicio para asociarla a su biblioteca.</p>
+      <div className="flex gap-2"><button disabled={pending || uploading} type="submit" className="rounded-lg bg-cyan-500 px-5 py-2 font-semibold text-black disabled:opacity-50">{pending?"Guardando...":editingId?"Guardar cambios":"Crear ejercicio"}</button>{editingId && <button type="button" onClick={reset} className="rounded-lg border px-4 py-2">Cancelar</button>}</div>
     </form>
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-bold">Mi biblioteca ({items.length})</h2><input aria-label="Buscar ejercicio" className={inputClass+" max-w-xs"} placeholder="Buscar por nombre..." value={query} onChange={e=>setQuery(e.target.value)} /></div>
