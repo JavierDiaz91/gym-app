@@ -44,6 +44,8 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
   const [rirIncrement, setRirIncrement] = useState(-1);
   const [deload, setDeload] = useState(true);
   const [preview, setPreview] = useState<PlanDraft | null>(null);
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(plan.draft || { days: [] }));
+  const hasUnsavedChanges = plan.status === "draft" && JSON.stringify(draft) !== savedSnapshot;
   const [pending, start] = useTransition();
   const editable = plan.status === "draft" || personalize;
   const change = (next: PlanDraft) => setDraft(next);
@@ -86,19 +88,33 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       if (result.success) { onSuccess?.(result.id); router.refresh(); }
     });
   }
+  const saveDraft = () => {
+    const snapshot = JSON.stringify(draft);
+    run(() => saveTrainingPlanDraft(plan.id, draft), () => setSavedSnapshot(snapshot));
+  };
+  const saveAndPublish = () => {
+    if (!window.confirm("¿Guardar los cambios y publicar esta plantilla?")) return;
+    run(async () => {
+      const saved = await saveTrainingPlanDraft(plan.id, draft);
+      return saved.success ? publishTrainingPlan(plan.id) : saved;
+    });
+  };
   return <main className="mx-auto max-w-6xl space-y-5 p-4 md:p-8 text-foreground">
     <Link href="/trainer/rutinas/planes" className="text-sm text-cyan-500">← Volver a plantillas</Link>
     <div className="flex flex-wrap justify-between gap-3">
       <div><h1 className="text-2xl font-bold">{plan.title}</h1><p className="text-sm text-muted-foreground">{plan.durationWeeks} semanas · {editable ? "Borrador" : "Publicado"}</p></div>
       <div className="flex flex-wrap gap-2">
         <button className={button} disabled={pending} onClick={() => run(() => duplicateTrainingPlan(plan.id), (id) => id && router.push("/trainer/rutinas/planes/" + id))}>Duplicar plantilla</button>
-        {plan.status === "draft" && <><button className={button} disabled={pending} onClick={() => run(() => saveTrainingPlanDraft(plan.id, draft))}>Guardar borrador</button>
-        <button className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={() => run(async () => {
-          const saved = await saveTrainingPlanDraft(plan.id, draft);
-          return saved.success ? publishTrainingPlan(plan.id) : saved;
-        })}>Guardar y publicar</button></>}
+
       </div>
     </div>
+    {plan.status === "draft" && <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-300 bg-background/95 p-3 shadow-md backdrop-blur dark:border-slate-700" role="region" aria-label="Acciones de la plantilla">
+      <span className="text-sm font-medium" role="status" aria-live="polite">{pending ? "Guardando..." : hasUnsavedChanges ? "● Cambios sin guardar" : "✓ Cambios guardados"}</span>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={button} disabled={pending || !hasUnsavedChanges} onClick={saveDraft}>{pending ? "Guardando..." : "Guardar cambios"}</button>
+        <button type="button" className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={saveAndPublish}>Guardar y publicar</button>
+      </div>
+    </div>}
     {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
     <div className="flex flex-wrap gap-2 items-center">
       <span className="text-sm font-semibold">Semana:</span>
