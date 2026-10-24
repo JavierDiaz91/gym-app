@@ -7,6 +7,7 @@ import {
   LayoutDashboard, 
   Users, 
   Dumbbell, 
+  BookOpen, 
   UserCheck, 
   LogOut, 
   Activity, 
@@ -19,6 +20,7 @@ const navigation = [
   { name: "Dashboard", href: "/trainer", icon: LayoutDashboard },
   { name: "Mis Alumnos", href: "/trainer/alumnos", icon: Users },
   { name: "Rutinas", href: "/trainer/rutinas", icon: Dumbbell },
+  { name: "Mis Ejercicios", href: "/trainer/ejercicios", icon: BookOpen },
   { name: "Asignación Masiva", href: "/trainer/asignar-masivo", icon: UserCheck },
 ];
 
