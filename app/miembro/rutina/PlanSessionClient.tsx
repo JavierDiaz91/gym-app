@@ -16,6 +16,8 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
   const [error, setError] = useState("");
   const [completed, setCompleted] = useState<string[]>(initialCompleted);
   const [sets, setSets] = useState<SetLog[]>(initialSets);
+  const [dirtySeries, setDirtySeries] = useState<string[]>([]);
+  const seriesId = (key: string, index: number) => `${key}:${index}`;
   const total = blocks.reduce((n, b) => n + b.items.length, 0);
   const done = blocks.reduce((n, b) => n + b.items.filter(i => completed.includes(i.key)).length, 0);
   function run(action: () => Promise<{success:boolean;error?:string}>, after?: () => void) {
@@ -43,12 +45,14 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
         <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary transition-all" style={{ width: total ? `${done / total * 100}%` : "0%" }} /></div>
         {status === "not_started" && <button disabled={pending} onClick={() => run(() => startPlanSession(assignmentId, week, day))} className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground disabled:opacity-50">Iniciar actividad</button>}
         {status === "in_progress" && <button disabled={pending || done !== total || total === 0} onClick={() => {
+          if (dirtySeries.length && !window.confirm(`Tenés ${dirtySeries.length} serie(s) con cambios sin guardar. Si finalizás ahora, esos cambios se perderán. ¿Finalizar igualmente?`)) return;
           if (!window.confirm("¿Finalizar esta actividad? No podrás volver a editarla.")) return;
           run(() => finishPlanSession(assignmentId, week, day));
         }} className="w-full rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-40">Finalizar actividad</button>}
         {status === "in_progress" && done !== total && <p className="text-xs text-muted-foreground">Marcá todos los ejercicios realizados para habilitar la finalización.</p>}
         {status === "completed" && <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-700 dark:text-emerald-300">Actividad finalizada. No se puede finalizar por segunda vez.</div>}
         {startedAt && <p className="text-xs text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
+        {status === "in_progress" && dirtySeries.length > 0 && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">Tenés {dirtySeries.length} serie(s) con cambios sin guardar. Guardalas antes de finalizar para conservar sus valores.</p>}
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
       </section>
       {blocks.map((block, index) => (
@@ -87,10 +91,16 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
                           const saved = sets.find((x) => x.key === item.key && x.setIndex === index);
                           return (
                             <SetEntry key={index} index={index} saved={saved} disabled={pending || status === "completed"}
-                              onSave={(actual) => run(
-                                () => saveActualSet(assignmentId, week, day, item.key, index, actual),
-                                () => setSets((old) => [...old.filter((x) => !(x.key === item.key && x.setIndex === index)), { key: item.key, setIndex: index, ...actual }])
-                              )} />
+                              onDirtyChange={(dirty) => setDirtySeries((old) => dirty
+                                ? old.includes(seriesId(item.key, index)) ? old : [...old, seriesId(item.key, index)]
+                                : old.filter((id) => id !== seriesId(item.key, index)))}
+                              onSave={async (actual) => {
+                                const result = await saveActualSet(assignmentId, week, day, item.key, index, actual);
+                                if (result.success) {
+                                  setSets((old) => [...old.filter((x) => !(x.key === item.key && x.setIndex === index)), { key: item.key, setIndex: index, ...actual }]);
+                                }
+                                return result;
+                              }} />
                           );
                         })}
                       </div>
@@ -110,20 +120,69 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
 }
 
 type Actual = { reps: number | null; load: number | null; rir: number | null };
-function SetEntry({ index, saved, disabled, onSave }: { index: number; saved?: SetLog; disabled: boolean; onSave: (actual: Actual) => void }) {
+function SetEntry({ index, saved, disabled, onSave, onDirtyChange }: {
+  index: number;
+  saved?: SetLog;
+  disabled: boolean;
+  onSave: (actual: Actual) => Promise<{ success: boolean; error?: string }>;
+  onDirtyChange: (dirty: boolean) => void;
+}) {
   const [reps, setReps] = useState(saved?.reps?.toString() ?? "");
   const [load, setLoad] = useState(saved?.load?.toString() ?? "");
   const [rir, setRir] = useState(saved?.rir?.toString() ?? "");
+  const [baseline, setBaseline] = useState<Actual>({
+    reps: saved?.reps ?? null, load: saved?.load ?? null, rir: saved?.rir ?? null,
+  });
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
   const parse = (value: string) => value.trim() === "" ? null : Number(value);
+  const current: Actual = { reps: parse(reps), load: parse(load), rir: parse(rir) };
+  const dirty = current.reps !== baseline.reps || current.load !== baseline.load || current.rir !== baseline.rir;
+  function change(field: "reps" | "load" | "rir", value: string) {
+    const next = { ...current, [field]: parse(value) };
+    if (field === "reps") setReps(value);
+    if (field === "load") setLoad(value);
+    if (field === "rir") setRir(value);
+    setMessage("");
+    setSaveError("");
+    onDirtyChange(next.reps !== baseline.reps || next.load !== baseline.load || next.rir !== baseline.rir);
+  }
+  async function save() {
+    if (!dirty || saving || disabled) return;
+    setSaving(true);
+    setSaveError("");
+    setMessage("");
+    try {
+      const result = await onSave(current);
+      if (result.success) {
+        setBaseline(current);
+        onDirtyChange(false);
+        setMessage("Serie guardada correctamente");
+      } else {
+        setSaveError(result.error || "No se pudo guardar la serie");
+      }
+    } catch {
+      setSaveError("Error de conexión. Los cambios siguen sin guardar.");
+    } finally {
+      setSaving(false);
+    }
+  }
   return (
     <div className="rounded-lg bg-muted/50 p-3">
-      <p className="mb-2 text-sm font-semibold">Serie {index}</p>
-      <div className="grid grid-cols-3 gap-2">
-        <label className="text-xs">Peso (kg)<input aria-label={`Peso serie ${index}`} type="number" min="0" max="10000" step="0.5" value={load} onChange={(e) => setLoad(e.target.value)} disabled={disabled} className="mt-1 w-full rounded border bg-background p-2" /></label>
-        <label className="text-xs">Repeticiones<input aria-label={`Repeticiones serie ${index}`} type="number" min="0" max="1000" step="1" value={reps} onChange={(e) => setReps(e.target.value)} disabled={disabled} className="mt-1 w-full rounded border bg-background p-2" /></label>
-        <label className="text-xs">RIR<input aria-label={`RIR serie ${index}`} type="number" min="0" max="30" step="0.5" value={rir} onChange={(e) => setRir(e.target.value)} disabled={disabled} className="mt-1 w-full rounded border bg-background p-2" /></label>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">Serie {index}</p>
+        {dirty ? <span className="text-xs font-semibold text-amber-700">Cambios sin guardar</span>
+          : message ? <span role="status" className="text-xs font-semibold text-emerald-700">{message}</span>
+          : saved && (saved.load != null || saved.reps != null || saved.rir != null) ? <span className="text-xs text-emerald-700">Serie {index} guardada</span> : null}
       </div>
-      { !disabled && <button type="button" className="mt-2 rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" onClick={() => onSave({ reps: parse(reps), load: parse(load), rir: parse(rir) })}>Guardar serie</button> }
+      <div className="grid grid-cols-3 gap-2">
+        <label className="text-xs">Peso (kg)<input aria-label={`Peso serie ${index}`} type="number" min="0" max="10000" step="0.5" value={load} onChange={(e) => change("load", e.target.value)} disabled={disabled || saving} className="mt-1 w-full rounded border bg-background p-2" /></label>
+        <label className="text-xs">Repeticiones<input aria-label={`Repeticiones serie ${index}`} type="number" min="0" max="1000" step="1" value={reps} onChange={(e) => change("reps", e.target.value)} disabled={disabled || saving} className="mt-1 w-full rounded border bg-background p-2" /></label>
+        <label className="text-xs">RIR<input aria-label={`RIR serie ${index}`} type="number" min="0" max="30" step="0.5" value={rir} onChange={(e) => change("rir", e.target.value)} disabled={disabled || saving} className="mt-1 w-full rounded border bg-background p-2" /></label>
+      </div>
+      {saveError && <p role="alert" className="mt-2 text-xs text-red-600">{saveError}</p>}
+      {!disabled && <button type="button" disabled={saving || !dirty} className="mt-2 rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50" onClick={save}>{saving ? "Guardando..." : "Guardar serie"}</button>}
     </div>
   );
 }
