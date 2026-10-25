@@ -8,7 +8,14 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type Props = { params: Promise<{ id: string }> };
-type PlanDay = { title?: string; blocks?: { items?: unknown[] }[] };
+type Prescription = { sets?: number; reps?: string; rir?: string; restSeconds?: number; tempo?: string; durationSeconds?: number; distanceMeters?: number; notes?: string };
+type PlanItem = { key?: string; title?: string; prescriptions?: Prescription[] };
+type PlanDay = { title?: string; blocks?: { title?: string; items?: PlanItem[] }[] };
+const argentinaDate = (value: unknown) => new Intl.DateTimeFormat("es-AR", {
+  timeZone: "America/Argentina/Buenos_Aires",
+  day: "2-digit", month: "2-digit", year: "numeric",
+  hour: "2-digit", minute: "2-digit", hour12: false,
+}).format(new Date(String(value)));
 type Snapshot = { days?: PlanDay[] };
 
 export default async function ProgresoAlumnoPage({ params }: Props) {
@@ -66,6 +73,15 @@ export default async function ProgresoAlumnoPage({ params }: Props) {
     GROUP BY ws.id, ws.member_training_plan_id, ws.week_number,
              ws.day_index, ws.status, ws.started_at, ws.finished_at
     ORDER BY ws.week_number, ws.day_index
+  ` : [];
+
+  const completedKeys = sessions.length ? await sql`
+    SELECT wsl.workout_session_id, wsl.item_snapshot_key
+    FROM workout_set_logs wsl
+    JOIN workout_sessions ws ON ws.id = wsl.workout_session_id
+    WHERE ws.member_id = ${memberId}
+      AND ws.member_training_plan_id = ANY(${assignmentIds}::bigint[])
+      AND wsl.set_index = 1 AND wsl.notes = 'completed'
   ` : [];
 
   return (
@@ -132,7 +148,42 @@ export default async function ProgresoAlumnoPage({ params }: Props) {
                             <p className="mt-1 truncate text-xs text-muted-foreground">{day.title || "Entrenamiento"}</p>
                             <p className="mt-2 text-xs font-medium">{done ? "Finalizada" : active ? "En curso" : "Pendiente"}</p>
                             {entry && <p className="mt-1 text-xs text-muted-foreground">{Number(entry.completed_exercises || 0)} ejercicios marcados</p>}
-                            {entry?.finished_at && <p className="mt-1 text-xs text-muted-foreground">Finalizó: {new Date(String(entry.finished_at)).toLocaleString("es-AR")}</p>}
+                            {entry?.finished_at && <p className="mt-1 text-xs text-muted-foreground">Finalizó: {argentinaDate(entry.finished_at)} (Argentina)</p>}
+                            {entry && (
+                              <details className="mt-3 border-t pt-2">
+                                <summary className="cursor-pointer text-xs font-semibold text-primary">Ver detalle de sesión</summary>
+                                {entry.started_at && <p className="mt-2 text-xs text-muted-foreground">Inicio: {argentinaDate(entry.started_at)} (Argentina)</p>}
+                                <div className="mt-2 space-y-2">
+                                  {(day.blocks || []).flatMap((block) => block.items || []).map((item, itemIndex) => {
+                                    const prescription = item.prescriptions?.[week - 1];
+                                    const marked = completedKeys.some((log) =>
+                                      Number(log.workout_session_id) === Number(entry.id)
+                                      && String(log.item_snapshot_key) === String(item.key)
+                                    );
+                                    return (
+                                      <div key={item.key || itemIndex} className="rounded-lg bg-muted/50 p-2 text-xs">
+                                        <p className="font-semibold">{item.title || `Ejercicio ${itemIndex + 1}`}</p>
+                                        <p className="mt-1">{marked ? "Realizado: marcado por el alumno" : "Realizado: sin marcar"}</p>
+                                        {prescription && (
+                                          <p className="mt-1 text-muted-foreground">
+                                            Prescrito: {[
+                                              prescription.sets != null ? `${prescription.sets} series` : null,
+                                              prescription.reps ? `${prescription.reps} repeticiones` : null,
+                                              prescription.rir ? `RIR ${prescription.rir}` : null,
+                                              prescription.restSeconds != null ? `${prescription.restSeconds} s descanso` : null,
+                                              prescription.tempo ? `tempo ${prescription.tempo}` : null,
+                                              prescription.durationSeconds != null ? `${prescription.durationSeconds} s duración` : null,
+                                              prescription.distanceMeters != null ? `${prescription.distanceMeters} m` : null,
+                                            ].filter(Boolean).join(" · ")}
+                                          </p>
+                                        )}
+                                        <p className="mt-1 text-muted-foreground">Peso, repeticiones y RIR reales: no registrados en esta modalidad.</p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </details>
+                            )}
                           </div>
                         );
                       })}
