@@ -203,7 +203,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-cyan-300">Editar ejercicio, instrucciones e imagen</summary>
             <div className="mt-3">
           <div className="flex flex-wrap gap-2 items-start">
-            {item.imageUrl && <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-24 w-24 rounded-lg object-cover" />}
+            {item.imageUrl && <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-300 bg-slate-100 p-2 dark:border-slate-600"><img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-full w-full object-contain grayscale" /></div>}
             <div className="flex-1 space-y-2">
               <select aria-label="Seleccionar ejercicio del catálogo" className={field} disabled={!editable} value="" onChange={(e) => { const ex = exercises.find((x) => x.id === Number(e.target.value)); if (!ex) return; updateItem(di, bi, ii, (current) => ({ ...current, title: ex.name, imageUrl: ex.imageUrl, instructions: ex.instructions, prescriptions: current.prescriptions })); setPreview(null); setMessage("Ejercicio seleccionado. Se conservaron las cargas de todas las semanas; guardá el borrador para confirmar el cambio."); }}>
                 <option value="">Elegir de Mis Ejercicios (biblioteca personal)</option>
