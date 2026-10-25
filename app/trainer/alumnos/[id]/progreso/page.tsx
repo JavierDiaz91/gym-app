@@ -9,14 +9,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type Props = { params: Promise<{ id: string }> };
-type Prescription = { sets?: number; reps?: string; rir?: string; restSeconds?: number; tempo?: string; durationSeconds?: number; distanceMeters?: number; notes?: string };
-type PlanItem = { key?: string; title?: string; prescriptions?: Prescription[] };
+type PlanItem = { key?: string; title?: string };
 type PlanDay = { title?: string; blocks?: { title?: string; items?: PlanItem[] }[] };
-const argentinaDate = (value: unknown) => new Intl.DateTimeFormat("es-AR", {
-  timeZone: "America/Argentina/Buenos_Aires",
-  day: "2-digit", month: "2-digit", year: "numeric",
-  hour: "2-digit", minute: "2-digit", hour12: false,
-}).format(new Date(String(value)));
 type Snapshot = { days?: PlanDay[] };
 
 export default async function ProgresoAlumnoPage({ params }: Props) {
