@@ -253,10 +253,11 @@ export default function AlumnosClient({
                     {currentPlan ? (
                       <>
                         <Link href={`/trainer/alumnos/${member.id}/progreso?plan=${currentPlan.assignmentId}`} className="font-semibold text-[#00aeef] hover:underline">{currentPlan.title}</Link>
-                        <p className="mt-1 text-xs text-muted-foreground">Asignación #{currentPlan.assignmentId} · ${currentPlan.durationWeeks} semanas</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Asignación #{currentPlan.assignmentId}</p>
                         <p className="mt-2 text-xs text-muted-foreground">Inicio: {currentPlan.startDate} · Duración: {currentPlan.durationWeeks} semanas</p>
                       </>
-                    ) : <p className="text-sm text-muted-foreground">Sin plan asignado. Podés asignar uno desde esta ficha.</p>}
+                    ) : <p className="text-sm text-muted-foreground">Sin plan vigente.</p>}
+                    {scheduledPlan && <p className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/5 p-2 text-xs text-sky-400">Próximo plan: {scheduledPlan.title} · Inicio: {scheduledPlan.startDate}</p>}
                     {(member.routines?.length || 0) > 0 && <p className="mt-3 text-xs text-muted-foreground">Rutinas anteriores: {member.routines?.map((r) => r.title).join(", ")}</p>}
                   </div>
                   <div className="rounded-xl border border-border bg-secondary/30 p-4">
