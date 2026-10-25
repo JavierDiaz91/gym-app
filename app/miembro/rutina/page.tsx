@@ -36,6 +36,8 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
       LEFT JOIN training_plans tp ON tp.id = mtp.source_plan_id AND tp.gym_id = mtp.gym_id
       WHERE mtp.id = ${planAssignmentId} AND mtp.member_id = ${memberId}
         AND mtp.gym_id = ${session.gymId} AND mtp.status = 'active'
+        AND CURRENT_DATE >= mtp.start_date
+        AND CURRENT_DATE < mtp.start_date + (GREATEST(1, COALESCE(tp.duration_weeks, 4)) * 7)
       LIMIT 1
     ` : [];
     if (!assignments.length) {
