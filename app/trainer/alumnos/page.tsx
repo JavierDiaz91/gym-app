@@ -30,6 +30,22 @@ export default async function TrainerAlumnosPage() {
       AND mtp.trainer_id = (SELECT id FROM trainers WHERE user_id = ${session.id} AND gym_id = ${Number(session.gymId)} LIMIT 1)
     ORDER BY mtp.member_id, mtp.id DESC
   ` : [];
+  const lastSessions = memberIds.length ? await sql`
+    SELECT ws.member_id, MAX(ws.finished_at) AS last_finished_at
+    FROM workout_sessions ws
+    JOIN member_training_plans mtp ON mtp.id = ws.member_training_plan_id
+    WHERE ws.member_id = ANY(${memberIds}::bigint[])
+      AND ws.status = 'completed'
+      AND mtp.gym_id = ${Number(session.gymId)}
+      AND mtp.trainer_id = (SELECT id FROM trainers WHERE user_id = ${session.id} AND gym_id = ${Number(session.gymId)} LIMIT 1)
+    GROUP BY ws.member_id
+  ` : [];
+  const lastWorkoutByMember = new Map(lastSessions.map((r) => [Number(r.member_id), r.last_finished_at]));
+  const formatArgentinaDate = (value: unknown) => new Intl.DateTimeFormat("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(new Date(String(value)));
   const members = (rawMembers || []).map((row: any) => ({
     id: Number(row.id),
     first_name: row.first_name || row.name || "Alumno",
@@ -42,6 +58,7 @@ export default async function TrainerAlumnosPage() {
         ? [{ id: Number(row.routine_id), title: row.routine_name }] 
         : [],
     last_workout_at: row.last_workout_at ? String(row.last_workout_at) : undefined,
+    last_workout: lastWorkoutByMember.get(Number(row.id)) ? formatArgentinaDate(lastWorkoutByMember.get(Number(row.id))) + " (Argentina)" : undefined,
     training_plan_title: planAssignments.find((p) => Number(p.member_id) === Number(row.id))?.title || undefined,
   }));
 
