@@ -47,7 +47,17 @@ export default async function BulkAssignPage() {
       ? membersResult
       : (membersResult as any).rows || [];
 
-    members = rawMembers;
+    const memberIds = rawMembers.map((m: any) => Number(m.id));
+    const activeAssignments = memberIds.length ? await sql`
+      SELECT member_id, source_plan_id
+      FROM member_training_plans
+      WHERE gym_id = ${session.gymId} AND trainer_id = ${trainerId}
+        AND status = 'active' AND member_id = ANY(${memberIds}::bigint[])
+    ` : [];
+    members = rawMembers.map((m: any) => ({
+      ...m,
+      activePlanIds: activeAssignments.filter((a) => Number(a.member_id) === Number(m.id)).map((a) => Number(a.source_plan_id)),
+    }));
 
     // 3. Obtener SOLO las rutinas ACTIVAS creadas por ESTE entrenador
     const routinesResult = await sql`
