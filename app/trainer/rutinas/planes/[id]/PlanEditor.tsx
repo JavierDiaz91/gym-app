@@ -117,11 +117,15 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     </div>}
     {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta plantilla ya está publicada. Para modificar la plantilla y guardar una nueva versión, usá «Duplicar plantilla»; para ajustar únicamente la rutina de un alumno, activá «Personalizar ejercicios y cargas» antes de asignarla. Esos ajustes se guardan al asignar y no cambian la plantilla original.</p>}
     {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
-    <div className="flex flex-wrap gap-2 items-center">
+    <section className="space-y-3 rounded-2xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Seleccionar semana y día">
+      <div className="space-y-1"><h2 className="text-base font-bold">1. Elegí la semana y el día</h2><p className="text-xs text-muted-foreground">Trabajá sobre un día a la vez. Cada semana conserva sus propias cargas.</p></div>
+      <div className="flex flex-wrap gap-2 items-center">
       <span className="text-sm font-semibold">Semana:</span>
       {Array.from({ length: plan.durationWeeks }, (_, i) => <button key={i} type="button" className={button + (week === i ? " border-cyan-500 text-cyan-500" : "")} onClick={() => setWeek(i)}>{i + 1}</button>)}
     </div>
-    {editable && <section className="rounded-xl border p-4 space-y-3">
+    {editable && <details className="rounded-xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Progresión semanal avanzada">
+      <summary className="cursor-pointer list-item text-sm font-semibold">Progresión semanal <span className="ml-2 font-normal text-muted-foreground">· Opcional, configurar cuando la semana 1 esté lista</span></summary>
+      <div className="mt-4 space-y-3">
       <h2 className="font-semibold">Automatización semanal</h2>
       <p className="text-sm text-muted-foreground">Las semanas mantienen parámetros independientes. Los cambios se guardan al presionar Guardar borrador.</p>
       <label className="block text-sm">Aplicar a
@@ -156,12 +160,14 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           </div>)}
         </div>)}
       </div>}
-    </section>}
-    {editable && <button className={button} disabled={draft.days.length >= 7} onClick={() => { setSelectedDay(draft.days.length); change({ days: [...draft.days, { title: "Día " + (draft.days.length + 1), modality: "strength", blocks: [] }] }); }}>+ Agregar día</button>}
+      </div>
+    </details>}
+    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-bold">2. Organizá los ejercicios</h2>{editable && <button type="button" className={button} disabled={draft.days.length >= 7} onClick={() => { setSelectedDay(draft.days.length); change({ days: [...draft.days, { title: "Día " + (draft.days.length + 1), modality: "strength", blocks: [] }] }); }}>+ Agregar día</button>}</div>
     <nav aria-label="Seleccionar día de entrenamiento" className="flex flex-wrap gap-2 rounded-xl border border-slate-300 p-3 dark:border-slate-700">
       {draft.days.map((day, di) => <button type="button" key={di} onClick={() => setSelectedDay(di)} aria-current={selectedDay === di ? "step" : undefined} className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${selectedDay === di ? "border-cyan-500 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300" : "border-slate-300 hover:bg-muted dark:border-slate-600"}`}>Día {di + 1} · {day.title}</button>)}
     </nav>
-    {draft.days.map((day, di) => selectedDay !== di ? null : <section key={di} className="rounded-xl border-2 border-slate-300 p-4 space-y-4 dark:border-slate-600">
+    </section>
+    {draft.days.map((day, di) => selectedDay !== di ? null : <section key={di} className="rounded-2xl border border-slate-300 bg-muted/5 p-4 space-y-5 dark:border-slate-700">
       <div className="flex flex-wrap gap-2 items-center">
         <input aria-label="Nombre del día" className={field + " max-w-sm font-semibold"} disabled={!editable} value={day.title} onChange={(e) => updateDay(di, (d) => ({ ...d, title: e.target.value }))}/>
         <select aria-label="Modalidad" disabled={!editable} className={field + " max-w-40"} value={day.modality} onChange={(e) => updateDay(di, (d) => ({ ...d, modality: e.target.value as PlanDay["modality"] }))}>
@@ -170,7 +176,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         {editable && <button className={button} onClick={() => change({ days: draft.days.filter((_, i) => i !== di) })}>Eliminar día</button>}
       </div>
       {day.blocks.map((block, bi) => <div key={bi} className="rounded-xl border border-slate-300 bg-muted/20 p-3 sm:p-4 space-y-3 dark:border-slate-700">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-slate-700">
           <input aria-label="Nombre del bloque" className={field + " max-w-sm"} disabled={!editable} value={block.title} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, title: e.target.value }))}/>
           <select aria-label="Tipo de bloque" disabled={!editable} className={field + " max-w-44"} value={block.type} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, type: e.target.value as PlanBlock["type"] }))}>
             {["warmup","main","circuit","cooldown","custom"].map((x) => <option key={x} value={x}>{({warmup:"Entrada en calor",main:"Principal",circuit:"Circuito",cooldown:"Vuelta a la calma",custom:"Otro"} as Record<string,string>)[x]}</option>)}
@@ -207,7 +213,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </div>
           </details>
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold">Ver y editar cargas · {plan.durationWeeks} semanas</summary>
+            <summary className="cursor-pointer text-sm font-semibold">Ajustar cargas por semana <span className="font-normal text-muted-foreground">· {plan.durationWeeks} semanas · Opcional</span></summary>
           <div className="mt-3 space-y-3">
             <p className="text-xs text-muted-foreground">Editá directamente cada celda para configurar las cargas por semana. Los cambios quedan en el borrador hasta guardar.</p>
             <div className="overflow-x-auto rounded-xl border border-slate-300 bg-background dark:border-slate-700">
@@ -244,9 +250,9 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           </div>
           </details>
         </div>; })}
-        {editable && <button className={button} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio / intervalo</button>}
+        {editable && <button type="button" className={button + " border-cyan-500/50 text-cyan-600 dark:text-cyan-300"} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio / intervalo</button>}
       </div>)}
-      {editable && <button className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: [...d.blocks, { title: "Bloque principal", type: "main", items: [] }] }))}>+ Agregar bloque</button>}
+      {editable && <button type="button" className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: [...d.blocks, { title: "Bloque principal", type: "main", items: [] }] }))}>+ Agregar bloque</button>}
     </section>)}
     {plan.status === "published" && <section className="rounded-xl border p-4 space-y-3">
       <h2 className="font-semibold">Asignar al alumno</h2>
