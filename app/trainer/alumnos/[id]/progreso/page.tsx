@@ -76,12 +76,12 @@ export default async function ProgresoAlumnoPage({ params }: Props) {
   ` : [];
 
   const completedKeys = sessions.length ? await sql`
-    SELECT wsl.workout_session_id, wsl.item_snapshot_key
+    SELECT wsl.workout_session_id, wsl.item_snapshot_key, wsl.set_index,
+           wsl.actual_reps, wsl.actual_load, wsl.actual_rir, wsl.notes
     FROM workout_set_logs wsl
     JOIN workout_sessions ws ON ws.id = wsl.workout_session_id
     WHERE ws.member_id = ${memberId}
       AND ws.member_training_plan_id = ANY(${assignmentIds}::bigint[])
-      AND wsl.set_index = 1 AND wsl.notes = 'completed'
   ` : [];
 
   return (
@@ -177,7 +177,27 @@ export default async function ProgresoAlumnoPage({ params }: Props) {
                                             ].filter(Boolean).join(" · ")}
                                           </p>
                                         )}
-                                        <p className="mt-1 text-muted-foreground">Peso, repeticiones y RIR reales: no registrados en esta modalidad.</p>
+                                        {(() => {
+                                          const logs = completedKeys.filter((log) =>
+                                            Number(log.workout_session_id) === Number(entry.id)
+                                            && String(log.item_snapshot_key) === String(item.key)
+                                            && (log.actual_reps != null || log.actual_load != null || log.actual_rir != null)
+                                          );
+                                          return logs.length ? (
+                                            <div className="mt-2 space-y-1">
+                                              <p className="font-semibold">Resultados registrados:</p>
+                                              {logs.map((log) => (
+                                                <p key={Number(log.set_index)} className="text-muted-foreground">
+                                                  Serie {Number(log.set_index)}: {[
+                                                    log.actual_load != null ? `${Number(log.actual_load)} kg` : null,
+                                                    log.actual_reps != null ? `${Number(log.actual_reps)} repeticiones` : null,
+                                                    log.actual_rir != null ? `RIR ${Number(log.actual_rir)}` : null,
+                                                  ].filter(Boolean).join(" · ")}
+                                                </p>
+                                              ))}
+                                            </div>
+                                          ) : <p className="mt-1 text-muted-foreground">Peso, repeticiones y RIR reales: no registrados.</p>;
+                                        })()}
                                       </div>
                                     );
                                   })}
