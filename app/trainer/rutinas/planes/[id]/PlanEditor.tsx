@@ -171,7 +171,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       </div>
     ) : <nav aria-label="Seleccionar día de entrenamiento" className="flex flex-wrap gap-2 rounded-xl border border-slate-300 p-3 dark:border-slate-700">
       {draft.days.map((day, di) => <button type="button" key={di} onClick={() => setSelectedDay(di)} aria-current={selectedDay === di ? "step" : undefined} className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${selectedDay === di ? "border-cyan-500 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300" : "border-slate-300 hover:bg-muted dark:border-slate-600"}`}>Día {di + 1} · {day.title}</button>)}
-    </nav>
+    </nav>}
     </section>
     {draft.days.map((day, di) => selectedDay !== di ? null : <section key={di} className="rounded-2xl border border-slate-300 bg-muted/5 p-4 space-y-5 dark:border-slate-700">
       <div className="flex flex-wrap gap-2 items-center">
