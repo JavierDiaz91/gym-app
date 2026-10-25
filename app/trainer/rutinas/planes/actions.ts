@@ -192,6 +192,14 @@ export async function assignTrainingPlan(planId: number, memberId: number, custo
     const members = await sql`SELECT id FROM members WHERE id = ${memberId} AND gym_id = ${gymId}
       AND trainer_id = ${trainerId} LIMIT 1`;
     if (!plans.length || !members.length) return { success: false, error: "Plan o alumno no autorizado" };
+    const existing = await sql`
+      SELECT id FROM member_training_plans
+      WHERE gym_id = ${gymId} AND trainer_id = ${trainerId}
+        AND member_id = ${memberId} AND source_plan_id = ${planId}
+        AND status = 'active'
+      LIMIT 1
+    `;
+    if (existing.length) return { success: false, error: "El alumno ya tiene este plan activo. No se creó otra asignación." };
     const snapshot = customization ?? (plans[0].draft_jsonb as PlanDraft);
     if (!validDraft(snapshot, Number(plans[0].duration_weeks))) return { success: false, error: "Personalización inválida" };
     await sql`INSERT INTO member_training_plans
