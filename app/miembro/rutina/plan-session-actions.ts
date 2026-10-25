@@ -70,6 +70,33 @@ export async function markPlanExercise(assignmentId: number, week: number, day: 
   } catch (e) { return { success: false, error: e instanceof Error ? e.message : "No se pudo registrar" }; }
 }
 
+type ActualSet = { reps?: number | null; load?: number | null; rir?: number | null };
+export async function saveActualSet(assignmentId: number, week: number, day: number, key: string, setIndex: number, actual: ActualSet): Promise<Result> {
+  try {
+    const { memberId, days } = await memberContext(assignmentId, week, day);
+    const item = days[day - 1].blocks?.flatMap((b: { items?: { key: string; prescriptions?: { sets?: number }[] }[] }) => b.items || []).find((i: { key: string }) => i.key === key);
+    const maxSets = Math.max(1, Math.min(30, Number(item?.prescriptions?.[week - 1]?.sets) || 1));
+    if (!item || !key || key.length > 100 || !Number.isSafeInteger(setIndex) || setIndex < 1 || setIndex > maxSets) throw new Error("Serie inválida");
+    const reps = actual.reps ?? null, load = actual.load ?? null, rir = actual.rir ?? null;
+    if (reps !== null && (!Number.isSafeInteger(reps) || reps < 0 || reps > 1000)) throw new Error("Repeticiones inválidas");
+    if (load !== null && (!Number.isFinite(load) || load < 0 || load > 10000)) throw new Error("Peso inválido");
+    if (rir !== null && (!Number.isFinite(rir) || rir < 0 || rir > 30)) throw new Error("RIR inválido");
+    const rows = await sql`
+      INSERT INTO workout_set_logs (workout_session_id, item_snapshot_key, set_index, actual_reps, actual_load, actual_rir)
+      SELECT ws.id, ${key}, ${setIndex}, ${reps}, ${load}, ${rir}
+      FROM workout_sessions ws
+      WHERE ws.member_training_plan_id = ${assignmentId} AND ws.member_id = ${memberId}
+        AND ws.week_number = ${week} AND ws.day_index = ${day} AND ws.status = 'in_progress'
+      ON CONFLICT (workout_session_id, item_snapshot_key, set_index)
+      DO UPDATE SET actual_reps = EXCLUDED.actual_reps, actual_load = EXCLUDED.actual_load, actual_rir = EXCLUDED.actual_rir
+      RETURNING id
+    `;
+    if (!rows.length) return { success: false, error: "Iniciá una sesión en curso para registrar las cargas." };
+    revalidatePath("/miembro/rutina");
+    return { success: true };
+  } catch (e) { return { success: false, error: e instanceof Error ? e.message : "No se pudo guardar la serie" }; }
+}
+
 export async function finishPlanSession(assignmentId: number, week: number, day: number): Promise<Result> {
   try {
     const { memberId, days } = await memberContext(assignmentId, week, day);
