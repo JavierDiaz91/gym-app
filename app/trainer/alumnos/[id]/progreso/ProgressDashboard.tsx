@@ -151,17 +151,34 @@ export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) 
               const found = values.find(v => v.set === set)?.value;
               return found == null ? "Sin registrar" : fmt(found) + unit;
             };
-            const numericTarget = c.plannedReps != null && /^\\d+(?:[.,]\\d+)?$/.test(c.plannedReps.trim()) ? Number(c.plannedReps.replace(",", ".")) : null;
+            const numericTarget = c.plannedReps != null && /^\d+(?:[.,]\d+)?$/.test(c.plannedReps.trim()) ? Number(c.plannedReps.replace(",", ".")) : null;
             const repsWithData = c.actualReps.filter(v => v.value != null);
             const repsMeeting = numericTarget != null ? repsWithData.filter(v => (v.value ?? 0) >= numericTarget).length : 0;
+            const repPercent = numericTarget != null && numericTarget > 0 && repsWithData.length > 0
+              ? Math.round(repsWithData.reduce((sum, row) => sum + Math.min(100, Math.max(0, (row.value ?? 0) / numericTarget * 100)), 0) / repsWithData.length)
+              : null;
+            const repDifference = (set: number) => {
+              const value = c.actualReps.find(row => row.set === set)?.value;
+              return value == null || numericTarget == null ? null : value - numericTarget;
+            };
             return <div key={`${c.week}-${c.day}`} className="space-y-3 rounded-lg bg-muted/30 p-3">
               <h5 className="text-sm font-semibold">Semana {c.week} · Día {c.day}</h5>
               <div className="grid gap-2 sm:grid-cols-3">
                 <div className="rounded-lg bg-background p-3 text-sm"><p className="text-xs text-muted-foreground">Series prescritas</p><strong>{c.plannedSets ?? "No especificadas"}</strong><p className="mt-1 text-xs">Con cargas registradas: {c.recordedSets}</p></div>
-                <div className="rounded-lg bg-background p-3 text-sm"><p className="text-xs text-muted-foreground">Repeticiones prescritas / serie</p><strong>{c.plannedReps ?? "No especificadas"}</strong><p className="mt-1 text-xs">{numericTarget == null ? "Sin porcentaje comparable" : repsWithData.length ? `${repsMeeting} de ${repsWithData.length} series registradas alcanzaron la meta` : "Sin repeticiones reales registradas"}</p></div>
+                <div className="rounded-lg bg-background p-3 text-sm"><p className="text-xs text-muted-foreground">Repeticiones prescritas / serie</p><strong>{c.plannedReps ?? "No especificadas"}</strong><p className="mt-1 text-xs">{numericTarget == null ? "Sin porcentaje comparable" : repsWithData.length ? `${repsMeeting} de ${repsWithData.length} series con repeticiones registradas alcanzaron la meta` : "Sin repeticiones reales registradas"}</p></div>
                 <div className="rounded-lg bg-background p-3 text-sm"><p className="text-xs text-muted-foreground">RIR prescrito</p><strong>{c.plannedRir ?? "No especificado"}</strong><p className="mt-1 text-xs">Los RIR reales se muestran por serie.</p></div>
               </div>
-              {series.length > 0 ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-2">Serie</th><th className="p-2">Peso real</th><th className="p-2">Reps reales</th><th className="p-2">RIR real</th></tr></thead><tbody>{series.map(set => <tr key={set} className="border-b last:border-0"><td className="p-2 font-medium">{set}</td><td className="p-2">{actualValue(c.actualLoad, set, " kg")}</td><td className="p-2">{actualValue(c.actualReps, set)}</td><td className="p-2">{actualValue(c.actualRir, set)}</td></tr>)}</tbody></table></div> : <p className="text-sm text-muted-foreground">El ejercicio fue marcado, pero no se registraron cargas opcionales.</p>}
+              {repPercent != null && <div className="rounded-lg border bg-background p-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="font-medium">Repeticiones registradas respecto de lo prescrito</span>
+                  <strong className={repPercent >= 100 ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}>{repPercent}%</strong>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Promedio de repeticiones registradas respecto de lo prescrito" aria-valuenow={repPercent} aria-valuemin={0} aria-valuemax={100}>
+                  <div className={`h-full rounded-full ${repPercent >= 100 ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${repPercent}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">Promedio de las {repsWithData.length} series con repeticiones registradas. Cada serie se limita al 100% para este indicador; los campos vacíos no se consideran.</p>
+              </div>}
+              {series.length > 0 ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-2">Serie</th><th className="p-2">Peso real</th><th className="p-2">Reps reales</th><th className="p-2">RIR real</th><th className="p-2">Reps vs. objetivo</th></tr></thead><tbody>{series.map(set => <tr key={set} className="border-b last:border-0"><td className="p-2 font-medium">{set}</td><td className="p-2">{actualValue(c.actualLoad, set, " kg")}</td><td className="p-2">{actualValue(c.actualReps, set)}</td><td className="p-2">{actualValue(c.actualRir, set)}</td><td className="p-2">{repDifference(set) == null ? <span className="text-muted-foreground">Sin comparación</span> : <span className={repDifference(set)! >= 0 ? "font-medium text-emerald-700 dark:text-emerald-400" : "font-medium text-amber-700 dark:text-amber-400"}>{repDifference(set)! >= 0 ? `Meta alcanzada (${fmt(repDifference(set)!)} extra)` : `${fmt(Math.abs(repDifference(set)!))} menos · ${fmt(Math.max(0, Math.min(100, (c.actualReps.find(v => v.set === set)?.value ?? 0) / numericTarget! * 100)))}%`}</span>}</td></tr>)}</tbody></table></div> : <p className="text-sm text-muted-foreground">El ejercicio fue marcado, pero no se registraron cargas opcionales.</p>}
             </div>;
           })}
           <p className="text-xs text-muted-foreground">Las series con datos no equivalen necesariamente a series completadas. No se infieren valores faltantes ni se calculan porcentajes sobre campos opcionales vacíos.</p>
