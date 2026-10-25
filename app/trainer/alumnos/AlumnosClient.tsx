@@ -34,7 +34,7 @@ interface Member {
   last_workout_at?: string;
   last_workout?: string;
   training_plan_title?: string;
-  training_plans?: { assignmentId: number; title: string; sourcePlanId: number }[];
+  training_plans?: { assignmentId: number; title: string; sourcePlanId: number; startDate: string; durationWeeks: number; lifecycle: string }[];
 }
 
 interface Routine {
@@ -84,10 +84,10 @@ export default function AlumnosClient({
 
   const filteredMembers = membersList.filter((m) => {
     const matchesName = `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase());
-    const hasPlan = (m.training_plans?.length || 0) > 0;
+    const hasPlan = (m.training_plans || []).some(p => p.lifecycle === 'current');
     return matchesName && (planFilter === "all" || (planFilter === "with" ? hasPlan : !hasPlan));
   });
-  const withPlanCount = membersList.filter((m) => (m.training_plans?.length || 0) > 0).length;
+  const withPlanCount = membersList.filter((m) => (m.training_plans || []).some(p => p.lifecycle === 'current')).length;
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,7 +226,8 @@ export default function AlumnosClient({
           {filteredMembers.map((member) => {
             const initials = `${member.first_name?.[0] || ""}${member.last_name?.[0] || ""}`.toUpperCase();
             const plans = member.training_plans || [];
-            const currentPlan = plans[0];
+            const currentPlan = plans.find(p => p.lifecycle === 'current');
+            const scheduledPlan = plans.find(p => p.lifecycle === 'scheduled');
             return (
               <article key={member.id} className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-sm hover:border-[#00aeef]/30 transition-colors">
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -252,8 +253,8 @@ export default function AlumnosClient({
                     {currentPlan ? (
                       <>
                         <Link href={`/trainer/alumnos/${member.id}/progreso?plan=${currentPlan.assignmentId}`} className="font-semibold text-[#00aeef] hover:underline">{currentPlan.title}</Link>
-                        <p className="mt-1 text-xs text-muted-foreground">Asignación #{currentPlan.assignmentId}{plans.length > 1 ? ` · ${plans.length} planes asignados` : ""}</p>
-                        {plans.length > 1 && <div className="mt-3 flex flex-wrap gap-2">{plans.slice(1).map((p) => <Link key={p.assignmentId} href={`/trainer/alumnos/${member.id}/progreso?plan=${p.assignmentId}`} className="rounded-lg border border-border px-2.5 py-1 text-xs hover:border-[#00aeef]/40">{p.title} · #{p.assignmentId}</Link>)}</div>}
+                        <p className="mt-1 text-xs text-muted-foreground">Asignación #{currentPlan.assignmentId} · ${currentPlan.durationWeeks} semanas</p>
+                        <p className="mt-2 text-xs text-muted-foreground">Inicio: {currentPlan.startDate} · Duración: {currentPlan.durationWeeks} semanas</p>
                       </>
                     ) : <p className="text-sm text-muted-foreground">Sin plan asignado. Podés asignar uno desde esta ficha.</p>}
                     {(member.routines?.length || 0) > 0 && <p className="mt-3 text-xs text-muted-foreground">Rutinas anteriores: {member.routines?.map((r) => r.title).join(", ")}</p>}
@@ -315,7 +316,7 @@ export default function AlumnosClient({
                 )}
               </div>
 
-              {selectedAssignment.startsWith("plan:") && selectedMember.training_plans?.some((p) => p.sourcePlanId === Number(selectedAssignment.split(":")[1])) && (
+              {selectedAssignment.startsWith("plan:") && selectedMember.training_plans?.some((p) => p.sourcePlanId === Number(selectedAssignment.split(":")[1]) && p.lifecycle !== 'expired') && (
                 <p className="text-xs text-amber-600">Este alumno ya tiene activo el plan seleccionado. No se permite duplicarlo.</p>
               )}
 
