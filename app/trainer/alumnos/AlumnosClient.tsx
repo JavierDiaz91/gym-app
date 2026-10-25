@@ -15,7 +15,7 @@ import {
   History
 } from "lucide-react";
 import { assignMemberToTrainer, removeMemberFromTrainer, assignRoutineToMember } from "@/app/actions";
-import { assignTrainingPlan } from "../rutinas/planes/actions";
+import { assignTrainingPlan, updateAssignedPlanStartDate } from "../rutinas/planes/actions";
 
 interface RoutineItem {
   id: number;
@@ -77,6 +77,10 @@ export default function AlumnosClient({
   const [assignLoading, setAssignLoading] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState("");
   const [assignError, setAssignError] = useState("");
+  const [dateEdit, setDateEdit] = useState<{ memberId: number; assignmentId: number; title: string; original: string } | null>(null);
+  const [newStartDate, setNewStartDate] = useState("");
+  const [dateError, setDateError] = useState("");
+  const [dateSaving, setDateSaving] = useState(false);
 
   useEffect(() => {
     setMembersList(initialMembers);
@@ -169,6 +173,20 @@ export default function AlumnosClient({
     }
   };
 
+  const saveStartDate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dateEdit || dateSaving) return;
+    setDateSaving(true);
+    setDateError("");
+    try {
+      const result = await updateAssignedPlanStartDate(dateEdit.assignmentId, dateEdit.memberId, newStartDate);
+      if (!result.success) { setDateError(result.error || "No se pudo actualizar."); return; }
+      setDateEdit(null);
+      router.refresh();
+    } catch { setDateError("No se pudo actualizar la fecha."); }
+    finally { setDateSaving(false); }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 text-foreground transition-colors">
       
@@ -258,6 +276,13 @@ export default function AlumnosClient({
                       </>
                     ) : <p className="text-sm text-muted-foreground">Sin plan vigente.</p>}
                     {scheduledPlan && <p className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/5 p-2 text-xs text-sky-400">Próximo plan: {scheduledPlan.title} · Inicio: {scheduledPlan.startDate}</p>}
+                    {plans.filter(p => p.lifecycle !== "expired").map(p => (
+                      <button key={p.assignmentId} type="button"
+                        onClick={() => { setDateEdit({ memberId: member.id, assignmentId: p.assignmentId, title: p.title, original: p.startDate }); setNewStartDate(p.startDate); setDateError(""); }}
+                        className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#00aeef] hover:underline">
+                        <Calendar className="h-3.5 w-3.5" />Modificar inicio · {p.title}
+                      </button>
+                    ))}
                     {(member.routines?.length || 0) > 0 && <p className="mt-3 text-xs text-muted-foreground">Rutinas anteriores: {member.routines?.map((r) => r.title).join(", ")}</p>}
                   </div>
                   <div className="rounded-xl border border-border bg-secondary/30 p-4">
@@ -275,6 +300,32 @@ export default function AlumnosClient({
               </article>
             );
           })}
+        </div>
+      )}
+
+      {dateEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <form onSubmit={saveStartDate} className="w-full max-w-md space-y-4 rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-bold">Modificar fecha de inicio</h3>
+              <button type="button" aria-label="Cerrar" onClick={() => setDateEdit(null)}><X className="h-5 w-5" /></button>
+            </div>
+            <p className="text-sm text-muted-foreground">{dateEdit.title}</p>
+            <p className="text-xs text-muted-foreground">Fecha actual: {dateEdit.original}. El cambio afecta solo a este alumno y mantiene la duración del plan. Si existen entrenamientos registrados, el sistema no permitirá cambiarla.</p>
+            <label className="block space-y-2 text-sm font-semibold">
+              <span>Nueva fecha de inicio</span>
+              <input type="date" required value={newStartDate} onChange={e => setNewStartDate(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-foreground" />
+            </label>
+            {dateError && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-400">{dateError}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setDateEdit(null)} className="rounded-xl border border-border px-4 py-2 text-sm">Cancelar</button>
+              <button type="submit" disabled={dateSaving || !newStartDate || newStartDate === dateEdit.original}
+                className="rounded-xl bg-[#00aeef] px-4 py-2 text-sm font-bold text-black disabled:opacity-50">
+                {dateSaving ? "Guardando..." : "Confirmar cambio"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
