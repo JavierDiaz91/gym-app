@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { 
   UserPlus, 
   Dumbbell, 
@@ -308,6 +309,16 @@ export default function AlumnosClient({
                       <span className="font-semibold text-foreground">
                         {member.last_workout || "Sin registros"}
                       </span>
+                    </div>
+
+                    <div className="pt-2 border-t border-border">
+                      <Link
+                        href={`/trainer/alumnos/${member.id}/progreso`}
+                        className="flex items-center justify-center gap-2 rounded-lg bg-[#00aeef]/10 px-3 py-2 text-xs font-bold text-[#00aeef] hover:bg-[#00aeef]/20"
+                      >
+                        <Dumbbell className="h-4 w-4" />
+                        Ver progreso del plan
+                      </Link>
                     </div>
 
                     {/* BOTÓN VER HISTORIAL DEL ALUMNO */}
