@@ -37,7 +37,7 @@ function TrendChart({ points, metric }: { points: { label: string; value: number
         {points.length > 1 && <polyline points={polyline} fill="none" stroke="#0d9488" strokeWidth="3" strokeLinejoin="round" />}
         {points.map((p, i) => <g key={i}><circle cx={x(i)} cy={y(p.value)} r="5" fill="#0d9488" /><text x={x(i)} y={height - 14} fontSize="11" textAnchor="middle" fill="currentColor">{p.label}</text></g>)}
       </svg>
-      <p className="text-center text-xs text-muted-foreground">Cada punto representa el máximo valor registrado en esa semana. Las semanas sin registros se omiten.</p>
+      <p className="text-center text-xs text-muted-foreground">{points.length === 1 ? "Solo existe una semana con registros: todavía no se puede calcular una evolución." : "Cada punto es el máximo valor registrado en esa semana. Las semanas sin datos se omiten."}</p>
     </div>
   );
 }
@@ -62,6 +62,7 @@ export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) 
   }, [plan, selectedExercise, metric]);
   if (!plan) return null;
   const total = plan.weeks * plan.daysPerWeek;
+  const change = points.length >= 2 && points[0].value > 0 ? (points[points.length - 1].value - points[0].value) / points[0].value * 100 : null;
   const percent = total ? Math.round(plan.completed / total * 100) : 0;
   const completedPct = (week: number) => plan.daysPerWeek ? Math.round((plan.weeklyCompleted[week - 1] || 0) / plan.daysPerWeek * 100) : 0;
   return (
@@ -106,8 +107,13 @@ export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) 
             </select>
           </label>
         </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Último valor registrado</p><p className="text-xl font-bold">{points.length ? `${fmt(points[points.length - 1].value)}${metric === "load" ? " kg" : ""}` : "Sin datos"}</p></div>
+          <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Semanas con registros</p><p className="text-xl font-bold">{points.length} / {plan.weeks}</p></div>
+          <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Variación entre primera y última semana registradas</p><p className="text-xl font-bold">{change === null ? "Sin comparación" : `${change > 0 ? "+" : ""}${fmt(change)}%`}</p></div>
+        </div>
         <TrendChart points={points} metric={metric} />
-        <p className="text-xs text-muted-foreground">Solo se grafican valores realmente ingresados por el alumno. El cumplimiento se calcula sobre sesiones finalizadas, no sobre cargas registradas.</p>
+        <p className="text-xs text-muted-foreground">Todos los valores provienen de los registros del alumno. La variación es matemática y no implica necesariamente una mejora (especialmente en RIR). El cumplimiento se calcula únicamente con sesiones finalizadas.</p>
       </div>
     </section>
   );
