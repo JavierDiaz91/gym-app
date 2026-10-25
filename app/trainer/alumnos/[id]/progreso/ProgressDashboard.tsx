@@ -17,16 +17,24 @@ type Metric = "load" | "reps" | "rir";
 const metricLabel: Record<Metric, string> = { load: "Peso (kg)", reps: "Repeticiones", rir: "RIR" };
 const fmt = (n: number) => new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(n);
 
-function TrendChart({ points, metric }: { points: { label: string; value: number }[]; metric: Metric }) {
+function TrendChart({ points, metric, weeks }: { points: { week: number; label: string; value: number }[]; metric: Metric; weeks: number }) {
   if (!points.length) return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">Sin datos reales registrados para este ejercicio y esta métrica.</div>;
-  const width = 680, height = 235, left = 50, right = 20, top = 20, bottom = 42;
-  const values = points.map((p) => p.value);
+  if (points.length === 1) return (
+    <div className="rounded-xl border bg-muted/20 p-6 text-center">
+      <p className="text-sm text-muted-foreground">Única medición disponible · Semana {points[0].week}</p>
+      <p className="mt-2 text-4xl font-bold text-primary">{fmt(points[0].value)}{metric === "load" ? " kg" : ""}</p>
+      <p className="mt-3 text-sm text-muted-foreground">Necesitamos datos de otra semana para dibujar una evolución real.</p>
+    </div>
+  );
+  const width = 680, height = 245, left = 52, right = 22, top = 26, bottom = 48;
+  const values = points.map(p => p.value);
   const min = Math.min(...values), max = Math.max(...values);
-  const range = max - min || Math.max(1, max * 0.15);
-  const lo = Math.max(0, min - range * 0.18), hi = max + range * 0.18;
-  const x = (i: number) => left + (points.length === 1 ? (width - left - right) / 2 : i * (width - left - right) / (points.length - 1));
-  const y = (v: number) => top + (hi - v) * (height - top - bottom) / (hi - lo);
-  const polyline = points.map((p, i) => `${x(i)},${y(p.value)}`).join(" ");
+  const spread = max - min;
+  const padding = spread === 0 ? Math.max(1, Math.abs(max) * 0.1) : spread * 0.2;
+  const lo = Math.max(0, min - padding), hi = max + padding;
+  const x = (week: number) => left + (weeks === 1 ? (width - left - right) / 2 : (week - 1) * (width - left - right) / (weeks - 1));
+  const y = (v: number) => top + (hi - v) * (height - top - bottom) / (hi - lo || 1);
+  const polyline = points.map(p => `${x(p.week)},${y(p.value)}`).join(" ");
   return (
     <div className="overflow-x-auto rounded-xl border p-3">
       <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[360px] w-full" role="img" aria-label={`Evolución de ${metricLabel[metric]}: ${points.map(p => p.label + " " + fmt(p.value)).join(", ")}`}>
@@ -34,10 +42,11 @@ function TrendChart({ points, metric }: { points: { label: string; value: number
           const value = lo + (hi - lo) * i / 4;
           return <g key={i}><line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="currentColor" opacity=".12" /><text x={left - 8} y={y(value) + 4} textAnchor="end" fontSize="11" fill="currentColor" opacity=".7">{fmt(value)}</text></g>;
         })}
-        {points.length > 1 && <polyline points={polyline} fill="none" stroke="#0d9488" strokeWidth="3" strokeLinejoin="round" />}
-        {points.map((p, i) => <g key={i}><circle cx={x(i)} cy={y(p.value)} r="5" fill="#0d9488" /><text x={x(i)} y={height - 14} fontSize="11" textAnchor="middle" fill="currentColor">{p.label}</text></g>)}
+        <polyline points={polyline} fill="none" stroke="#0d9488" strokeWidth="3" strokeLinejoin="round" />
+        {points.map(p => <g key={p.week}><circle cx={x(p.week)} cy={y(p.value)} r="5" fill="#0d9488" /><text x={x(p.week)} y={y(p.value) - 12} fontSize="12" fontWeight="600" textAnchor="middle" fill="currentColor">{fmt(p.value)}</text></g>)}
+        {Array.from({ length: weeks }, (_, i) => <text key={i} x={x(i + 1)} y={height - 13} fontSize="11" textAnchor="middle" fill="currentColor" opacity=".8">Sem. {i + 1}</text>)}
       </svg>
-      <p className="text-center text-xs text-muted-foreground">{points.length === 1 ? "Solo existe una semana con registros: todavía no se puede calcular una evolución." : "Cada punto es el máximo valor registrado en esa semana. Las semanas sin datos se omiten."}</p>
+      <p className="text-center text-xs text-muted-foreground">Máximo valor registrado por semana. Los intervalos sin mediciones no representan cero.</p>
     </div>
   );
 }
@@ -58,12 +67,13 @@ export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) 
       if (value == null) continue;
       weekly.set(row.week, Math.max(value, weekly.get(row.week) ?? -Infinity));
     }
-    return [...weekly.entries()].sort((a, b) => a[0] - b[0]).map(([week, value]) => ({ label: `Sem. ${week}`, value }));
+    return [...weekly.entries()].sort((a, b) => a[0] - b[0]).map(([week, value]) => ({ week, label: `Sem. ${week}`, value }));
   }, [plan, selectedExercise, metric]);
   if (!plan) return null;
   const total = plan.weeks * plan.daysPerWeek;
-  const change = points.length >= 2 && points[0].value > 0 ? (points[points.length - 1].value - points[0].value) / points[0].value * 100 : null;
+  const change = points.length >= 2 && points[0].value !== 0 ? (points[points.length - 1].value - points[0].value) / points[0].value * 100 : null;
   const percent = total ? Math.round(plan.completed / total * 100) : 0;
+  const changePeriod = points.length >= 2 ? `Sem. ${points[0].week} a ${points[points.length - 1].week}` : "Sin período comparable";
   const completedPct = (week: number) => plan.daysPerWeek ? Math.round((plan.weeklyCompleted[week - 1] || 0) / plan.daysPerWeek * 100) : 0;
   return (
     <section className="space-y-5 rounded-2xl border bg-card p-4 shadow-sm sm:p-6">
@@ -110,10 +120,10 @@ export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Último valor registrado</p><p className="text-xl font-bold">{points.length ? `${fmt(points[points.length - 1].value)}${metric === "load" ? " kg" : ""}` : "Sin datos"}</p></div>
           <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Semanas con registros</p><p className="text-xl font-bold">{points.length} / {plan.weeks}</p></div>
-          <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Variación entre primera y última semana registradas</p><p className="text-xl font-bold">{change === null ? "Sin comparación" : `${change > 0 ? "+" : ""}${fmt(change)}%`}</p></div>
+          <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Variación porcentual · {changePeriod}</p><p className="text-xl font-bold">{change === null ? "Sin comparación" : `${change > 0 ? "+" : ""}${fmt(change)}%`}</p></div>
         </div>
-        <TrendChart points={points} metric={metric} />
-        <p className="text-xs text-muted-foreground">Todos los valores provienen de los registros del alumno. La variación es matemática y no implica necesariamente una mejora (especialmente en RIR). El cumplimiento se calcula únicamente con sesiones finalizadas.</p>
+        <TrendChart points={points} metric={metric} weeks={plan.weeks} />
+        <p className="text-xs text-muted-foreground">Todos los valores provienen de los registros del alumno. La variación compara máximos semanales y no implica necesariamente una mejora (especialmente en RIR). El cumplimiento se calcula únicamente con sesiones finalizadas.</p>
       </div>
     </section>
   );
