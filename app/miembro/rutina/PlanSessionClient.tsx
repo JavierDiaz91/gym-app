@@ -2,18 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { startPlanSession, finishPlanSession, markPlanExercise } from "./plan-session-actions";
+import { startPlanSession, finishPlanSession, markPlanExercise, saveActualSet } from "./plan-session-actions";
 
 type Prescription = { sets?: number; reps?: string; rir?: string; restSeconds?: number; durationSeconds?: number; distanceMeters?: number; tempo?: string; notes?: string };
 type Item = { key: string; title: string; imageUrl?: string; imageVerified?: boolean; instructions?: string; prescriptions: Prescription[] };
+type SetLog = { key: string; setIndex: number; reps: number | null; load: number | null; rir: number | null };
 type Block = { title: string; type?: string; items: Item[] };
-type Props = { assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; startedAt?: string | null; finishedAt?: string | null };
+type Props = { assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; initialSets: SetLog[]; startedAt?: string | null; finishedAt?: string | null };
 
-export default function PlanSessionClient({ assignmentId, week, day, title, blocks, status, initialCompleted, startedAt, finishedAt }: Props) {
+export default function PlanSessionClient({ assignmentId, week, day, title, blocks, status, initialCompleted, initialSets, startedAt, finishedAt }: Props) {
   const router = useRouter();
   const [pending, transition] = useTransition();
   const [error, setError] = useState("");
   const [completed, setCompleted] = useState<string[]>(initialCompleted);
+  const [sets, setSets] = useState<SetLog[]>(initialSets);
   const total = blocks.reduce((n, b) => n + b.items.length, 0);
   const done = blocks.reduce((n, b) => n + b.items.filter(i => completed.includes(i.key)).length, 0);
   function run(action: () => Promise<{success:boolean;error?:string}>, after?: () => void) {
@@ -75,6 +77,25 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
                     {p.tempo && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Tempo</p><p className="text-lg font-bold">{p.tempo}</p></div>}
                     {p.distanceMeters != null && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Distancia</p><p className="text-lg font-bold">{p.distanceMeters} m</p></div>}
                   </div>
+                  {status !== "not_started" && Number(p.sets) > 0 && (
+                    <details className="rounded-xl border p-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-primary">Registrar cargas por serie (opcional)</summary>
+                      <p className="mt-2 text-xs text-muted-foreground">Podés dejar todos los campos vacíos y marcar el ejercicio como hecho.</p>
+                      <div className="mt-3 space-y-3">
+                        {Array.from({ length: Math.min(30, Number(p.sets)) }, (_, i) => {
+                          const index = i + 1;
+                          const saved = sets.find((x) => x.key === item.key && x.setIndex === index);
+                          return (
+                            <SetEntry key={index} index={index} saved={saved} disabled={pending || status === "completed"}
+                              onSave={(actual) => run(
+                                () => saveActualSet(assignmentId, week, day, item.key, index, actual),
+                                () => setSets((old) => [...old.filter((x) => !(x.key === item.key && x.setIndex === index)), { key: item.key, setIndex: index, ...actual }])
+                              )} />
+                          );
+                        })}
+                      </div>
+                    </details>
+                  )}
                   {item.instructions && <p className="text-sm leading-relaxed text-muted-foreground"><strong className="text-foreground">Cómo hacerlo:</strong> {item.instructions}</p>}
                   {p.notes && <p className="text-sm text-muted-foreground">{p.notes}</p>}
                   {(!item.imageUrl || item.imageVerified !== true) && <p className="text-xs text-muted-foreground italic">Demostración visual pendiente de verificación por el entrenador.</p>}
@@ -84,6 +105,25 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
           })}
         </section>
       ))}
+    </div>
+  );
+}
+
+type Actual = { reps: number | null; load: number | null; rir: number | null };
+function SetEntry({ index, saved, disabled, onSave }: { index: number; saved?: SetLog; disabled: boolean; onSave: (actual: Actual) => void }) {
+  const [reps, setReps] = useState(saved?.reps?.toString() ?? "");
+  const [load, setLoad] = useState(saved?.load?.toString() ?? "");
+  const [rir, setRir] = useState(saved?.rir?.toString() ?? "");
+  const parse = (value: string) => value.trim() === "" ? null : Number(value);
+  return (
+    <div className="rounded-lg bg-muted/50 p-3">
+      <p className="mb-2 text-sm font-semibold">Serie {index}</p>
+      <div className="grid grid-cols-3 gap-2">
+        <label className="text-xs">Peso (kg)<input aria-label={`Peso serie ${index}`} type="number" min="0" max="10000" step="0.5" value={load} onChange={(e) => setLoad(e.target.value)} disabled={disabled} className="mt-1 w-full rounded border bg-background p-2" /></label>
+        <label className="text-xs">Repeticiones<input aria-label={`Repeticiones serie ${index}`} type="number" min="0" max="1000" step="1" value={reps} onChange={(e) => setReps(e.target.value)} disabled={disabled} className="mt-1 w-full rounded border bg-background p-2" /></label>
+        <label className="text-xs">RIR<input aria-label={`RIR serie ${index}`} type="number" min="0" max="30" step="0.5" value={rir} onChange={(e) => setRir(e.target.value)} disabled={disabled} className="mt-1 w-full rounded border bg-background p-2" /></label>
+      </div>
+      { !disabled && <button type="button" className="mt-2 rounded bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" onClick={() => onSave({ reps: parse(reps), load: parse(load), rir: parse(rir) })}>Guardar serie</button> }
     </div>
   );
 }
