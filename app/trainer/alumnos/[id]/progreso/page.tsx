@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type Props = { params: Promise<{ id: string }> };
-type PlanItem = { key?: string; title?: string };
+type Prescription = { sets?: number; reps?: string | number; rir?: string | number; restSeconds?: number };
+type PlanItem = { key?: string; title?: string; prescriptions?: Prescription[] };
 type PlanDay = { title?: string; blocks?: { title?: string; items?: PlanItem[] }[] };
 type Snapshot = { days?: PlanDay[] };
 
@@ -85,11 +86,29 @@ export default async function ProgresoAlumnoPage({ params }: Props) {
     const weeks = Math.max(1, Math.min(52, Number(assignment.duration_weeks) || 4));
     const planSessions = sessions.filter(s => Number(s.member_training_plan_id) === Number(assignment.id));
     const sets: ProgressSet[] = [];
+    const comparisons: ProgressPlan["comparisons"] = [];
     for (const sessionRow of planSessions) {
       const week = Number(sessionRow.week_number);
       const day = Number(sessionRow.day_index);
       const items = days[day - 1]?.blocks?.flatMap(b => b.items || []) || [];
-      for (const log of completedKeys.filter(l => Number(l.workout_session_id) === Number(sessionRow.id))) {
+      const sessionLogs = completedKeys.filter(l => Number(l.workout_session_id) === Number(sessionRow.id));
+      for (const item of items) {
+        const itemLogs = sessionLogs.filter(l => String(l.item_snapshot_key) === String(item.key));
+        if (!itemLogs.length) continue;
+        const prescription = item.prescriptions?.[week - 1];
+        const actual = itemLogs.filter(l => l.actual_reps != null || l.actual_load != null || l.actual_rir != null);
+        comparisons.push({
+          exercise: String(item.title || "Ejercicio"), week, day,
+          plannedSets: prescription?.sets == null ? null : Number(prescription.sets),
+          plannedReps: prescription?.reps == null ? null : String(prescription.reps),
+          plannedRir: prescription?.rir == null ? null : String(prescription.rir),
+          recordedSets: actual.length,
+          actualReps: actual.map(l => ({ set: Number(l.set_index), value: l.actual_reps == null ? null : Number(l.actual_reps) })),
+          actualRir: actual.map(l => ({ set: Number(l.set_index), value: l.actual_rir == null ? null : Number(l.actual_rir) })),
+          actualLoad: actual.map(l => ({ set: Number(l.set_index), value: l.actual_load == null ? null : Number(l.actual_load) })),
+        });
+      }
+      for (const log of sessionLogs) {
         if (log.actual_load == null && log.actual_reps == null && log.actual_rir == null) continue;
         const item = items.find(i => i.key === String(log.item_snapshot_key));
         if (!item) continue;
@@ -109,7 +128,7 @@ export default async function ProgresoAlumnoPage({ params }: Props) {
       inProgress: planSessions.filter(s => s.status === "in_progress").length,
       completedExercises: planSessions.reduce((sum, row) => sum + Number(row.completed_exercises || 0), 0),
       weeklyCompleted: Array.from({ length: weeks }, (_, i) => planSessions.filter(s => Number(s.week_number) === i + 1 && s.status === "completed").length),
-      sets,
+      sets, comparisons,
     };
   });
 
