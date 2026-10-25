@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { assignRoutineToMultipleMembersBulk } from "@/app/actions";
+import { assignTrainingPlan } from "../rutinas/planes/actions";
 import { Filter, CheckSquare, Square, Dumbbell, Send, Loader2 } from "lucide-react";
 
 interface Member {
@@ -23,9 +24,11 @@ interface Routine {
 export default function BulkAssignClient({
   initialMembers,
   routines,
+  trainingPlans,
 }: {
   initialMembers: Member[];
   routines: Routine[];
+  trainingPlans: { id: number; title: string; durationWeeks: number }[];
 }) {
   const [genderFilter, setGenderFilter] = useState<string>("all");
   const [activityFilter, setActivityFilter] = useState<string>("all");
@@ -108,21 +111,32 @@ export default function BulkAssignClient({
       return;
     }
     if (!selectedRoutine) {
-      setMessage({ type: "error", text: "Seleccioná una rutina de la lista." });
+      setMessage({ type: "error", text: "Seleccioná un plan o una rutina de la lista." });
       return;
     }
 
     startTransition(async () => {
       setMessage(null);
-      const res = await assignRoutineToMultipleMembersBulk(
-        selectedMembers,
-        Number(selectedRoutine)
-      );
+      const [kind, idText] = selectedRoutine.split(":");
+      const selectedId = Number(idText);
+      let res: { success: boolean; count?: number; error?: string };
+      if (kind === "plan") {
+        let count = 0;
+        const failures: string[] = [];
+        for (const memberId of selectedMembers) {
+          const outcome = await assignTrainingPlan(selectedId, memberId);
+          if (outcome.success) count++;
+          else failures.push(`Alumno #${memberId}: ${outcome.error || "Error"}`);
+        }
+        res = { success: failures.length === 0, count, error: failures.length ? `${count} asignados; ${failures.length} fallidos. ${failures.slice(0, 3).join("; ")}` : undefined };
+      } else {
+        res = await assignRoutineToMultipleMembersBulk(selectedMembers, selectedId);
+      }
 
       if (res.success) {
         setMessage({
           type: "success",
-          text: `¡Rutina asignada correctamente a ${res.count} atleta(s)!`,
+          text: `¡Entrenamiento asignado correctamente a ${res.count} alumno(s)!`,
         });
 
         setSelectedMembers([]);
@@ -265,7 +279,7 @@ export default function BulkAssignClient({
       <div className="bg-card border border-border rounded-2xl p-5 shadow-xl space-y-4">
         <div className="flex items-center gap-2 font-extrabold text-xs uppercase tracking-wider text-foreground">
           <Dumbbell className="w-4 h-4 text-[#00aeef]" />
-          <span>Elegir Rutina a Asignar</span>
+          <span>Elegir plan de entrenamiento a asignar</span>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -274,11 +288,12 @@ export default function BulkAssignClient({
             onChange={(e) => setSelectedRoutine(e.target.value)}
             className="flex-1 text-xs font-medium p-3 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 focus:border-[#00aeef] transition-colors cursor-pointer"
           >
-            <option value="" className="bg-card text-card-foreground">-- Seleccionar Rutina del Catálogo --</option>
+            <option value="" className="bg-card text-card-foreground">-- Seleccionar plan o rutina --</option>
+            {trainingPlans.map((p) => (
+              <option key={`plan:${p.id}`} value={`plan:${p.id}`}>{p.title} · {p.durationWeeks} semanas (plan)</option>
+            ))}
             {routines.map((r) => (
-              <option key={r.id} value={r.id} className="bg-card text-card-foreground">
-                {r.name}
-              </option>
+              <option key={`routine:${r.id}`} value={`routine:${r.id}`}>{r.name} (rutina anterior)</option>
             ))}
           </select>
 
@@ -302,6 +317,7 @@ export default function BulkAssignClient({
           </button>
         </div>
 
+        <p className="text-xs text-muted-foreground">Asignar un plan crea una nueva asignación por alumno. Revisá si ya tiene ese plan antes de confirmar; no reemplaza ni borra las asignaciones existentes.</p>
         {message && (
           <p
             className={`text-xs p-3 rounded-xl font-medium border ${
