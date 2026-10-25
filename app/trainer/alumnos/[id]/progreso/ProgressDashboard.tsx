@@ -22,6 +22,64 @@ export type ProgressPlan = {
 };
 type Metric = "load" | "reps" | "rir";
 
+
+type WeeklySummary = { week: number; load: number | null; reps: number | null; rir: number | null };
+function summarizeWeeks(sets: ProgressSet[], exercise: string): WeeklySummary[] {
+  const weeks = new Map<number, WeeklySummary>();
+  for (const set of sets) {
+    if (set.exercise !== exercise) continue;
+    const current = weeks.get(set.week) ?? { week: set.week, load: null, reps: null, rir: null };
+    if (set.load != null) current.load = Math.max(current.load ?? -Infinity, set.load);
+    if (set.reps != null) current.reps = Math.max(current.reps ?? -Infinity, set.reps);
+    if (set.rir != null) current.rir = Math.max(current.rir ?? -Infinity, set.rir);
+    weeks.set(set.week, current);
+  }
+  return [...weeks.values()].sort((a, b) => a.week - b.week);
+}
+function metricChange(before: number | null, after: number | null) {
+  return before != null && after != null && before !== 0 ? (after - before) / before * 100 : null;
+}
+function PerformanceInsight({ sets, comparisons, exercise }: { sets: ProgressSet[]; comparisons: ProgressComparison[]; exercise: string }) {
+  const weeks = summarizeWeeks(sets, exercise);
+  const withLoad = weeks.filter(w => w.load != null);
+  const withReps = weeks.filter(w => w.reps != null);
+  const withRir = weeks.filter(w => w.rir != null);
+  const loadFirst = withLoad[0], loadLast = withLoad[withLoad.length - 1];
+  const repsFirst = withReps[0], repsLast = withReps[withReps.length - 1];
+  const rirFirst = withRir[0], rirLast = withRir[withRir.length - 1];
+  const loadChange = withLoad.length >= 2 ? metricChange(loadFirst.load, loadLast.load) : null;
+  const repsChange = withReps.length >= 2 ? metricChange(repsFirst.reps, repsLast.reps) : null;
+  const displayChange = (change: number | null) => change == null ? "Sin comparación porcentual" : `${change > 0 ? "+" : ""}${fmt(change)}%`;
+  const lastComparison = comparisons.filter(c => c.exercise === exercise).sort((a,b) => b.week - a.week || b.day - a.day)[0];
+  const plannedRir = lastComparison?.plannedRir?.trim();
+  const numericRir = plannedRir && /^\\d+(?:[.,]\\d+)?$/.test(plannedRir) ? Number(plannedRir.replace(",", ".")) : null;
+  const actualRirs = lastComparison?.actualRir.filter(r => r.value != null) ?? [];
+  const rirMismatch = numericRir != null && actualRirs.length > 0 && actualRirs.some(r => r.value !== numericRir);
+  if (!exercise) return null;
+  return <div className="space-y-3 rounded-xl border bg-muted/20 p-4" aria-label="Análisis del rendimiento">
+    <h4 className="font-semibold">Análisis del rendimiento · {exercise}</h4>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="rounded-lg bg-background p-3 text-sm">
+        <p className="text-xs text-muted-foreground">Peso máximo semanal</p>
+        <p className="font-semibold">{withLoad.length >= 2 ? `Sem. ${loadFirst.week}: ${fmt(loadFirst.load!)} kg → Sem. ${loadLast.week}: ${fmt(loadLast.load!)} kg` : "Sin dos semanas comparables"}</p>
+        <p className="text-xs text-muted-foreground">{displayChange(loadChange)}</p>
+      </div>
+      <div className="rounded-lg bg-background p-3 text-sm">
+        <p className="text-xs text-muted-foreground">Repeticiones máximas semanales</p>
+        <p className="font-semibold">{withReps.length >= 2 ? `Sem. ${repsFirst.week}: ${fmt(repsFirst.reps!)} → Sem. ${repsLast.week}: ${fmt(repsLast.reps!)}` : "Sin dos semanas comparables"}</p>
+        <p className="text-xs text-muted-foreground">{displayChange(repsChange)}</p>
+      </div>
+    </div>
+    <p className="text-sm text-muted-foreground">{withRir.length >= 2
+      ? `RIR máximo registrado: ${fmt(rirFirst.rir!)} en semana ${rirFirst.week} y ${fmt(rirLast.rir!)} en semana ${rirLast.week}. No representa por sí solo una mejora.`
+      : "No hay RIR registrado en dos semanas para comparar."}</p>
+    {rirMismatch && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+      Semana {lastComparison.week}, día {lastComparison.day}: RIR prescrito {fmt(numericRir!)}; valores reales {actualRirs.map(r => `serie ${r.set}: ${fmt(r.value!)}`).join(", ")}. Revisar el esfuerzo con el alumno.
+    </p>}
+    <p className="text-xs text-muted-foreground">Comparación descriptiva de máximos semanales. Más peso o repeticiones no demuestran por sí solos una mejora de fuerza. No se completan datos faltantes.</p>
+  </div>;
+}
+
 const metricLabel: Record<Metric, string> = { load: "Peso (kg)", reps: "Repeticiones", rir: "RIR" };
 const fmt = (n: number) => new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(n);
 
@@ -136,6 +194,7 @@ export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) 
           <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Variación porcentual · {changePeriod}</p><p className="text-xl font-bold">{change === null ? "Sin comparación" : `${change > 0 ? "+" : ""}${fmt(change)}%`}</p></div>
         </div>
         <TrendChart points={points} metric={metric} weeks={plan.weeks} />
+        <PerformanceInsight sets={plan.sets} comparisons={plan.comparisons} exercise={selectedExercise} />
         <div className="space-y-3 rounded-xl border p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><h4 className="font-semibold">Planificado vs. realizado</h4><p className="text-xs text-muted-foreground">Comparación por serie, basada en la prescripción y en las cargas guardadas por el alumno.</p></div>
