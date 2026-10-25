@@ -215,7 +215,7 @@ export async function updateAssignedPlanStartDate(assignmentId: number, memberId
   try {
     const { gymId, trainerId } = await trainerContext();
     if (!Number.isSafeInteger(assignmentId) || assignmentId <= 0 || !Number.isSafeInteger(memberId) || memberId <= 0 ||
-        !/^\\d{4}-\\d{2}-\\d{2}$/.test(dateInput)) {
+        !/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
       return { success: false, error: "Fecha o asignación inválida." };
     }
     const parsed = new Date(dateInput + "T00:00:00Z");
