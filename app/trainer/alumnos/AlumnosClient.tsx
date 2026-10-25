@@ -66,6 +66,7 @@ export default function AlumnosClient({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [search, setSearch] = useState("");
+  const [planFilter, setPlanFilter] = useState<"all" | "with" | "without">("all");
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   
   // Estado para el Modal de Historial
@@ -81,9 +82,12 @@ export default function AlumnosClient({
     setMembersList(initialMembers);
   }, [initialMembers]);
 
-  const filteredMembers = membersList.filter((m) =>
-    `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredMembers = membersList.filter((m) => {
+    const matchesName = `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase());
+    const hasPlan = (m.training_plans?.length || 0) > 0;
+    return matchesName && (planFilter === "all" || (planFilter === "with" ? hasPlan : !hasPlan));
+  });
+  const withPlanCount = membersList.filter((m) => (m.training_plans?.length || 0) > 0).length;
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,167 +195,82 @@ export default function AlumnosClient({
         </button>
       </div>
 
-      {/* Buscador de Alumnos */}
-      {membersList.length > 0 && (
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-sm bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 focus:border-[#00aeef] text-foreground placeholder:text-muted-foreground transition-all"
-          />
-        </div>
-      )}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Alumnos vinculados</p><p className="mt-1 text-2xl font-bold">{membersList.length}</p></div>
+        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Con plan asignado</p><p className="mt-1 text-2xl font-bold text-[#00aeef]">{withPlanCount}</p></div>
+        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Sin plan asignado</p><p className="mt-1 text-2xl font-bold">{membersList.length - withPlanCount}</p></div>
+      </div>
 
-      {/* Grid de Alumnos */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input aria-label="Buscar alumnos" type="search" placeholder="Buscar alumnos por nombre..." value={search} onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 text-sm bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 text-foreground" />
+        </div>
+        <select aria-label="Filtrar por plan" value={planFilter} onChange={(e) => setPlanFilter(e.target.value as "all" | "with" | "without")}
+          className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground">
+          <option value="all">Todos los alumnos</option>
+          <option value="with">Con plan asignado</option>
+          <option value="without">Sin plan asignado</option>
+        </select>
+      </div>
+
       {filteredMembers.length === 0 ? (
-        <div className="bg-card border border-border rounded-2xl p-12 text-center">
-          <div className="w-12 h-12 bg-secondary text-muted-foreground rounded-2xl flex items-center justify-center mx-auto mb-3 border border-border">
-            <Users className="w-6 h-6" />
-          </div>
-          <h3 className="text-foreground font-semibold text-base">No tenés alumnos vinculados</h3>
-          <p className="text-muted-foreground text-sm max-w-sm mx-auto mt-1">
-            Usá el botón de "Vincular Alumno" para sumar tu primer atleta mediante su correo.
-          </p>
+        <div className="rounded-2xl border border-border bg-card p-10 text-center">
+          <Users className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+          <h3 className="font-semibold">{membersList.length ? "No hay alumnos con esos filtros" : "Todavía no tenés alumnos vinculados"}</h3>
+          <p className="mt-2 text-sm text-muted-foreground">{membersList.length ? "Probá con otro nombre o filtro." : "Vinculá un alumno para empezar a gestionar sus planes."}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="space-y-4">
           {filteredMembers.map((member) => {
             const initials = `${member.first_name?.[0] || ""}${member.last_name?.[0] || ""}`.toUpperCase();
-            const hasRoutinesArray = member.routines && member.routines.length > 0;
-            const hasSingleRoutine = !!member.routine_name;
-
+            const plans = member.training_plans || [];
+            const currentPlan = plans[0];
             return (
-              <div
-                key={member.id}
-                className="bg-card border border-border hover:border-[#00aeef]/40 rounded-2xl p-5 shadow-lg transition-all duration-200 flex flex-col justify-between relative group"
-              >
-                <div>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      {/* Avatar con degradado Cyan */}
-                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#00aeef] to-cyan-700 text-black font-extrabold text-sm flex items-center justify-center shadow-md">
-                        {initials}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-foreground text-sm leading-tight">
-                          {member.first_name} {member.last_name}
-                        </h3>
-                        <span className="inline-block mt-0.5 text-[11px] font-semibold bg-[#00aeef]/10 text-[#00aeef] px-2 py-0.5 rounded-md border border-[#00aeef]/20">
-                          Activo
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="relative">
-                      <button
-                        onClick={() => setActiveMenuId(activeMenuId === member.id ? null : member.id)}
-                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-
-                      {activeMenuId === member.id && (
-                        <div className="absolute right-0 mt-1 w-44 bg-popover rounded-xl shadow-xl border border-border py-1.5 z-20">
-                          <button
-                            onClick={() => {
-                              setActiveMenuId(null);
-                              handleRemoveMember(member.id);
-                            }}
-                            className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 transition-colors"
-                          >
-                            <UserX className="w-3.5 h-3.5" />
-                            <span>Desvincular alumno</span>
-                          </button>
-                        </div>
-                      )}
+              <article key={member.id} className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-sm hover:border-[#00aeef]/30 transition-colors">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00aeef]/15 text-[#00aeef] font-extrabold">{initials}</div>
+                    <div>
+                      <h2 className="text-lg font-bold">{member.first_name} {member.last_name}</h2>
+                      <p className="text-xs text-muted-foreground">Alumno vinculado · {member.status === "inactive" ? "Inactivo" : "Activo"}</p>
                     </div>
                   </div>
-
-                  {/* Panel con Rutina Asignada e Historial */}
-                  <div className="bg-secondary/50 rounded-xl p-3 space-y-2.5 border border-border mb-4">
-                    <div>
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                        Planes activos {member.training_plans?.length ? `(${member.training_plans.length})` : ""}
-                      </span>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {member.training_plans?.map((plan) => (
-                          <Link key={plan.assignmentId} href={`/trainer/alumnos/${member.id}/progreso?plan=${plan.assignmentId}`}
-                            className="inline-flex items-center text-xs font-semibold text-[#00aeef] px-2.5 py-1 rounded-lg border border-[#00aeef]/20 hover:bg-[#00aeef]/10">
-                            {plan.title} · Asignación #{plan.assignmentId}
-                          </Link>
-                        ))}
-                        {hasRoutinesArray ? (
-                          member.routines!.map((r) => (
-                            <span 
-                              key={r.id}
-                              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#00aeef]/10 text-[#00aeef] px-2.5 py-1 rounded-lg border border-[#00aeef]/20"
-                            >
-                              <Dumbbell className="w-3 h-3 text-[#00aeef]" />
-                              {r.title}
-                            </span>
-                          ))
-                        ) : hasSingleRoutine ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#00aeef]/10 text-[#00aeef] px-2.5 py-1 rounded-lg border border-[#00aeef]/20">
-                            <Dumbbell className="w-3 h-3 text-[#00aeef]" />
-                            {member.routine_name}
-                          </span>
-                        ) : (
-                          !member.training_plans?.length && <span className="text-xs text-muted-foreground italic">Sin planes ni rutinas asignadas</span>
-                        )}
+                  <div className="relative">
+                    <button aria-label={`Opciones de ${member.first_name}`} onClick={() => setActiveMenuId(activeMenuId === member.id ? null : member.id)} className="rounded-lg p-2 hover:bg-secondary"><MoreVertical className="h-5 w-5" /></button>
+                    {activeMenuId === member.id && (
+                      <div className="absolute right-0 z-20 w-48 rounded-xl border border-border bg-popover p-2 shadow-xl">
+                        <button onClick={() => {setActiveMenuId(null); handleRemoveMember(member.id);}} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-rose-500 hover:bg-rose-500/10"><UserX className="h-4 w-4" />Desvincular alumno</button>
                       </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                        Último entreno:
-                      </span>
-                      <span className="font-semibold text-foreground">
-                        {member.last_workout || "Sin registros"}
-                      </span>
-                    </div>
-
-                    <div className="pt-2 border-t border-border">
-                      <Link
-                        href={`/trainer/alumnos/${member.id}/progreso`}
-                        className="flex items-center justify-center gap-2 rounded-lg bg-[#00aeef]/10 px-3 py-2 text-xs font-bold text-[#00aeef] hover:bg-[#00aeef]/20"
-                      >
-                        <Dumbbell className="h-4 w-4" />
-                        Ver progreso del plan
-                      </Link>
-                    </div>
-
-                    {/* BOTÓN VER HISTORIAL DEL ALUMNO */}
-                    <div className="pt-2 border-t border-border flex justify-end">
-                      <Link
-                        href={`/trainer/alumnos/${member.id}/progreso/historial`}
-                        className="text-xs font-semibold text-[#00aeef] hover:text-[#33c0f4] flex items-center gap-1.5 hover:underline cursor-pointer transition-colors"
-                      >
-                        <History className="w-3.5 h-3.5" />
-                        Ver historial de entrenamientos
-                      </Link>
-                    </div>
+                    )}
                   </div>
                 </div>
-
-                {/* Botón Asignar Rutina */}
-                <button
-                  onClick={() => {
-                    setSelectedMember(member);
-                    setSelectedRoutineId(member.routine_id || (routines[0]?.id ? Number(routines[0].id) : null));
-                    setSelectedAssignment("");
-                    setAssignError("");
-                  }}
-                  className="w-full flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border hover:border-[#00aeef]/40 font-semibold py-2 rounded-xl text-xs transition-all"
-                >
-                  <Dumbbell className="w-3.5 h-3.5 text-[#00aeef]" />
-                  <span>Asignar plan o rutina</span>
-                </button>
-              </div>
+                <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.65fr)]">
+                  <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan de entrenamiento</p>
+                    {currentPlan ? (
+                      <>
+                        <Link href={`/trainer/alumnos/${member.id}/progreso?plan=${currentPlan.assignmentId}`} className="font-semibold text-[#00aeef] hover:underline">{currentPlan.title}</Link>
+                        <p className="mt-1 text-xs text-muted-foreground">Asignación #{currentPlan.assignmentId}{plans.length > 1 ? ` · ${plans.length} planes asignados` : ""}</p>
+                        {plans.length > 1 && <div className="mt-3 flex flex-wrap gap-2">{plans.slice(1).map((p) => <Link key={p.assignmentId} href={`/trainer/alumnos/${member.id}/progreso?plan=${p.assignmentId}`} className="rounded-lg border border-border px-2.5 py-1 text-xs hover:border-[#00aeef]/40">{p.title} · #{p.assignmentId}</Link>)}</div>}
+                      </>
+                    ) : <p className="text-sm text-muted-foreground">Sin plan asignado. Podés asignar uno desde esta ficha.</p>}
+                    {(member.routines?.length || 0) > 0 && <p className="mt-3 text-xs text-muted-foreground">Rutinas anteriores: {member.routines?.map((r) => r.title).join(", ")}</p>}
+                  </div>
+                  <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Último entrenamiento</p>
+                    <p className="mt-2 text-sm font-semibold">{member.last_workout || "Sin registros"}</p>
+                    <p className="mt-3 text-xs text-muted-foreground">Consultá la evolución y el historial desde los accesos inferiores.</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button onClick={() => {setSelectedMember(member);setSelectedRoutineId(member.routine_id || null);setSelectedAssignment("");setAssignError("");}}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#00aeef] px-4 py-2.5 text-xs font-bold text-black hover:bg-[#0098d4]"><Dumbbell className="h-4 w-4" />Asignar plan o rutina</button>
+                  <Link href={`/trainer/alumnos/${member.id}/progreso`} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary"><Dumbbell className="h-4 w-4" />Ver progreso</Link>
+                  <Link href={`/trainer/alumnos/${member.id}/progreso/historial`} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary"><History className="h-4 w-4" />Historial</Link>
+                </div>
+              </article>
             );
           })}
         </div>
