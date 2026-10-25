@@ -63,7 +63,7 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
             const checked = completed.includes(item.key);
             return (
               <article key={item.key || itemIndex} className={`overflow-hidden rounded-2xl border-2 bg-white shadow-md ring-1 ring-black/5 transition-colors dark:bg-slate-950 dark:ring-white/5 ${checked ? "border-emerald-500 dark:border-emerald-400" : "border-slate-300 dark:border-slate-600"}`}>
-                {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className="border-b p-3"><details className="group"><summary className="cursor-pointer text-sm font-semibold text-primary">Ver demostración del ejercicio</summary><img src={item.imageUrl} alt={`Demostración verificada de ${item.title}`} loading="lazy" className="mt-3 h-36 w-48 max-w-full rounded-lg border bg-muted object-contain" /></details></div>}
+                {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className="border-b p-3"><details className="group"><summary className="cursor-pointer text-sm font-semibold text-primary">Ver demostración del ejercicio</summary><img src={item.imageUrl} alt={`Demostración verificada de ${item.title}`} loading="lazy" className="mt-3 h-36 w-48 max-w-full rounded-xl border border-slate-300 bg-slate-100 p-2 object-contain grayscale dark:border-slate-600" /></details></div>}
                 <div className="p-4 sm:p-5 space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div><p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p><h4 className="text-lg font-bold text-slate-950 dark:text-white">{item.title}</h4></div>
