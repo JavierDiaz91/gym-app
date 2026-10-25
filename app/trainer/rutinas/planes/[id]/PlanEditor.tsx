@@ -163,7 +163,13 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       </div>
     </details>}
     <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-bold">2. Organizá los ejercicios</h2>{editable && <button type="button" className={button} disabled={draft.days.length >= 7} onClick={() => { setSelectedDay(draft.days.length); change({ days: [...draft.days, { title: "Día " + (draft.days.length + 1), modality: "strength", blocks: [] }] }); }}>+ Agregar día</button>}</div>
-    <nav aria-label="Seleccionar día de entrenamiento" className="flex flex-wrap gap-2 rounded-xl border border-slate-300 p-3 dark:border-slate-700">
+    {draft.days.length === 0 ? (
+      <div role="status" className="rounded-xl border border-dashed border-slate-500/60 bg-slate-900/20 px-5 py-8 text-center dark:bg-slate-900/30">
+        <p className="text-base font-semibold">Todavía no agregaste días de entrenamiento</p>
+        <p className="mt-2 text-sm text-muted-foreground">Comenzá creando el primer día de tu planificación. Después vas a poder organizar bloques y ejercicios.</p>
+        {editable && <button type="button" className={button + " mt-4 border-cyan-500/60 text-cyan-600 dark:text-cyan-300"} onClick={() => { setSelectedDay(0); change({ days: [{ title: "Día 1", modality: "strength", blocks: [] }] }); }}>+ Crear primer día</button>}
+      </div>
+    ) : <nav aria-label="Seleccionar día de entrenamiento" className="flex flex-wrap gap-2 rounded-xl border border-slate-300 p-3 dark:border-slate-700">
       {draft.days.map((day, di) => <button type="button" key={di} onClick={() => setSelectedDay(di)} aria-current={selectedDay === di ? "step" : undefined} className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${selectedDay === di ? "border-cyan-500 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300" : "border-slate-300 hover:bg-muted dark:border-slate-600"}`}>Día {di + 1} · {day.title}</button>)}
     </nav>
     </section>
