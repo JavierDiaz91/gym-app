@@ -1,3 +1,4 @@
+import ProgressDashboard, { type ProgressPlan, type ProgressSet } from "./ProgressDashboard";
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/app/actions";
@@ -84,6 +85,40 @@ export default async function ProgresoAlumnoPage({ params }: Props) {
       AND ws.member_training_plan_id = ANY(${assignmentIds}::bigint[])
   ` : [];
 
+  const dashboards: ProgressPlan[] = assignments.map((assignment) => {
+    const snapshot = assignment.snapshot_jsonb as Snapshot | null;
+    const days = Array.isArray(snapshot?.days) ? snapshot.days : [];
+    const weeks = Math.max(1, Math.min(52, Number(assignment.duration_weeks) || 4));
+    const planSessions = sessions.filter(s => Number(s.member_training_plan_id) === Number(assignment.id));
+    const sets: ProgressSet[] = [];
+    for (const sessionRow of planSessions) {
+      const week = Number(sessionRow.week_number);
+      const day = Number(sessionRow.day_index);
+      const items = days[day - 1]?.blocks?.flatMap(b => b.items || []) || [];
+      for (const log of completedKeys.filter(l => Number(l.workout_session_id) === Number(sessionRow.id))) {
+        if (log.actual_load == null && log.actual_reps == null && log.actual_rir == null) continue;
+        const item = items.find(i => i.key === String(log.item_snapshot_key));
+        if (!item) continue;
+        sets.push({
+          exercise: String(item.title || "Ejercicio"),
+          week, day, set: Number(log.set_index),
+          load: log.actual_load == null ? null : Number(log.actual_load),
+          reps: log.actual_reps == null ? null : Number(log.actual_reps),
+          rir: log.actual_rir == null ? null : Number(log.actual_rir),
+        });
+      }
+    }
+    return {
+      id: Number(assignment.id), title: String(assignment.title), weeks,
+      daysPerWeek: days.length,
+      completed: planSessions.filter(s => s.status === "completed").length,
+      inProgress: planSessions.filter(s => s.status === "in_progress").length,
+      completedExercises: planSessions.reduce((sum, row) => sum + Number(row.completed_exercises || 0), 0),
+      weeklyCompleted: Array.from({ length: weeks }, (_, i) => planSessions.filter(s => Number(s.week_number) === i + 1 && s.status === "completed").length),
+      sets,
+    };
+  });
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <Link href="/trainer/alumnos" className="inline-flex items-center gap-2 text-sm text-primary">
@@ -99,6 +134,10 @@ export default async function ProgresoAlumnoPage({ params }: Props) {
           Este alumno todavía no tiene planes multisemana asignados por vos.
         </div>
       )}
+      {dashboards.length > 0 && <ProgressDashboard plans={dashboards} />}
+      {assignments.length > 0 && <details className="rounded-2xl border bg-card p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-primary">Ver historial detallado de sesiones</summary>
+        <div className="mt-5 space-y-6">
       {assignments.map((assignment) => {
         const snapshot = assignment.snapshot_jsonb as Snapshot | null;
         const days = Array.isArray(snapshot?.days) ? snapshot.days : [];
@@ -215,6 +254,8 @@ export default async function ProgresoAlumnoPage({ params }: Props) {
           </section>
         );
       })}
+        </div>
+      </details>}
     </div>
   );
 }
