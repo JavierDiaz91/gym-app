@@ -64,7 +64,7 @@ export async function createTrainingPlan(input: PlanInput): Promise<{ success: b
     // Categories must already exist in training_categories (global or gym-local).
     const categoryRows = await sql`
       SELECT id, dimension, slug FROM training_categories
-      WHERE is_active = TRUE AND (gym_id = ${gymId} OR (gym_id IS NULL AND EXISTS (SELECT 1 FROM training_category_preferences pref WHERE pref.gym_id = ${gymId} AND pref.category_id = training_categories.id AND pref.is_enabled = TRUE)))
+      WHERE is_active = TRUE AND gym_id = ${gymId} AND trainer_id = ${trainerId}
     `;
     const categoryIds = choices.map(([dim, slug]) =>
       categoryRows.find((c) => c.dimension === dim && c.slug === slug)?.id
@@ -219,15 +219,55 @@ export async function listExerciseImages() {
 
 
 export async function listEnabledTrainingCategories() {
- const {gymId}=await trainerContext();
+ const {gymId,trainerId}=await trainerContext();
  const rows=await sql`
  SELECT c.dimension,c.slug,c.label
  FROM training_categories c
- WHERE c.is_active=TRUE AND
- (c.gym_id=${gymId} OR (c.gym_id IS NULL AND EXISTS (
- SELECT 1 FROM training_category_preferences p
- WHERE p.gym_id=${gymId} AND p.category_id=c.id AND p.is_enabled=TRUE)))
+ WHERE c.is_active=TRUE AND c.gym_id=${gymId} AND c.trainer_id=${trainerId}
  ORDER BY c.dimension,c.label
  `;
  return rows.map(r=>({dimension:String(r.dimension),slug:String(r.slug),label:String(r.label)}));
+}
+
+export async function createTrainerCategory(dimension: string, labelInput: string) {
+  try {
+    const { gymId, trainerId } = await trainerContext();
+    const label = labelInput.trim().replace(/\\s+/g, " ");
+    if (!dimensions.includes(dimension as typeof dimensions[number]) || label.length < 2 || label.length > 80)
+      return { success: false, error: "Ingresá un nombre de 2 a 80 caracteres." };
+    const existing = await sql`SELECT id FROM training_categories
+      WHERE gym_id=${gymId} AND trainer_id=${trainerId} AND dimension=${dimension}
+      AND lower(label)=lower(${label}) LIMIT 1`;
+    if (existing.length) return { success: false, error: "Ya tenés una categoría con ese nombre." };
+    const slug = "trainer-" + trainerId + "-" + dimension + "-" + crypto.randomUUID();
+    await sql`INSERT INTO training_categories (gym_id, trainer_id, dimension, slug, label, is_active)
+      VALUES (${gymId}, ${trainerId}, ${dimension}, ${slug}, ${label}, TRUE)`;
+    revalidatePath("/trainer/rutinas/planes");
+    revalidatePath("/trainer/mis-categorias");
+    return { success: true };
+  } catch (error) {
+    console.error("Error creando categoría de entrenador", error);
+    return { success: false, error: "No se pudo crear la categoría. Verificá que la migración 010 esté aplicada." };
+  }
+}
+
+export async function setTrainerCategoryActive(slug: string, active: boolean) {
+  try {
+    const { gymId, trainerId } = await trainerContext();
+    const rows = await sql`UPDATE training_categories SET is_active=${active}
+      WHERE gym_id=${gymId} AND trainer_id=${trainerId} AND slug=${slug}
+      RETURNING id`;
+    if (!rows.length) return { success: false, error: "Categoría no encontrada" };
+    revalidatePath("/trainer/rutinas/planes");
+    revalidatePath("/trainer/mis-categorias");
+    return { success: true };
+  } catch { return { success: false, error: "No se pudo actualizar la categoría" }; }
+}
+
+export async function listTrainerCategoriesForManagement() {
+  const { gymId, trainerId } = await trainerContext();
+  const rows = await sql`SELECT dimension, slug, label, is_active FROM training_categories
+    WHERE gym_id=${gymId} AND trainer_id=${trainerId}
+    ORDER BY dimension, label`;
+  return rows.map(r => ({ dimension: String(r.dimension), slug: String(r.slug), label: String(r.label), active: Boolean(r.is_active) }));
 }
