@@ -1,0 +1,114 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Activity, BarChart3, Dumbbell, TrendingUp } from "lucide-react";
+
+export type ProgressSet = {
+  exercise: string; week: number; day: number; set: number;
+  load: number | null; reps: number | null; rir: number | null;
+};
+export type ProgressPlan = {
+  id: number; title: string; weeks: number; daysPerWeek: number;
+  completed: number; inProgress: number; completedExercises: number;
+  weeklyCompleted: number[]; sets: ProgressSet[];
+};
+type Metric = "load" | "reps" | "rir";
+
+const metricLabel: Record<Metric, string> = { load: "Peso (kg)", reps: "Repeticiones", rir: "RIR" };
+const fmt = (n: number) => new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(n);
+
+function TrendChart({ points, metric }: { points: { label: string; value: number }[]; metric: Metric }) {
+  if (!points.length) return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">Sin datos reales registrados para este ejercicio y esta métrica.</div>;
+  const width = 680, height = 235, left = 50, right = 20, top = 20, bottom = 42;
+  const values = points.map((p) => p.value);
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || Math.max(1, max * 0.15);
+  const lo = Math.max(0, min - range * 0.18), hi = max + range * 0.18;
+  const x = (i: number) => left + (points.length === 1 ? (width - left - right) / 2 : i * (width - left - right) / (points.length - 1));
+  const y = (v: number) => top + (hi - v) * (height - top - bottom) / (hi - lo);
+  const polyline = points.map((p, i) => `${x(i)},${y(p.value)}`).join(" ");
+  return (
+    <div className="overflow-x-auto rounded-xl border p-3">
+      <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[360px] w-full" role="img" aria-label={`Evolución de ${metricLabel[metric]}: ${points.map(p => p.label + " " + fmt(p.value)).join(", ")}`}>
+        {[0, 1, 2, 3, 4].map(i => {
+          const value = lo + (hi - lo) * i / 4;
+          return <g key={i}><line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="currentColor" opacity=".12" /><text x={left - 8} y={y(value) + 4} textAnchor="end" fontSize="11" fill="currentColor" opacity=".7">{fmt(value)}</text></g>;
+        })}
+        {points.length > 1 && <polyline points={polyline} fill="none" stroke="#0d9488" strokeWidth="3" strokeLinejoin="round" />}
+        {points.map((p, i) => <g key={i}><circle cx={x(i)} cy={y(p.value)} r="5" fill="#0d9488" /><text x={x(i)} y={height - 14} fontSize="11" textAnchor="middle" fill="currentColor">{p.label}</text></g>)}
+      </svg>
+      <p className="text-center text-xs text-muted-foreground">Cada punto representa el máximo valor registrado en esa semana. Las semanas sin registros se omiten.</p>
+    </div>
+  );
+}
+
+export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) {
+  const [planId, setPlanId] = useState(plans[0]?.id ?? 0);
+  const [metric, setMetric] = useState<Metric>("load");
+  const [exercise, setExercise] = useState("");
+  const plan = plans.find(p => p.id === planId) || plans[0];
+  const exercises = useMemo(() => [...new Set((plan?.sets || []).map(s => s.exercise))].sort((a, b) => a.localeCompare(b, "es")), [plan]);
+  const selectedExercise = exercises.includes(exercise) ? exercise : (exercises[0] || "");
+  const points = useMemo(() => {
+    if (!plan || !selectedExercise) return [];
+    const weekly = new Map<number, number>();
+    for (const row of plan.sets) {
+      if (row.exercise !== selectedExercise) continue;
+      const value = row[metric];
+      if (value == null) continue;
+      weekly.set(row.week, Math.max(value, weekly.get(row.week) ?? -Infinity));
+    }
+    return [...weekly.entries()].sort((a, b) => a[0] - b[0]).map(([week, value]) => ({ label: `Sem. ${week}`, value }));
+  }, [plan, selectedExercise, metric]);
+  if (!plan) return null;
+  const total = plan.weeks * plan.daysPerWeek;
+  const percent = total ? Math.round(plan.completed / total * 100) : 0;
+  const completedPct = (week: number) => plan.daysPerWeek ? Math.round((plan.weeklyCompleted[week - 1] || 0) / plan.daysPerWeek * 100) : 0;
+  return (
+    <section className="space-y-5 rounded-2xl border bg-card p-4 shadow-sm sm:p-6">
+      <div className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /><h2 className="text-xl font-bold">Dashboard de evolución</h2></div>
+      <div>
+        <label htmlFor="progress-plan" className="mb-1 block text-sm font-medium">Plan de entrenamiento</label>
+        <select id="progress-plan" value={plan.id} onChange={e => { setPlanId(Number(e.target.value)); setExercise(""); }} className="w-full rounded-lg border bg-background p-2 text-sm">
+          {plans.map(p => <option key={p.id} value={p.id}>{p.title} · Asignación #{p.id}</option>)}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { label: "Cumplimiento", value: `${percent}%`, icon: Activity },
+          { label: "Sesiones finalizadas", value: `${plan.completed} / ${total}`, icon: BarChart3 },
+          { label: "En curso", value: String(plan.inProgress), icon: TrendingUp },
+          { label: "Ejercicios completados", value: String(plan.completedExercises), icon: Dumbbell },
+        ].map(k => <div key={k.label} className="rounded-xl bg-muted/60 p-4"><k.icon className="mb-2 h-4 w-4 text-primary" /><p className="text-xs text-muted-foreground">{k.label}</p><p className="text-2xl font-bold">{k.value}</p></div>)}
+      </div>
+      <div className="h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, percent)}%` }} /></div>
+      <div className="space-y-3">
+        <h3 className="font-semibold">Cumplimiento por semana</h3>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: plan.weeks }, (_, i) => {
+            const percentage = completedPct(i + 1);
+            return <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between text-sm"><span>Semana {i + 1}</span><strong>{percentage}%</strong></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, percentage)}%` }} /></div><p className="mt-2 text-xs text-muted-foreground">{plan.weeklyCompleted[i] || 0} de {plan.daysPerWeek} sesiones</p></div>;
+          })}
+        </div>
+      </div>
+      <div className="space-y-3 border-t pt-5">
+        <h3 className="font-semibold">Evolución de rendimiento por ejercicio</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">Ejercicio
+            <select value={selectedExercise} onChange={e => setExercise(e.target.value)} disabled={!exercises.length} className="mt-1 block w-full rounded-lg border bg-background p-2">
+              {!exercises.length && <option value="">Sin cargas registradas</option>}
+              {exercises.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </label>
+          <label className="text-sm">Indicador
+            <select value={metric} onChange={e => setMetric(e.target.value as Metric)} className="mt-1 block w-full rounded-lg border bg-background p-2">
+              <option value="load">Peso (kg)</option><option value="reps">Repeticiones</option><option value="rir">RIR</option>
+            </select>
+          </label>
+        </div>
+        <TrendChart points={points} metric={metric} />
+        <p className="text-xs text-muted-foreground">Solo se grafican valores realmente ingresados por el alumno. El cumplimiento se calcula sobre sesiones finalizadas, no sobre cargas registradas.</p>
+      </div>
+    </section>
+  );
+}
