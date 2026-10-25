@@ -8,9 +8,9 @@ type Prescription = { sets?: number; reps?: string; rir?: string; restSeconds?: 
 type Item = { key: string; title: string; imageUrl?: string; imageVerified?: boolean; instructions?: string; prescriptions: Prescription[] };
 type SetLog = { key: string; setIndex: number; reps: number | null; load: number | null; rir: number | null };
 type Block = { title: string; type?: string; items: Item[] };
-type Props = { assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; initialSets: SetLog[]; startedAt?: string | null; finishedAt?: string | null };
+type Props = { readOnly?: boolean; assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; initialSets: SetLog[]; startedAt?: string | null; finishedAt?: string | null };
 
-export default function PlanSessionClient({ assignmentId, week, day, title, blocks, status, initialCompleted, initialSets, startedAt, finishedAt }: Props) {
+export default function PlanSessionClient({ readOnly = false, assignmentId, week, day, title, blocks, status, initialCompleted, initialSets, startedAt, finishedAt }: Props) {
   const router = useRouter();
   const [pending, transition] = useTransition();
   const [error, setError] = useState("");
@@ -38,21 +38,21 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
           <div>
             <p className="text-xs font-semibold text-primary uppercase tracking-wide">Semana {week} · Día {day}</p>
             <h2 className="text-xl font-bold">{title}</h2>
-            <p className="text-sm text-muted-foreground">{status === "completed" ? "Sesión finalizada" : status === "in_progress" ? "Sesión en curso" : "Lista para empezar"}</p>
+            <p className="text-sm text-muted-foreground">{status === "completed" ? "Sesión finalizada" : readOnly ? "Consulta de semana fuera de vigencia" : status === "in_progress" ? "Sesión en curso" : "Lista para empezar"}</p>
           </div>
           <div className="rounded-xl bg-muted px-4 py-2 text-sm font-semibold">{done} de {total} ejercicios</div>
         </div>
         <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary transition-all" style={{ width: total ? `${done / total * 100}%` : "0%" }} /></div>
-        {status === "not_started" && <button disabled={pending} onClick={() => run(() => startPlanSession(assignmentId, week, day))} className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground disabled:opacity-50">Iniciar actividad</button>}
-        {status === "in_progress" && <button disabled={pending || done !== total || total === 0} onClick={() => {
+        {!readOnly && status === "not_started" && <button disabled={pending} onClick={() => run(() => startPlanSession(assignmentId, week, day))} className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground disabled:opacity-50">Iniciar actividad</button>}
+        {!readOnly && status === "in_progress" && <button disabled={pending || done !== total || total === 0} onClick={() => {
           if (dirtySeries.length && !window.confirm(`Tenés ${dirtySeries.length} serie(s) con cambios sin guardar. Si finalizás ahora, esos cambios se perderán. ¿Finalizar igualmente?`)) return;
           if (!window.confirm("¿Finalizar esta actividad? No podrás volver a editarla.")) return;
           run(() => finishPlanSession(assignmentId, week, day));
         }} className="w-full rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-40">Finalizar actividad</button>}
-        {status === "in_progress" && done !== total && <p className="text-xs text-muted-foreground">Marcá todos los ejercicios realizados para habilitar la finalización.</p>}
+        {!readOnly && status === "in_progress" && done !== total && <p className="text-xs text-muted-foreground">Marcá todos los ejercicios realizados para habilitar la finalización.</p>}
         {status === "completed" && <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-700 dark:text-emerald-300">Actividad finalizada. No se puede finalizar por segunda vez.</div>}
         {startedAt && <p className="text-xs text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
-        {status === "in_progress" && dirtySeries.length > 0 && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">Tenés {dirtySeries.length} serie(s) con cambios sin guardar. Guardalas antes de finalizar para conservar sus valores.</p>}
+        {!readOnly && status === "in_progress" && dirtySeries.length > 0 && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">Tenés {dirtySeries.length} serie(s) con cambios sin guardar. Guardalas antes de finalizar para conservar sus valores.</p>}
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
       </section>
       {blocks.map((block, index) => (
@@ -67,7 +67,7 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
                 <div className="p-4 sm:p-5 space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div><p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p><h4 className="text-lg font-bold text-slate-950 dark:text-white">{item.title}</h4></div>
-                    {status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-sm font-semibold cursor-pointer"><input type="checkbox" disabled={pending || status === "completed"} checked={checked} onChange={e => {
+                    {status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-sm font-semibold cursor-pointer"><input type="checkbox" disabled={pending || readOnly || status === "completed"} checked={checked} onChange={e => {
                       const next = e.target.checked;
                       run(() => markPlanExercise(assignmentId, week, day, item.key, next), () => setCompleted(old => next ? [...old.filter(k => k !== item.key), item.key] : old.filter(k => k !== item.key)));
                     }} className="h-5 w-5 accent-emerald-600" />Hecho</label>}
@@ -90,7 +90,7 @@ export default function PlanSessionClient({ assignmentId, week, day, title, bloc
                           const index = i + 1;
                           const saved = sets.find((x) => x.key === item.key && x.setIndex === index);
                           return (
-                            <SetEntry key={index} index={index} saved={saved} disabled={pending || status === "completed"}
+                            <SetEntry key={index} index={index} saved={saved} disabled={pending || readOnly || status === "completed"}
                               onDirtyChange={(dirty) => setDirtySeries((old) => dirty
                                 ? old.includes(seriesId(item.key, index)) ? old : [...old, seriesId(item.key, index)]
                                 : old.filter((id) => id !== seriesId(item.key, index)))}
