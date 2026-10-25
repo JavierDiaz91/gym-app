@@ -13,6 +13,7 @@ interface Member {
   activity_type: string | null;
   level: string | null;
   routine_id: number | null;
+  activePlanIds?: number[];
 }
 
 interface Routine {
@@ -104,6 +105,12 @@ export default function BulkAssignClient({
     return map[act.toLowerCase()] || act;
   };
 
+  const selectedPlanId = selectedRoutine.startsWith("plan:") ? Number(selectedRoutine.split(":")[1]) : null;
+  const alreadyAssigned = selectedPlanId === null ? [] : selectedMembers.filter((id) =>
+    initialMembers.find((m) => m.id === id)?.activePlanIds?.includes(selectedPlanId)
+  );
+  const eligibleMembers = selectedMembers.filter((id) => !alreadyAssigned.includes(id));
+
   // Enviar asignación masiva al servidor
   const handleAssign = () => {
     if (selectedMembers.length === 0) {
@@ -115,6 +122,12 @@ export default function BulkAssignClient({
       return;
     }
 
+    if (eligibleMembers.length === 0) {
+      setMessage({ type: "error", text: "Todos los alumnos seleccionados ya tienen activo este plan." });
+      return;
+    }
+    if (!window.confirm(`Se asignará el entrenamiento a ${eligibleMembers.length} alumno(s). ${alreadyAssigned.length} ya lo tienen activo y serán omitidos. ¿Confirmar?`)) return;
+
     startTransition(async () => {
       setMessage(null);
       const [kind, idText] = selectedRoutine.split(":");
@@ -123,14 +136,14 @@ export default function BulkAssignClient({
       if (kind === "plan") {
         let count = 0;
         const failures: string[] = [];
-        for (const memberId of selectedMembers) {
+        for (const memberId of eligibleMembers) {
           const outcome = await assignTrainingPlan(selectedId, memberId);
           if (outcome.success) count++;
           else failures.push(`Alumno #${memberId}: ${outcome.error || "Error"}`);
         }
         res = { success: failures.length === 0, count, error: failures.length ? `${count} asignados; ${failures.length} fallidos. ${failures.slice(0, 3).join("; ")}` : undefined };
       } else {
-        res = await assignRoutineToMultipleMembersBulk(selectedMembers, selectedId);
+        res = await assignRoutineToMultipleMembersBulk(eligibleMembers, selectedId);
       }
 
       if (res.success) {
@@ -141,6 +154,7 @@ export default function BulkAssignClient({
 
         setSelectedMembers([]);
         setSelectedRoutine("");
+        window.location.reload();
 
         setTimeout(() => {
           setMessage(null);
@@ -300,7 +314,7 @@ export default function BulkAssignClient({
           <button
             type="button"
             onClick={handleAssign}
-            disabled={isPending || selectedMembers.length === 0 || !selectedRoutine}
+            disabled={isPending || eligibleMembers.length === 0 || !selectedRoutine}
             className="px-6 py-3 text-xs font-extrabold text-black bg-[#00aeef] hover:bg-[#0098d4] disabled:bg-muted disabled:text-muted-foreground rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed shadow-md"
           >
             {isPending ? (
@@ -311,13 +325,16 @@ export default function BulkAssignClient({
             ) : (
               <>
                 <Send className="w-3.5 h-3.5 text-black" />
-                Asignar a ({selectedMembers.length})
+                Asignar a ({eligibleMembers.length})
               </>
             )}
           </button>
         </div>
 
-        <p className="text-xs text-muted-foreground">Asignar un plan crea una nueva asignación por alumno. Revisá si ya tiene ese plan antes de confirmar; no reemplaza ni borra las asignaciones existentes.</p>
+        {selectedPlanId !== null && selectedMembers.length > 0 && (
+          <p className="text-xs text-muted-foreground">{eligibleMembers.length} alumno(s) elegibles · {alreadyAssigned.length} ya tienen el plan activo y se omitirán.</p>
+        )}
+        <p className="text-xs text-muted-foreground">Los planes activos existentes no se reemplazan. Se solicita confirmación antes de asignar.</p>
         {message && (
           <p
             className={`text-xs p-3 rounded-xl font-medium border ${
