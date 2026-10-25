@@ -7,10 +7,18 @@ export type ProgressSet = {
   exercise: string; week: number; day: number; set: number;
   load: number | null; reps: number | null; rir: number | null;
 };
+export type ProgressComparison = {
+  exercise: string; week: number; day: number;
+  plannedSets: number | null; plannedReps: string | null; plannedRir: string | null;
+  recordedSets: number;
+  actualReps: { set: number; value: number | null }[];
+  actualRir: { set: number; value: number | null }[];
+  actualLoad: { set: number; value: number | null }[];
+};
 export type ProgressPlan = {
   id: number; title: string; weeks: number; daysPerWeek: number;
   completed: number; inProgress: number; completedExercises: number;
-  weeklyCompleted: number[]; sets: ProgressSet[];
+  weeklyCompleted: number[]; sets: ProgressSet[]; comparisons: ProgressComparison[];
 };
 type Metric = "load" | "reps" | "rir";
 
@@ -55,9 +63,14 @@ export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) 
   const [planId, setPlanId] = useState(plans[0]?.id ?? 0);
   const [metric, setMetric] = useState<Metric>("load");
   const [exercise, setExercise] = useState("");
+  const [comparisonWeek, setComparisonWeek] = useState(0);
   const plan = plans.find(p => p.id === planId) || plans[0];
   const exercises = useMemo(() => [...new Set((plan?.sets || []).map(s => s.exercise))].sort((a, b) => a.localeCompare(b, "es")), [plan]);
   const selectedExercise = exercises.includes(exercise) ? exercise : (exercises[0] || "");
+  const availableComparisons = (plan?.comparisons || []).filter(c => c.exercise === selectedExercise);
+  const comparisonWeeks = [...new Set(availableComparisons.map(c => c.week))].sort((a, b) => a - b);
+  const selectedWeek = comparisonWeeks.includes(comparisonWeek) ? comparisonWeek : comparisonWeeks[comparisonWeeks.length - 1];
+  const selectedComparisons = availableComparisons.filter(c => c.week === selectedWeek).sort((a, b) => a.day - b.day);
   const points = useMemo(() => {
     if (!plan || !selectedExercise) return [];
     const weekly = new Map<number, number>();
@@ -123,6 +136,36 @@ export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) 
           <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Variación porcentual · {changePeriod}</p><p className="text-xl font-bold">{change === null ? "Sin comparación" : `${change > 0 ? "+" : ""}${fmt(change)}%`}</p></div>
         </div>
         <TrendChart points={points} metric={metric} weeks={plan.weeks} />
+        <div className="space-y-3 rounded-xl border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><h4 className="font-semibold">Planificado vs. realizado</h4><p className="text-xs text-muted-foreground">Comparación por serie, basada en la prescripción y en las cargas guardadas por el alumno.</p></div>
+            {comparisonWeeks.length > 0 && <label className="text-sm">Semana
+              <select value={selectedWeek} onChange={e => setComparisonWeek(Number(e.target.value))} className="ml-2 rounded-lg border bg-background p-2">
+                {comparisonWeeks.map(week => <option key={week} value={week}>Semana {week}</option>)}
+              </select>
+            </label>}
+          </div>
+          {selectedComparisons.length === 0 ? <p className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">Este ejercicio todavía no tiene registros para comparar.</p> : selectedComparisons.map(c => {
+            const series = [...new Set([...c.actualReps.map(v => v.set), ...c.actualRir.map(v => v.set), ...c.actualLoad.map(v => v.set)])].sort((a,b) => a-b);
+            const actualValue = (values: { set: number; value: number | null }[], set: number, unit = "") => {
+              const found = values.find(v => v.set === set)?.value;
+              return found == null ? "Sin registrar" : fmt(found) + unit;
+            };
+            const numericTarget = c.plannedReps != null && /^\\d+(?:[.,]\\d+)?$/.test(c.plannedReps.trim()) ? Number(c.plannedReps.replace(",", ".")) : null;
+            const repsWithData = c.actualReps.filter(v => v.value != null);
+            const repsMeeting = numericTarget != null ? repsWithData.filter(v => (v.value ?? 0) >= numericTarget).length : 0;
+            return <div key={`${c.week}-${c.day}`} className="space-y-3 rounded-lg bg-muted/30 p-3">
+              <h5 className="text-sm font-semibold">Semana {c.week} · Día {c.day}</h5>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-lg bg-background p-3 text-sm"><p className="text-xs text-muted-foreground">Series prescritas</p><strong>{c.plannedSets ?? "No especificadas"}</strong><p className="mt-1 text-xs">Con cargas registradas: {c.recordedSets}</p></div>
+                <div className="rounded-lg bg-background p-3 text-sm"><p className="text-xs text-muted-foreground">Repeticiones prescritas / serie</p><strong>{c.plannedReps ?? "No especificadas"}</strong><p className="mt-1 text-xs">{numericTarget == null ? "Sin porcentaje comparable" : repsWithData.length ? `${repsMeeting} de ${repsWithData.length} series registradas alcanzaron la meta` : "Sin repeticiones reales registradas"}</p></div>
+                <div className="rounded-lg bg-background p-3 text-sm"><p className="text-xs text-muted-foreground">RIR prescrito</p><strong>{c.plannedRir ?? "No especificado"}</strong><p className="mt-1 text-xs">Los RIR reales se muestran por serie.</p></div>
+              </div>
+              {series.length > 0 ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-2">Serie</th><th className="p-2">Peso real</th><th className="p-2">Reps reales</th><th className="p-2">RIR real</th></tr></thead><tbody>{series.map(set => <tr key={set} className="border-b last:border-0"><td className="p-2 font-medium">{set}</td><td className="p-2">{actualValue(c.actualLoad, set, " kg")}</td><td className="p-2">{actualValue(c.actualReps, set)}</td><td className="p-2">{actualValue(c.actualRir, set)}</td></tr>)}</tbody></table></div> : <p className="text-sm text-muted-foreground">El ejercicio fue marcado, pero no se registraron cargas opcionales.</p>}
+            </div>;
+          })}
+          <p className="text-xs text-muted-foreground">Las series con datos no equivalen necesariamente a series completadas. No se infieren valores faltantes ni se calculan porcentajes sobre campos opcionales vacíos.</p>
+        </div>
         <p className="text-xs text-muted-foreground">Todos los valores provienen de los registros del alumno. La variación compara máximos semanales y no implica necesariamente una mejora (especialmente en RIR). El cumplimiento se calcula únicamente con sesiones finalizadas.</p>
       </div>
     </section>
