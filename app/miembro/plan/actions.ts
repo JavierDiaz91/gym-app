@@ -15,6 +15,8 @@ export async function getMyTrainingPlan() {
     SELECT id, snapshot_jsonb, start_date, source_version
     FROM member_training_plans
     WHERE member_id = ${memberId} AND gym_id = ${gymId} AND status = 'active'
+      AND CURRENT_DATE >= start_date
+      AND CURRENT_DATE < start_date + (COALESCE((SELECT GREATEST(1, duration_weeks) FROM training_plans WHERE id = source_plan_id AND gym_id = ${gymId}), 4) * 7)
     ORDER BY assigned_at DESC, id DESC LIMIT 1
   `;
   if (!rows.length) return null;
