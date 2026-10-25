@@ -69,27 +69,27 @@ export function CreateTrainerModal({ buttonText = "Nuevo Entrenador", variant = 
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="last_name">Apellido</Label>
-              <Input id="last_name" name="last_name" required placeholder="GÃ³mez" />
+              <Input id="last_name" name="last_name" required placeholder="Gómez" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="email">Correo electrÃ³nico</Label>
+            <Label htmlFor="email">Correo electrónico</Label>
             <Input id="email" name="email" type="email" required placeholder="entrenador@correo.com" />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="password">ContraseÃ±a inicial</Label>
-            <Input id="password" name="password" type="password" required defaultValue="123456" />
+            <Label htmlFor="password">Contraseña inicial</Label>
+            <Input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" placeholder="Mínimo 8 caracteres" />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="specialization">EspecializaciÃ³n</Label>
-            <Input id="specialization" name="specialization" placeholder="MusculaciÃ³n / Hipertrofia" />
+            <Label htmlFor="specialization">Especialización</Label>
+            <Input id="specialization" name="specialization" placeholder="Musculación / Hipertrofia" />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="bio">BiografÃ­a / Notas</Label>
+            <Label htmlFor="bio">Biografía / Notas</Label>
             <Textarea id="bio" name="bio" rows={2} placeholder="Experiencia..." className="resize-none" />
           </div>
 

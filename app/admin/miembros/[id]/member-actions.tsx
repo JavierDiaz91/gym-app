@@ -20,6 +20,8 @@ import {
   updateMemberAction,
   createSubscription,
   getMembershipPlans,
+  getTrainers,
+  setMemberTrainerFromAdmin,
 } from "@/app/actions";
 import type { Member } from "@/app/types/member";
 
@@ -28,6 +30,8 @@ interface MembershipOption {
   name: string;
   price: number;
 }
+
+interface TrainerOption { id: number; first_name: string; last_name: string; is_active: boolean; }
 
 interface MemberActionsProps {
   member: Member;
@@ -40,6 +44,8 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
   const [isOpen, setIsOpen] = useState(false);
   const [isRenewOpen, setIsRenewOpen] = useState(false);
   const [renewPlanId, setRenewPlanId] = useState("");
+  const [trainers, setTrainers] = useState<TrainerOption[]>([]);
+  const [trainerId, setTrainerId] = useState(String(member.trainer_id ?? ""));
   const [membershipsList, setMembershipsList] = useState<MembershipOption[]>(initialMemberships);
 
   const [formData, setFormData] = useState({
@@ -67,6 +73,12 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
     fetchMemberships();
   }
 }, [isOpen, isRenewOpen, member]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    getTrainers().then((rows) => setTrainers(rows)).catch(() => setTrainers([]));
+    setTrainerId(String(member.trainer_id ?? ""));
+  }, [isOpen, member.trainer_id]);
 
   const handleStatusChange = (newStatus: string) => {
     startTransition(async () => {
@@ -105,6 +117,9 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
       });
 
       if (res?.success) {
+        const selected = trainerId ? Number(trainerId) : null;
+        const assigned = await setMemberTrainerFromAdmin(member.id, selected);
+        if (!assigned.success) { alert(assigned.error || "No se pudo asignar el entrenador"); return; }
         setIsOpen(false);
         router.refresh();
       } else {
@@ -171,7 +186,16 @@ export function MemberActions({ member, memberships: initialMemberships = [] }: 
                   }
                 />
               </div>
-
+              <div className="grid gap-2">
+                <Label htmlFor="trainer_id">Entrenador asignado</Label>
+                <select id="trainer_id" value={trainerId} onChange={(e) => setTrainerId(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <option value="">Sin entrenador</option>
+                  {trainers.filter((t) => t.is_active || String(t.id) === trainerId).map((t) => (
+                    <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <DialogFooter>
               <Button

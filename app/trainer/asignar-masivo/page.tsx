@@ -2,6 +2,7 @@ import { getSession } from "@/app/actions";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import BulkAssignClient from "./BulkAssignClient";
+import { listTrainingPlans } from "../rutinas/planes/actions";
 
 export default async function BulkAssignPage() {
   const session = await getSession();
@@ -12,6 +13,7 @@ export default async function BulkAssignPage() {
   let trainerId: number | null = null;
   let members: any[] = [];
   let routines: any[] = [];
+  const trainingPlans = (await listTrainingPlans()).filter(p => p.status === "published");
 
   try {
     // 1. Obtener ID del Entrenador
@@ -45,7 +47,17 @@ export default async function BulkAssignPage() {
       ? membersResult
       : (membersResult as any).rows || [];
 
-    members = rawMembers;
+    const memberIds = rawMembers.map((m: any) => Number(m.id));
+    const activeAssignments = memberIds.length ? await sql`
+      SELECT member_id, source_plan_id
+      FROM member_training_plans
+      WHERE gym_id = ${session.gymId} AND trainer_id = ${trainerId}
+        AND status = 'active' AND member_id = ANY(${memberIds}::bigint[])
+    ` : [];
+    members = rawMembers.map((m: any) => ({
+      ...m,
+      activePlanIds: activeAssignments.filter((a) => Number(a.member_id) === Number(m.id)).map((a) => Number(a.source_plan_id)),
+    }));
 
     // 3. Obtener SOLO las rutinas ACTIVAS creadas por ESTE entrenador
     const routinesResult = await sql`
@@ -82,7 +94,7 @@ export default async function BulkAssignPage() {
           </p>
         </div>
 
-        <BulkAssignClient initialMembers={members} routines={routines} />
+        <BulkAssignClient initialMembers={members} routines={routines} trainingPlans={trainingPlans} />
       </div>
     </div>
   );

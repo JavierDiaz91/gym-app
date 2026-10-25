@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { 
   UserPlus, 
   Dumbbell, 
@@ -14,7 +15,7 @@ import {
   History
 } from "lucide-react";
 import { assignMemberToTrainer, removeMemberFromTrainer, assignRoutineToMember } from "@/app/actions";
-import WorkoutHistoryModal from "./WorkoutHistoryModal";
+import { assignTrainingPlan, updateAssignedPlanStartDate } from "../rutinas/planes/actions";
 
 interface RoutineItem {
   id: number;
@@ -32,6 +33,8 @@ interface Member {
   routines?: RoutineItem[];
   last_workout_at?: string;
   last_workout?: string;
+  training_plan_title?: string;
+  training_plans?: { assignmentId: number; title: string; sourcePlanId: number; startDate: string; durationWeeks: number; lifecycle: string }[];
 }
 
 interface Routine {
@@ -46,12 +49,14 @@ interface Routine {
 interface AlumnosClientProps {
   initialMembers: Member[];
   routines: Routine[];
+  trainingPlans: { id: number; title: string; durationWeeks: number }[];
   sessionUserId: number | string;
 }
 
 export default function AlumnosClient({
   initialMembers,
   routines,
+  trainingPlans,
   sessionUserId,
 }: AlumnosClientProps) {
   const router = useRouter();
@@ -61,24 +66,32 @@ export default function AlumnosClient({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [search, setSearch] = useState("");
+  const [planFilter, setPlanFilter] = useState<"all" | "with" | "without">("all");
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   
   // Estado para el Modal de Historial
-  const [historyMember, setHistoryMember] = useState<Member | null>(null);
 
   // Estados para el Modal de Asignar Rutina
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [selectedRoutineId, setSelectedRoutineId] = useState<number | null>(null);
   const [assignLoading, setAssignLoading] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState("");
   const [assignError, setAssignError] = useState("");
+  const [dateEdit, setDateEdit] = useState<{ memberId: number; assignmentId: number; title: string; original: string } | null>(null);
+  const [newStartDate, setNewStartDate] = useState("");
+  const [dateError, setDateError] = useState("");
+  const [dateSaving, setDateSaving] = useState(false);
 
   useEffect(() => {
     setMembersList(initialMembers);
   }, [initialMembers]);
 
-  const filteredMembers = membersList.filter((m) =>
-    `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredMembers = membersList.filter((m) => {
+    const matchesName = `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase());
+    const hasPlan = (m.training_plans || []).some(p => p.lifecycle === 'current');
+    return matchesName && (planFilter === "all" || (planFilter === "with" ? hasPlan : !hasPlan));
+  });
+  const withPlanCount = membersList.filter((m) => (m.training_plans || []).some(p => p.lifecycle === 'current')).length;
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,31 +125,35 @@ export default function AlumnosClient({
 
   const handleAssignRoutine = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedMember || !selectedRoutineId) return;
+    if (!selectedMember || !selectedAssignment) return;
 
     setAssignLoading(true);
     setAssignError("");
 
     try {
-      const res = await assignRoutineToMember(selectedMember.id, selectedRoutineId);
+      const [kind, id] = selectedAssignment.split(":");
+      const res = kind === "plan"
+        ? await assignTrainingPlan(Number(id), selectedMember.id)
+        : await assignRoutineToMember(selectedMember.id, Number(id));
       setAssignLoading(false);
 
       if (res?.error) {
         setAssignError(res.error);
       } else {
-        const foundRoutine = routines.find((r) => Number(r.id) === Number(selectedRoutineId));
+        const foundRoutine = routines.find((r) => kind === "routine" && Number(r.id) === Number(id));
         const routineTitle = foundRoutine?.title || foundRoutine?.name || foundRoutine?.nombre || "Rutina";
 
         setMembersList((prev) =>
           prev.map((m) => {
             if (m.id === selectedMember.id) {
+              if (kind === "plan") return m;
               const updatedRoutines = m.routines ? [...m.routines] : [];
-              if (!updatedRoutines.some((r) => Number(r.id) === Number(selectedRoutineId))) {
-                updatedRoutines.push({ id: selectedRoutineId, title: routineTitle });
+              if (!updatedRoutines.some((r) => Number(r.id) === Number(id))) {
+                updatedRoutines.push({ id: Number(id), title: routineTitle });
               }
               return {
                 ...m,
-                routine_id: selectedRoutineId,
+                routine_id: Number(id),
                 routine_name: routineTitle,
                 routines: updatedRoutines,
               };
@@ -147,12 +164,27 @@ export default function AlumnosClient({
 
         setSelectedMember(null);
         setSelectedRoutineId(null);
+        setSelectedAssignment("");
         router.refresh();
       }
     } catch (err: any) {
       setAssignLoading(false);
       setAssignError(err?.message || "Ocurrió un error al asignar la rutina.");
     }
+  };
+
+  const saveStartDate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dateEdit || dateSaving) return;
+    setDateSaving(true);
+    setDateError("");
+    try {
+      const result = await updateAssignedPlanStartDate(dateEdit.assignmentId, dateEdit.memberId, newStartDate);
+      if (!result.success) { setDateError(result.error || "No se pudo actualizar."); return; }
+      setDateEdit(null);
+      router.refresh();
+    } catch { setDateError("No se pudo actualizar la fecha."); }
+    finally { setDateSaving(false); }
   };
 
   return (
@@ -181,162 +213,123 @@ export default function AlumnosClient({
         </button>
       </div>
 
-      {/* Buscador de Alumnos */}
-      {membersList.length > 0 && (
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-sm bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 focus:border-[#00aeef] text-foreground placeholder:text-muted-foreground transition-all"
-          />
-        </div>
-      )}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Alumnos vinculados</p><p className="mt-1 text-2xl font-bold">{membersList.length}</p></div>
+        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Con plan asignado</p><p className="mt-1 text-2xl font-bold text-[#00aeef]">{withPlanCount}</p></div>
+        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Sin plan asignado</p><p className="mt-1 text-2xl font-bold">{membersList.length - withPlanCount}</p></div>
+      </div>
 
-      {/* Grid de Alumnos */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input aria-label="Buscar alumnos" type="search" placeholder="Buscar alumnos por nombre..." value={search} onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 text-sm bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 text-foreground" />
+        </div>
+        <select aria-label="Filtrar por plan" value={planFilter} onChange={(e) => setPlanFilter(e.target.value as "all" | "with" | "without")}
+          className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground">
+          <option value="all">Todos los alumnos</option>
+          <option value="with">Con plan asignado</option>
+          <option value="without">Sin plan asignado</option>
+        </select>
+      </div>
+
       {filteredMembers.length === 0 ? (
-        <div className="bg-card border border-border rounded-2xl p-12 text-center">
-          <div className="w-12 h-12 bg-secondary text-muted-foreground rounded-2xl flex items-center justify-center mx-auto mb-3 border border-border">
-            <Users className="w-6 h-6" />
-          </div>
-          <h3 className="text-foreground font-semibold text-base">No tenés alumnos vinculados</h3>
-          <p className="text-muted-foreground text-sm max-w-sm mx-auto mt-1">
-            Usá el botón de "Vincular Alumno" para sumar tu primer atleta mediante su correo.
-          </p>
+        <div className="rounded-2xl border border-border bg-card p-10 text-center">
+          <Users className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+          <h3 className="font-semibold">{membersList.length ? "No hay alumnos con esos filtros" : "Todavía no tenés alumnos vinculados"}</h3>
+          <p className="mt-2 text-sm text-muted-foreground">{membersList.length ? "Probá con otro nombre o filtro." : "Vinculá un alumno para empezar a gestionar sus planes."}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="space-y-4">
           {filteredMembers.map((member) => {
             const initials = `${member.first_name?.[0] || ""}${member.last_name?.[0] || ""}`.toUpperCase();
-            const hasRoutinesArray = member.routines && member.routines.length > 0;
-            const hasSingleRoutine = !!member.routine_name;
-
+            const plans = member.training_plans || [];
+            const currentPlan = plans.find(p => p.lifecycle === 'current');
+            const scheduledPlan = plans.find(p => p.lifecycle === 'scheduled');
             return (
-              <div
-                key={member.id}
-                className="bg-card border border-border hover:border-[#00aeef]/40 rounded-2xl p-5 shadow-lg transition-all duration-200 flex flex-col justify-between relative group"
-              >
-                <div>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      {/* Avatar con degradado Cyan */}
-                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#00aeef] to-cyan-700 text-black font-extrabold text-sm flex items-center justify-center shadow-md">
-                        {initials}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-foreground text-sm leading-tight">
-                          {member.first_name} {member.last_name}
-                        </h3>
-                        <span className="inline-block mt-0.5 text-[11px] font-semibold bg-[#00aeef]/10 text-[#00aeef] px-2 py-0.5 rounded-md border border-[#00aeef]/20">
-                          Activo
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="relative">
-                      <button
-                        onClick={() => setActiveMenuId(activeMenuId === member.id ? null : member.id)}
-                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-
-                      {activeMenuId === member.id && (
-                        <div className="absolute right-0 mt-1 w-44 bg-popover rounded-xl shadow-xl border border-border py-1.5 z-20">
-                          <button
-                            onClick={() => {
-                              setActiveMenuId(null);
-                              handleRemoveMember(member.id);
-                            }}
-                            className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 transition-colors"
-                          >
-                            <UserX className="w-3.5 h-3.5" />
-                            <span>Desvincular alumno</span>
-                          </button>
-                        </div>
-                      )}
+              <article key={member.id} className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-sm hover:border-[#00aeef]/30 transition-colors">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00aeef]/15 text-[#00aeef] font-extrabold">{initials}</div>
+                    <div>
+                      <h2 className="text-lg font-bold">{member.first_name} {member.last_name}</h2>
+                      <p className="text-xs text-muted-foreground">Alumno vinculado · {member.status === "inactive" ? "Inactivo" : "Activo"}</p>
                     </div>
                   </div>
-
-                  {/* Panel con Rutina Asignada e Historial */}
-                  <div className="bg-secondary/50 rounded-xl p-3 space-y-2.5 border border-border mb-4">
-                    <div>
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                        Rutina Asignada
-                      </span>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {hasRoutinesArray ? (
-                          member.routines!.map((r) => (
-                            <span 
-                              key={r.id}
-                              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#00aeef]/10 text-[#00aeef] px-2.5 py-1 rounded-lg border border-[#00aeef]/20"
-                            >
-                              <Dumbbell className="w-3 h-3 text-[#00aeef]" />
-                              {r.title}
-                            </span>
-                          ))
-                        ) : hasSingleRoutine ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#00aeef]/10 text-[#00aeef] px-2.5 py-1 rounded-lg border border-[#00aeef]/20">
-                            <Dumbbell className="w-3 h-3 text-[#00aeef]" />
-                            {member.routine_name}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">Sin rutina asignada</span>
-                        )}
+                  <div className="relative">
+                    <button aria-label={`Opciones de ${member.first_name}`} onClick={() => setActiveMenuId(activeMenuId === member.id ? null : member.id)} className="rounded-lg p-2 hover:bg-secondary"><MoreVertical className="h-5 w-5" /></button>
+                    {activeMenuId === member.id && (
+                      <div className="absolute right-0 z-20 w-48 rounded-xl border border-border bg-popover p-2 shadow-xl">
+                        <button onClick={() => {setActiveMenuId(null); handleRemoveMember(member.id);}} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-rose-500 hover:bg-rose-500/10"><UserX className="h-4 w-4" />Desvincular alumno</button>
                       </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                        Último entreno:
-                      </span>
-                      <span className="font-semibold text-foreground">
-                        {member.last_workout || "Sin registros"}
-                      </span>
-                    </div>
-
-                    {/* BOTÓN VER HISTORIAL DEL ALUMNO */}
-                    <div className="pt-2 border-t border-border flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setHistoryMember(member)}
-                        className="text-xs font-semibold text-[#00aeef] hover:text-[#33c0f4] flex items-center gap-1.5 hover:underline cursor-pointer transition-colors"
-                      >
-                        <History className="w-3.5 h-3.5" />
-                        Ver Historial Completo
-                      </button>
-                    </div>
+                    )}
                   </div>
                 </div>
-
-                {/* Botón Asignar Rutina */}
-                <button
-                  onClick={() => {
-                    setSelectedMember(member);
-                    setSelectedRoutineId(member.routine_id || (routines[0]?.id ? Number(routines[0].id) : null));
-                    setAssignError("");
-                  }}
-                  className="w-full flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border hover:border-[#00aeef]/40 font-semibold py-2 rounded-xl text-xs transition-all"
-                >
-                  <Dumbbell className="w-3.5 h-3.5 text-[#00aeef]" />
-                  <span>Asignar Nueva Rutina</span>
-                </button>
-              </div>
+                <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.65fr)]">
+                  <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan de entrenamiento</p>
+                    {currentPlan ? (
+                      <>
+                        <Link href={`/trainer/alumnos/${member.id}/progreso?plan=${currentPlan.assignmentId}`} className="font-semibold text-[#00aeef] hover:underline">{currentPlan.title}</Link>
+                        <p className="mt-1 text-xs text-muted-foreground">Asignación #{currentPlan.assignmentId}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">Inicio: {currentPlan.startDate} · Duración: {currentPlan.durationWeeks} semanas</p>
+                      </>
+                    ) : <p className="text-sm text-muted-foreground">Sin plan vigente.</p>}
+                    {scheduledPlan && <p className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/5 p-2 text-xs text-sky-400">Próximo plan: {scheduledPlan.title} · Inicio: {scheduledPlan.startDate}</p>}
+                    {plans.filter(p => p.lifecycle !== "expired").map(p => (
+                      <button key={p.assignmentId} type="button"
+                        onClick={() => { setDateEdit({ memberId: member.id, assignmentId: p.assignmentId, title: p.title, original: p.startDate }); setNewStartDate(p.startDate); setDateError(""); }}
+                        className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#00aeef] hover:underline">
+                        <Calendar className="h-3.5 w-3.5" />Modificar inicio · {p.title}
+                      </button>
+                    ))}
+                    {(member.routines?.length || 0) > 0 && <p className="mt-3 text-xs text-muted-foreground">Rutinas anteriores: {member.routines?.map((r) => r.title).join(", ")}</p>}
+                  </div>
+                  <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Último entrenamiento</p>
+                    <p className="mt-2 text-sm font-semibold">{member.last_workout || "Sin registros"}</p>
+                    <p className="mt-3 text-xs text-muted-foreground">Consultá la evolución y el historial desde los accesos inferiores.</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button onClick={() => {setSelectedMember(member);setSelectedRoutineId(member.routine_id || null);setSelectedAssignment("");setAssignError("");}}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#00aeef] px-4 py-2.5 text-xs font-bold text-black hover:bg-[#0098d4]"><Dumbbell className="h-4 w-4" />Asignar plan o rutina</button>
+                  <Link href={`/trainer/alumnos/${member.id}/progreso`} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary"><Dumbbell className="h-4 w-4" />Ver progreso</Link>
+                  <Link href={`/trainer/alumnos/${member.id}/progreso/historial`} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary"><History className="h-4 w-4" />Historial</Link>
+                </div>
+              </article>
             );
           })}
         </div>
       )}
 
+      {dateEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <form onSubmit={saveStartDate} className="w-full max-w-md space-y-4 rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-bold">Modificar fecha de inicio</h3>
+              <button type="button" aria-label="Cerrar" onClick={() => setDateEdit(null)}><X className="h-5 w-5" /></button>
+            </div>
+            <p className="text-sm text-muted-foreground">{dateEdit.title}</p>
+            <p className="text-xs text-muted-foreground">Fecha actual: {dateEdit.original}. El cambio afecta solo a este alumno y mantiene la duración del plan. Si existen entrenamientos registrados, el sistema no permitirá cambiarla.</p>
+            <label className="block space-y-2 text-sm font-semibold">
+              <span>Nueva fecha de inicio</span>
+              <input type="date" required value={newStartDate} onChange={e => setNewStartDate(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-foreground" />
+            </label>
+            {dateError && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-400">{dateError}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setDateEdit(null)} className="rounded-xl border border-border px-4 py-2 text-sm">Cancelar</button>
+              <button type="submit" disabled={dateSaving || !newStartDate || newStartDate === dateEdit.original}
+                className="rounded-xl bg-[#00aeef] px-4 py-2 text-sm font-bold text-black disabled:opacity-50">
+                {dateSaving ? "Guardando..." : "Confirmar cambio"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* MODAL HISTORIAL DE ENTRENAMIENTOS */}
-      <WorkoutHistoryModal
-        member={historyMember}
-        isOpen={!!historyMember}
-        onClose={() => setHistoryMember(null)}
-      />
 
       {/* MODAL ASIGNAR RUTINA */}
       {selectedMember && (
@@ -344,7 +337,7 @@ export default function AlumnosClient({
           <div className="bg-card rounded-2xl max-w-md w-full p-6 shadow-2xl border border-border space-y-4 text-card-foreground">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-foreground">
-                Asignar Rutina a {selectedMember.first_name}
+                Asignar entrenamiento a {selectedMember.first_name}
               </h3>
               <button 
                 onClick={() => setSelectedMember(null)}
@@ -355,32 +348,29 @@ export default function AlumnosClient({
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Selecciona la rutina de tu catálogo que querés asignarle a este atleta.
+              Seleccioná un plan publicado o una rutina anterior para este alumno.
             </p>
 
             <form onSubmit={handleAssignRoutine} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1.5">
-                  Rutina
+                  Plan o rutina
                 </label>
-                {routines.length === 0 ? (
-                  <p className="text-xs text-amber-500 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
-                    No tenés rutinas creadas. Creá una rutina primero desde la sección Rutinas.
-                  </p>
+                {routines.length === 0 && trainingPlans.length === 0 ? (
+                  <p className="text-xs text-amber-500 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">No hay rutinas ni planes publicados disponibles.</p>
                 ) : (
-                  <select
-                    value={selectedRoutineId || ""}
-                    onChange={(e) => setSelectedRoutineId(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 focus:border-[#00aeef] text-foreground"
-                  >
-                    {routines.map((r) => (
-                      <option key={r.id} value={r.id} className="bg-card text-card-foreground">
-                        {r.title || r.nombre || r.name || `Rutina #${r.id}`}
-                      </option>
-                    ))}
+                  <select value={selectedAssignment} onChange={(e) => setSelectedAssignment(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm bg-background border border-border rounded-xl text-foreground">
+                    <option value="">Seleccioná una rutina o plan</option>
+                    {trainingPlans.map((p) => <option key={`plan:${p.id}`} value={`plan:${p.id}`}>{p.title} · {p.durationWeeks} semanas (plan)</option>)}
+                    {routines.map((r) => <option key={`routine:${r.id}`} value={`routine:${r.id}`}>{r.title || r.nombre || r.name || `Rutina #${r.id}`} (rutina)</option>)}
                   </select>
                 )}
               </div>
+
+              {selectedAssignment.startsWith("plan:") && selectedMember.training_plans?.some((p) => p.sourcePlanId === Number(selectedAssignment.split(":")[1]) && p.lifecycle !== 'expired') && (
+                <p className="text-xs text-amber-600">Este alumno ya tiene activo el plan seleccionado. No se permite duplicarlo.</p>
+              )}
 
               {assignError && (
                 <p className="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-xl font-medium">
@@ -398,7 +388,7 @@ export default function AlumnosClient({
                 </button>
                 <button
                   type="submit"
-                  disabled={assignLoading || routines.length === 0 || !selectedRoutineId}
+                  disabled={assignLoading || !selectedAssignment || (selectedAssignment.startsWith("plan:") && !!selectedMember.training_plans?.some((p) => p.sourcePlanId === Number(selectedAssignment.split(":")[1])))}
                   className="px-4 py-2 text-xs font-extrabold bg-[#00aeef] hover:bg-[#0098d4] text-black rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {assignLoading ? "Asignando..." : "Confirmar Asignación"}
