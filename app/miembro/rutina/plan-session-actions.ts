@@ -15,9 +15,13 @@ async function memberContext(assignmentId: number, week: number, day: number) {
     LEFT JOIN training_plans tp ON tp.id = mtp.source_plan_id AND tp.gym_id = mtp.gym_id
     WHERE mtp.id = ${assignmentId} AND mtp.gym_id = ${session.gymId}
       AND m.user_id = ${session.id} AND mtp.status = 'active'
+      AND CURRENT_DATE >= mtp.start_date
+      AND CURRENT_DATE < mtp.start_date + (GREATEST(1, COALESCE(tp.duration_weeks, 4)) * 7)
+      AND CURRENT_DATE >= mtp.start_date + ((${week} - 1) * 7)
+      AND CURRENT_DATE < mtp.start_date + (${week} * 7)
     LIMIT 1
   `;
-  if (!rows.length) throw new Error("Plan no asignado");
+  if (!rows.length) throw new Error("Esta semana no está vigente, todavía no comenzó o ya expiró.");
   const days = rows[0].snapshot_jsonb?.days;
   const weeks = Number(rows[0].duration_weeks) || 4;
   if (!Array.isArray(days) || day > days.length || week > weeks) throw new Error("Semana o día inválido");
