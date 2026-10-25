@@ -5,6 +5,9 @@ import Link from "next/link";
 import { archiveTrainerExercise, listTrainerExercises, saveTrainerExercise, uploadTrainerExerciseImage, type ExerciseInput, type TrainerExercise } from "./actions";
 
 const empty: ExerciseInput = { name: "", instructions: "", imageUrl: "", muscleGroup: "", equipment: "" };
+// Presentation-only: the original image URL and Blob contents are never altered.
+const imageFrame = "flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-300 bg-slate-100 p-2 dark:border-slate-600 dark:bg-slate-100";
+const monochromeImage = "h-full w-full object-contain grayscale";
 const inputClass = "w-full rounded-lg border border-slate-300 bg-background px-3 py-2 text-sm dark:border-slate-700";
 export default function ExerciseLibrary({ initial }: {initial: TrainerExercise[]}) {
   const [items, setItems] = useState(initial);
@@ -60,15 +63,15 @@ export default function ExerciseLibrary({ initial }: {initial: TrainerExercise[]
         <label className="space-y-1 text-sm font-medium">Imagen demostrativa (desde tu computadora)<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" disabled={uploading || pending} className={inputClass} onChange={e => { void uploadImage(e.target.files?.[0]); e.target.value = ""; }} /><span className="block text-xs text-muted-foreground">{uploading ? "Subiendo imagen..." : "JPG, PNG, WebP o GIF · máximo 5 MB"}</span></label>
       </div>
       <label className="block space-y-1 text-sm font-medium">Cómo realizarlo<textarea rows={3} maxLength={2000} className={inputClass} value={form.instructions} onChange={e=>setForm({...form,instructions:e.target.value})} placeholder="Instrucciones y técnica para el alumno" /></label>
-      {form.imageUrl && <div className="flex items-center gap-3"><img src={form.imageUrl} alt="Vista previa" className="h-24 w-24 rounded-xl border object-contain" /><span className="text-xs text-muted-foreground">Vista previa de la imagen</span></div>}
-      <p className="text-xs text-muted-foreground">La imagen se almacena en Vercel Blob. Una vez subida, guardá el ejercicio para asociarla a su biblioteca.</p>
+      {form.imageUrl && <div className="flex items-center gap-3"><div className={imageFrame}><img src={form.imageUrl} alt="Vista previa" className={monochromeImage} /></div><span className="text-xs text-muted-foreground">Vista previa en blanco y negro · el archivo original conserva sus colores.</span></div>}
+      <p className="text-xs text-muted-foreground">La imagen original se almacena en Vercel Blob sin modificar. La biblioteca la muestra en blanco y negro sobre un fondo uniforme.</p>
       <div className="flex gap-2"><button disabled={pending || uploading} type="submit" className="rounded-lg bg-cyan-500 px-5 py-2 font-semibold text-black disabled:opacity-50">{pending?"Guardando...":editingId?"Guardar cambios":"Crear ejercicio"}</button>{editingId && <button type="button" onClick={reset} className="rounded-lg border px-4 py-2">Cancelar</button>}</div>
     </form>
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-bold">Mi biblioteca ({items.length})</h2><input aria-label="Buscar ejercicio" className={inputClass+" max-w-xs"} placeholder="Buscar por nombre..." value={query} onChange={e=>setQuery(e.target.value)} /></div>
       <div className="grid gap-3 md:grid-cols-2">
         {items.filter(x=>x.name.toLowerCase().includes(query.toLowerCase())).map(x=><article key={x.id} className="flex gap-4 rounded-xl border-2 border-slate-300 bg-background p-4 shadow-sm dark:border-slate-700">
-          {x.imageUrl ? <img src={x.imageUrl} alt={x.name} className="h-24 w-24 shrink-0 rounded-lg border object-contain" /> : <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">Sin imagen</div>}
+          <div className={imageFrame}>{x.imageUrl ? <img src={x.imageUrl} alt={x.name} className={monochromeImage} /> : <span className="text-center text-xs text-slate-500">Sin imagen</span>}</div>
           <div className="min-w-0 flex-1 space-y-1"><h3 className="font-bold">{x.name}</h3><p className="text-xs text-muted-foreground">{[x.muscleGroup,x.equipment].filter(Boolean).join(" · ") || "Sin categoría"}</p><p className="line-clamp-2 text-xs text-muted-foreground">{x.instructions || "Sin instrucciones"}</p><div className="flex gap-2 pt-2"><button onClick={()=>edit(x)} className="rounded-lg border px-3 py-1 text-xs font-semibold">Editar</button><button disabled={pending} onClick={()=>archive(x)} className="rounded-lg border px-3 py-1 text-xs text-red-600">Archivar</button></div></div>
         </article>)}
       </div>
