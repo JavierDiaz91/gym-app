@@ -211,6 +211,40 @@ export async function assignTrainingPlan(planId: number, memberId: number, custo
   } catch { return { success: false, error: "No se pudo asignar" }; }
 }
 
+export async function updateAssignedPlanStartDate(assignmentId: number, memberId: number, dateInput: string) {
+  try {
+    const { gymId, trainerId } = await trainerContext();
+    if (!Number.isSafeInteger(assignmentId) || assignmentId <= 0 || !Number.isSafeInteger(memberId) || memberId <= 0 ||
+        !/^\\d{4}-\\d{2}-\\d{2}$/.test(dateInput)) {
+      return { success: false, error: "Fecha o asignación inválida." };
+    }
+    const parsed = new Date(dateInput + "T00:00:00Z");
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== dateInput) {
+      return { success: false, error: "Ingresá una fecha válida." };
+    }
+    // Solo la asignación propia; no modificar plantillas ni registros históricos.
+    const rows = await sql`
+      UPDATE member_training_plans mtp
+      SET start_date = ${dateInput}::date
+      WHERE mtp.id = ${assignmentId} AND mtp.member_id = ${memberId}
+        AND mtp.gym_id = ${gymId} AND mtp.trainer_id = ${trainerId}
+        AND mtp.status = 'active'
+        AND NOT EXISTS (
+          SELECT 1 FROM workout_sessions ws
+          WHERE ws.member_training_plan_id = mtp.id
+        )
+      RETURNING mtp.id
+    `;
+    if (!rows.length) return { success: false, error: "No se puede cambiar la fecha: verificá la asignación o si ya tiene entrenamientos registrados." };
+    revalidatePath("/trainer/alumnos");
+    revalidatePath("/miembro");
+    revalidatePath("/miembro/rutina");
+    return { success: true };
+  } catch {
+    return { success: false, error: "No se pudo actualizar la fecha de inicio." };
+  }
+}
+
 export async function listExerciseImages() {
   await trainerContext();
   const rows = await sql`SELECT id, name, image_url FROM exercises ORDER BY name LIMIT 500`;
