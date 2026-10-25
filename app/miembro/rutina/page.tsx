@@ -84,6 +84,18 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
       WHERE workout_session_id = ${workoutSession.id} AND set_index = 1 AND notes = 'completed'
     ` : [];
 
+    const setRows = workoutSession ? await sql`
+      SELECT item_snapshot_key, set_index, actual_reps, actual_load, actual_rir
+      FROM workout_set_logs WHERE workout_session_id = ${workoutSession.id}
+      ORDER BY item_snapshot_key, set_index
+    ` : [];
+    const initialSets = setRows.map((row) => ({
+      key: String(row.item_snapshot_key),
+      setIndex: Number(row.set_index),
+      reps: row.actual_reps == null ? null : Number(row.actual_reps),
+      load: row.actual_load == null ? null : Number(row.actual_load),
+      rir: row.actual_rir == null ? null : Number(row.actual_rir),
+    }));
     return (
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         <Link href="/miembro" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft className="w-4 h-4" /> Volver al panel</Link>
@@ -122,6 +134,7 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
             title={selectedDay.title} blocks={verifiedBlocks}
             status={String(workoutSession?.status || "not_started")}
             initialCompleted={completedRows.map((r) => String(r.item_snapshot_key))}
+            initialSets={initialSets}
             startedAt={workoutSession?.started_at ? String(workoutSession.started_at) : null}
             finishedAt={workoutSession?.finished_at ? String(workoutSession.finished_at) : null}
           />
