@@ -23,7 +23,11 @@ export default async function TrainerAlumnosPage() {
   const publishedPlans = allPlans.filter((p) => p.status === "published");
   const memberIds = (rawMembers || []).map((m: any) => Number(m.id));
   const planAssignments = memberIds.length ? await sql`
-    SELECT mtp.member_id, mtp.id AS assignment_id, tp.title, mtp.source_plan_id
+    SELECT mtp.member_id, mtp.id AS assignment_id, tp.title, mtp.source_plan_id,
+      mtp.start_date::text AS start_date, tp.duration_weeks,
+      CASE WHEN CURRENT_DATE < mtp.start_date THEN 'scheduled'
+           WHEN CURRENT_DATE >= mtp.start_date + (GREATEST(1, tp.duration_weeks) * 7) THEN 'expired'
+           ELSE 'current' END AS lifecycle
     FROM member_training_plans mtp
     JOIN training_plans tp ON tp.id = mtp.source_plan_id AND tp.gym_id = mtp.gym_id
     WHERE mtp.gym_id = ${Number(session.gymId)}
@@ -63,6 +67,7 @@ export default async function TrainerAlumnosPage() {
     last_workout: lastWorkoutByMember.get(Number(row.id)) ? formatArgentinaDate(lastWorkoutByMember.get(Number(row.id))) + " (Argentina)" : undefined,
     training_plans: planAssignments.filter((p) => Number(p.member_id) === Number(row.id)).map((p) => ({
       assignmentId: Number(p.assignment_id), title: String(p.title), sourcePlanId: Number(p.source_plan_id),
+      startDate: String(p.start_date), durationWeeks: Number(p.duration_weeks), lifecycle: String(p.lifecycle),
     })),
   }));
 
