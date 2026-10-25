@@ -31,13 +31,11 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
     `;
     const memberId = members[0]?.id;
     const assignments = memberId ? await sql`
-      SELECT mtp.id, mtp.trainer_id, mtp.snapshot_jsonb, tp.title, tp.duration_weeks
+      SELECT mtp.id, mtp.trainer_id, mtp.snapshot_jsonb, tp.title, tp.duration_weeks, mtp.start_date::text AS start_date
       FROM member_training_plans mtp
       LEFT JOIN training_plans tp ON tp.id = mtp.source_plan_id AND tp.gym_id = mtp.gym_id
       WHERE mtp.id = ${planAssignmentId} AND mtp.member_id = ${memberId}
         AND mtp.gym_id = ${session.gymId} AND mtp.status = 'active'
-        AND CURRENT_DATE >= mtp.start_date
-        AND CURRENT_DATE < mtp.start_date + (GREATEST(1, COALESCE(tp.duration_weeks, 4)) * 7)
       LIMIT 1
     ` : [];
     if (!assignments.length) {
@@ -54,6 +52,13 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
     const week = Number.isInteger(weekParam) ? Math.max(1, Math.min(duration, weekParam)) : 1;
     const dayParam = typeof resolvedParams?.day === "string" ? Number(resolvedParams.day) : 1;
     const day = Number.isInteger(dayParam) ? Math.max(1, Math.min(Math.max(1, days.length), dayParam)) : 1;
+    const startDate = String(assignments[0].start_date);
+    const calendarToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const toDayNumber = (date: string) => Math.floor(Date.parse(`${date}T00:00:00Z`) / 86400000);
+    const elapsedDays = toDayNumber(calendarToday) - toDayNumber(startDate);
+    const currentWeek = elapsedDays >= 0 && elapsedDays < duration * 7 ? Math.floor(elapsedDays / 7) + 1 : null;
+    const weekState = (n: number) => elapsedDays < (n - 1) * 7 ? 'Próxima' : elapsedDays >= n * 7 ? 'Vencida' : 'Vigente';
+    const canEditWeek = currentWeek === week;
     const selectedDay = days[day - 1];
     // Validate image URLs against this assignment's trainer and gym.
     const imageRows = selectedDay ? await sql`
@@ -104,6 +109,7 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
         <div>
           <p className="text-xs font-semibold text-primary">Plan de entrenamiento · {duration} semanas</p>
           <h1 className="text-2xl font-bold">{String(assignments[0].title || "Mi plan de entrenamiento")}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Inicio: {startDate} · Duración: {duration} semanas · {currentWeek ? `Semana vigente: ${currentWeek}` : elapsedDays < 0 ? 'Plan programado' : 'Plan vencido'}</p>
         </div>
         <section className="space-y-2">
           <h2 className="font-semibold">Seleccionar semana</h2>
@@ -112,7 +118,7 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
               <Link key={n} href={`${planUrl}&week=${n}&day=${day}`}
                 aria-current={n === week ? "page" : undefined}
                 className={`px-4 py-2 rounded-lg border text-sm ${n === week ? "bg-primary text-primary-foreground" : "bg-card"}`}>
-                Semana {n}
+                Semana {n} · {weekState(n)}
               </Link>
             ))}
           </div>
@@ -129,10 +135,11 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
             ))}
           </div>
         </section>
+        {!canEditWeek && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">{elapsedDays < (week - 1) * 7 ? 'Esta semana todavía no comenzó. Podés consultar los ejercicios, pero no registrar actividad.' : 'Esta semana ya venció. Podés consultar los ejercicios y las cargas guardadas, pero no modificarla.'}</p>}
         {selectedDay ? (
           <PlanSessionClient
             key={`${planAssignmentId}-${week}-${day}`}
-            assignmentId={planAssignmentId} week={week} day={day}
+            assignmentId={planAssignmentId} week={week} day={day} readOnly={!canEditWeek}
             title={selectedDay.title} blocks={verifiedBlocks}
             status={String(workoutSession?.status || "not_started")}
             initialCompleted={completedRows.map((r) => String(r.item_snapshot_key))}
