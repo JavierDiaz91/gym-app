@@ -7,7 +7,7 @@ import { createTrainingPlan, type PlanInput } from "./actions";
 
 type Plan = { id: number; title: string; description: string; durationWeeks: number; status: string; version: number };
 const fieldStyle = "mt-2 w-full rounded-xl border border-slate-300 bg-background px-3 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 dark:border-slate-700";
-const initial: PlanInput = { title:"", description:"", durationWeeks:4, discipline:"musculacion", objective:"fuerza", level:"principiante", audience:"todos" };
+const initial: PlanInput = { title:"", description:"", durationWeeks:4, discipline:"", objective:"", level:"", audience:"" };
 export default function PlanesClient({ plans, categories, setupError }: { plans: Plan[]; categories: {dimension:string;slug:string;label:string}[]; setupError?: string }) {
   const router = useRouter();
   const [form, setForm] = useState<PlanInput>(initial);
@@ -28,12 +28,12 @@ export default function PlanesClient({ plans, categories, setupError }: { plans:
     <main className="mx-auto max-w-6xl space-y-7 p-4 text-foreground md:p-8">
       <header className="flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-cyan-500/10 via-sky-500/5 to-transparent p-6 md:p-7"><div className="space-y-2"><p className="text-xs font-bold uppercase tracking-widest text-cyan-500">Trainer Hub · Planificador</p><h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">Planificaciones deportivas</h1><p className="max-w-xl text-sm leading-relaxed text-muted-foreground">Diseñá entrenamientos, organizá las semanas y reutilizá tus plantillas con tus alumnos.</p><p className="text-xs font-semibold text-cyan-500">{plans.length} {plans.length === 1 ? "plantilla disponible" : "plantillas disponibles"}</p></div><button type="button" disabled={!!setupError} onClick={() => setShowForm((v) => !v)} className="rounded-xl bg-cyan-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-50">{showForm ? "Cerrar formulario" : "+ Nueva plantilla"}</button></header>
       {setupError && <p role="alert" className="rounded-lg border border-amber-500 p-4 text-sm">{setupError}</p>}
-      {!setupError && categories.length===0 && <p className="rounded-lg border p-4">El gimnasio todavía no habilitó categorías deportivas. Pedile al administrador que las configure.</p>}
+      {!setupError && categories.length===0 && <p className="rounded-lg border p-4">Todavía no creaste categorías. <Link className="font-bold text-cyan-500 underline" href="/trainer/mis-categorias">Configurá tus categorías</Link> antes de crear una plantilla.</p>}
       {showForm && !setupError && <form onSubmit={submit} className="space-y-6 rounded-2xl border border-slate-300 bg-muted/10 p-5 shadow-sm dark:border-slate-700 md:p-7">
         <div className="border-b border-slate-300/60 pb-4 dark:border-slate-700"><p className="mb-1 text-xs font-bold uppercase tracking-widest text-cyan-500">Nueva planificación</p><h2 className="text-xl font-bold">Creá tu plantilla</h2><p className="mt-1 text-sm text-muted-foreground">Completá los datos generales. Después vas a poder organizar los días y ejercicios.</p></div>
         <label className="block text-sm font-semibold">Título<input required maxLength={150} value={form.title} onChange={(e)=>change("title",e.target.value)} className={fieldStyle} placeholder="Fuerza para corredores" /></label>
         <label className="block text-sm font-semibold">Descripción<textarea maxLength={2000} value={form.description} onChange={(e)=>change("description",e.target.value)} className={fieldStyle} rows={3}/></label>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">Clasificación de la plantilla</p><Link href="/trainer/mis-categorias" className="rounded-lg border border-cyan-500/30 px-3 py-2 text-xs font-bold text-cyan-500 hover:bg-cyan-500/10">+ Administrar mis categorías</Link></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {(["discipline","objective","level","audience"] as const).map((key) => <label key={key} className="text-sm font-semibold">{({discipline:"Disciplina",objective:"Objetivo",level:"Nivel",audience:"Dirigido a"})[key]}
             <select value={byDimension(key).some(c=>c.slug===form[key]) ? form[key] : ""} required onChange={(e)=>change(key,e.target.value)} className={fieldStyle}><option value="">Seleccionar...</option>{byDimension(key).map(c=><option key={c.slug} value={c.slug}>{c.label}</option>)}</select>
           </label>)}
