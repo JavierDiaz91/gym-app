@@ -52,7 +52,7 @@ function PerformanceInsight({ sets, comparisons, exercise }: { sets: ProgressSet
   const displayChange = (change: number | null) => change == null ? "Sin comparación porcentual" : `${change > 0 ? "+" : ""}${fmt(change)}%`;
   const lastComparison = comparisons.filter(c => c.exercise === exercise).sort((a,b) => b.week - a.week || b.day - a.day)[0];
   const plannedRir = lastComparison?.plannedRir?.trim();
-  const numericRir = plannedRir && /^\\d+(?:[.,]\\d+)?$/.test(plannedRir) ? Number(plannedRir.replace(",", ".")) : null;
+  const numericRir = plannedRir && /^\d+(?:[.,]\d+)?$/.test(plannedRir) ? Number(plannedRir.replace(",", ".")) : null;
   const actualRirs = lastComparison?.actualRir.filter(r => r.value != null) ?? [];
   const rirMismatch = numericRir != null && actualRirs.length > 0 && actualRirs.some(r => r.value !== numericRir);
   if (!exercise) return null;
