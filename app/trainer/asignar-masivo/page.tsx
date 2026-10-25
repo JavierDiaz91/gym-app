@@ -2,6 +2,7 @@ import { getSession } from "@/app/actions";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import BulkAssignClient from "./BulkAssignClient";
+import { listTrainingPlans } from "../rutinas/planes/actions";
 
 export default async function BulkAssignPage() {
   const session = await getSession();
@@ -12,6 +13,7 @@ export default async function BulkAssignPage() {
   let trainerId: number | null = null;
   let members: any[] = [];
   let routines: any[] = [];
+  const trainingPlans = (await listTrainingPlans()).filter(p => p.status === "published");
 
   try {
     // 1. Obtener ID del Entrenador
@@ -82,7 +84,7 @@ export default async function BulkAssignPage() {
           </p>
         </div>
 
-        <BulkAssignClient initialMembers={members} routines={routines} />
+        <BulkAssignClient initialMembers={members} routines={routines} trainingPlans={trainingPlans} />
       </div>
     </div>
   );
