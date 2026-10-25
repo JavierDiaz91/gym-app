@@ -34,6 +34,7 @@ interface Member {
   last_workout_at?: string;
   last_workout?: string;
   training_plan_title?: string;
+  training_plans?: { assignmentId: number; title: string; sourcePlanId: number }[];
 }
 
 interface Routine {
@@ -137,7 +138,7 @@ export default function AlumnosClient({
         setMembersList((prev) =>
           prev.map((m) => {
             if (m.id === selectedMember.id) {
-              if (kind === "plan") return { ...m, training_plan_title: trainingPlans.find((p) => p.id === Number(id))?.title };
+              if (kind === "plan") return m;
               const updatedRoutines = m.routines ? [...m.routines] : [];
               if (!updatedRoutines.some((r) => Number(r.id) === Number(id))) {
                 updatedRoutines.push({ id: Number(id), title: routineTitle });
@@ -273,11 +274,16 @@ export default function AlumnosClient({
                   <div className="bg-secondary/50 rounded-xl p-3 space-y-2.5 border border-border mb-4">
                     <div>
                       <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                        Rutina Asignada
+                        Planes activos {member.training_plans?.length ? `(${member.training_plans.length})` : ""}
                       </span>
 
                       <div className="flex flex-wrap gap-1.5">
-                        {member.training_plan_title && <span className="inline-flex items-center text-xs font-semibold text-[#00aeef] px-2.5 py-1 rounded-lg border border-[#00aeef]/20">Plan: {member.training_plan_title}</span>}
+                        {member.training_plans?.map((plan) => (
+                          <Link key={plan.assignmentId} href={`/trainer/alumnos/${member.id}/progreso?plan=${plan.assignmentId}`}
+                            className="inline-flex items-center text-xs font-semibold text-[#00aeef] px-2.5 py-1 rounded-lg border border-[#00aeef]/20 hover:bg-[#00aeef]/10">
+                            {plan.title} · Asignación #{plan.assignmentId}
+                          </Link>
+                        ))}
                         {hasRoutinesArray ? (
                           member.routines!.map((r) => (
                             <span 
@@ -294,7 +300,7 @@ export default function AlumnosClient({
                             {member.routine_name}
                           </span>
                         ) : (
-                          !member.training_plan_title && <span className="text-xs text-muted-foreground italic">Sin rutina asignada</span>
+                          !member.training_plans?.length && <span className="text-xs text-muted-foreground italic">Sin planes ni rutinas asignadas</span>
                         )}
                       </div>
                     </div>
@@ -337,7 +343,7 @@ export default function AlumnosClient({
                   onClick={() => {
                     setSelectedMember(member);
                     setSelectedRoutineId(member.routine_id || (routines[0]?.id ? Number(routines[0].id) : null));
-                    setSelectedAssignment(trainingPlans.length ? `plan:${trainingPlans[0].id}` : routines.length ? `routine:${routines[0].id}` : "");
+                    setSelectedAssignment("");
                     setAssignError("");
                   }}
                   className="w-full flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border hover:border-[#00aeef]/40 font-semibold py-2 rounded-xl text-xs transition-all"
@@ -370,13 +376,13 @@ export default function AlumnosClient({
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Selecciona la rutina de tu catálogo que querés asignarle a este atleta.
+              Seleccioná un plan publicado o una rutina anterior para este alumno.
             </p>
 
             <form onSubmit={handleAssignRoutine} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1.5">
-                  Rutina
+                  Plan o rutina
                 </label>
                 {routines.length === 0 && trainingPlans.length === 0 ? (
                   <p className="text-xs text-amber-500 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">No hay rutinas ni planes publicados disponibles.</p>
@@ -389,6 +395,10 @@ export default function AlumnosClient({
                   </select>
                 )}
               </div>
+
+              {selectedAssignment.startsWith("plan:") && selectedMember.training_plans?.some((p) => p.sourcePlanId === Number(selectedAssignment.split(":")[1])) && (
+                <p className="text-xs text-amber-600">Este alumno ya tiene activo el plan seleccionado. No se permite duplicarlo.</p>
+              )}
 
               {assignError && (
                 <p className="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-xl font-medium">
@@ -406,7 +416,7 @@ export default function AlumnosClient({
                 </button>
                 <button
                   type="submit"
-                  disabled={assignLoading || !selectedAssignment}
+                  disabled={assignLoading || !selectedAssignment || (selectedAssignment.startsWith("plan:") && !!selectedMember.training_plans?.some((p) => p.sourcePlanId === Number(selectedAssignment.split(":")[1])))}
                   className="px-4 py-2 text-xs font-extrabold bg-[#00aeef] hover:bg-[#0098d4] text-black rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {assignLoading ? "Asignando..." : "Confirmar Asignación"}
