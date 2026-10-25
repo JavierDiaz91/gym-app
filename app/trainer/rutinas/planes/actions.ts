@@ -205,7 +205,7 @@ export async function assignTrainingPlan(planId: number, memberId: number, custo
     await sql`INSERT INTO member_training_plans
       (gym_id, member_id, trainer_id, source_plan_id, source_version, start_date, snapshot_jsonb)
       VALUES (${gymId}, ${memberId}, ${trainerId}, ${planId}, ${Number(plans[0].version)},
-      CURRENT_DATE, ${JSON.stringify(snapshot)}::jsonb)`;
+      (date_trunc('month', (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') + INTERVAL '1 month'))::date, ${JSON.stringify(snapshot)}::jsonb)`;
     revalidatePath("/miembro/rutina");
     return { success: true };
   } catch { return { success: false, error: "No se pudo asignar" }; }
