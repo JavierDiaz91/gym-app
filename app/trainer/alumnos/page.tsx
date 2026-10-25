@@ -23,11 +23,13 @@ export default async function TrainerAlumnosPage() {
   const publishedPlans = allPlans.filter((p) => p.status === "published");
   const memberIds = (rawMembers || []).map((m: any) => Number(m.id));
   const planAssignments = memberIds.length ? await sql`
-    SELECT DISTINCT ON (mtp.member_id) mtp.member_id, tp.title, mtp.source_plan_id
+    SELECT mtp.member_id, mtp.id AS assignment_id, tp.title, mtp.source_plan_id
     FROM member_training_plans mtp
     JOIN training_plans tp ON tp.id = mtp.source_plan_id AND tp.gym_id = mtp.gym_id
-    WHERE mtp.gym_id = ${Number(session.gymId)} AND mtp.member_id = ANY(${memberIds}::bigint[])
+    WHERE mtp.gym_id = ${Number(session.gymId)}
+      AND mtp.member_id = ANY(${memberIds}::bigint[])
       AND mtp.trainer_id = (SELECT id FROM trainers WHERE user_id = ${session.id} AND gym_id = ${Number(session.gymId)} LIMIT 1)
+      AND mtp.status = 'active'
     ORDER BY mtp.member_id, mtp.id DESC
   ` : [];
   const lastSessions = memberIds.length ? await sql`
@@ -59,7 +61,9 @@ export default async function TrainerAlumnosPage() {
         : [],
     last_workout_at: row.last_workout_at ? String(row.last_workout_at) : undefined,
     last_workout: lastWorkoutByMember.get(Number(row.id)) ? formatArgentinaDate(lastWorkoutByMember.get(Number(row.id))) + " (Argentina)" : undefined,
-    training_plan_title: planAssignments.find((p) => Number(p.member_id) === Number(row.id))?.title || undefined,
+    training_plans: planAssignments.filter((p) => Number(p.member_id) === Number(row.id)).map((p) => ({
+      assignmentId: Number(p.assignment_id), title: String(p.title), sourcePlanId: Number(p.source_plan_id),
+    })),
   }));
 
   // Mapear el catálogo de rutinas al tipo estricto
