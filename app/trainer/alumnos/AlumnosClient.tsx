@@ -15,7 +15,6 @@ import {
   History
 } from "lucide-react";
 import { assignMemberToTrainer, removeMemberFromTrainer, assignRoutineToMember } from "@/app/actions";
-import WorkoutHistoryModal from "./WorkoutHistoryModal";
 import { assignTrainingPlan } from "../rutinas/planes/actions";
 
 interface RoutineItem {
@@ -69,7 +68,6 @@ export default function AlumnosClient({
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   
   // Estado para el Modal de Historial
-  const [historyMember, setHistoryMember] = useState<Member | null>(null);
 
   // Estados para el Modal de Asignar Rutina
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -323,14 +321,13 @@ export default function AlumnosClient({
 
                     {/* BOTÓN VER HISTORIAL DEL ALUMNO */}
                     <div className="pt-2 border-t border-border flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setHistoryMember(member)}
+                      <Link
+                        href={`/trainer/alumnos/${member.id}/progreso/historial`}
                         className="text-xs font-semibold text-[#00aeef] hover:text-[#33c0f4] flex items-center gap-1.5 hover:underline cursor-pointer transition-colors"
                       >
                         <History className="w-3.5 h-3.5" />
-                        Ver Historial Completo
-                      </button>
+                        Ver historial de entrenamientos
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -346,7 +343,7 @@ export default function AlumnosClient({
                   className="w-full flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border hover:border-[#00aeef]/40 font-semibold py-2 rounded-xl text-xs transition-all"
                 >
                   <Dumbbell className="w-3.5 h-3.5 text-[#00aeef]" />
-                  <span>Asignar Nueva Rutina</span>
+                  <span>Asignar plan o rutina</span>
                 </button>
               </div>
             );
@@ -355,11 +352,6 @@ export default function AlumnosClient({
       )}
 
       {/* MODAL HISTORIAL DE ENTRENAMIENTOS */}
-      <WorkoutHistoryModal
-        member={historyMember}
-        isOpen={!!historyMember}
-        onClose={() => setHistoryMember(null)}
-      />
 
       {/* MODAL ASIGNAR RUTINA */}
       {selectedMember && (
@@ -367,7 +359,7 @@ export default function AlumnosClient({
           <div className="bg-card rounded-2xl max-w-md w-full p-6 shadow-2xl border border-border space-y-4 text-card-foreground">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-foreground">
-                Asignar Rutina a {selectedMember.first_name}
+                Asignar entrenamiento a {selectedMember.first_name}
               </h3>
               <button 
                 onClick={() => setSelectedMember(null)}
