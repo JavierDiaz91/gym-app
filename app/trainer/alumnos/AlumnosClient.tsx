@@ -195,7 +195,7 @@ export default function AlumnosClient({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-black text-foreground tracking-tight">Mis Alumnos</h1>
-            <span className="bg-[#00aeef]/10 text-[#00aeef] text-xs font-semibold px-2.5 py-0.5 rounded-full border border-[#00aeef]/20">
+            <span className="bg-primary/10 text-primary text-xs font-semibold px-2.5 py-0.5 rounded-full border border-primary/20">
               {membersList.length} {membersList.length === 1 ? "Atleta" : "Atletas"}
             </span>
           </div>
@@ -206,7 +206,7 @@ export default function AlumnosClient({
 
         <button
           onClick={() => setIsAddOpen(true)}
-          className="flex items-center justify-center gap-2 bg-[#00aeef] hover:bg-[#0098d4] text-black font-extrabold px-4 py-2.5 rounded-xl shadow-md transition-all duration-200 active:scale-95 text-xs"
+          className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-black font-extrabold px-4 py-2.5 rounded-xl shadow-md transition-all duration-200 active:scale-95 text-xs"
         >
           <UserPlus className="w-4 h-4 text-black" />
           <span>Vincular Alumno</span>
@@ -215,7 +215,7 @@ export default function AlumnosClient({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Alumnos vinculados</p><p className="mt-1 text-2xl font-bold">{membersList.length}</p></div>
-        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Con plan asignado</p><p className="mt-1 text-2xl font-bold text-[#00aeef]">{withPlanCount}</p></div>
+        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Con plan asignado</p><p className="mt-1 text-2xl font-bold text-primary">{withPlanCount}</p></div>
         <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Sin plan asignado</p><p className="mt-1 text-2xl font-bold">{membersList.length - withPlanCount}</p></div>
       </div>
 
@@ -223,7 +223,7 @@ export default function AlumnosClient({
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input aria-label="Buscar alumnos" type="search" placeholder="Buscar alumnos por nombre..." value={search} onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 text-sm bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 text-foreground" />
+            className="w-full pl-10 pr-4 py-3 text-sm bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-foreground" />
         </div>
         <select aria-label="Filtrar por plan" value={planFilter} onChange={(e) => setPlanFilter(e.target.value as "all" | "with" | "without")}
           className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground">
@@ -247,10 +247,10 @@ export default function AlumnosClient({
             const currentPlan = plans.find(p => p.lifecycle === 'current');
             const scheduledPlan = plans.find(p => p.lifecycle === 'scheduled');
             return (
-              <article key={member.id} className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-sm hover:border-[#00aeef]/30 transition-colors">
+              <article key={member.id} className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-sm hover:border-primary/30 transition-colors">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00aeef]/15 text-[#00aeef] font-extrabold">{initials}</div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary font-extrabold">{initials}</div>
                     <div>
                       <h2 className="text-lg font-bold">{member.first_name} {member.last_name}</h2>
                       <p className="text-xs text-muted-foreground">Alumno vinculado · {member.status === "inactive" ? "Inactivo" : "Activo"}</p>
@@ -270,7 +270,7 @@ export default function AlumnosClient({
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan de entrenamiento</p>
                     {currentPlan ? (
                       <>
-                        <Link href={`/trainer/alumnos/${member.id}/progreso?plan=${currentPlan.assignmentId}`} className="font-semibold text-[#00aeef] hover:underline">{currentPlan.title}</Link>
+                        <Link href={`/trainer/alumnos/${member.id}/progreso?plan=${currentPlan.assignmentId}`} className="font-semibold text-primary hover:underline">{currentPlan.title}</Link>
                         <p className="mt-1 text-xs text-muted-foreground">Asignación #{currentPlan.assignmentId}</p>
                         <p className="mt-2 text-xs text-muted-foreground">Inicio: {currentPlan.startDate} · Duración: {currentPlan.durationWeeks} semanas</p>
                       </>
@@ -279,7 +279,7 @@ export default function AlumnosClient({
                     {plans.filter(p => p.lifecycle !== "expired").map(p => (
                       <button key={p.assignmentId} type="button"
                         onClick={() => { setDateEdit({ memberId: member.id, assignmentId: p.assignmentId, title: p.title, original: p.startDate }); setNewStartDate(p.startDate); setDateError(""); }}
-                        className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#00aeef] hover:underline">
+                        className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
                         <Calendar className="h-3.5 w-3.5" />Modificar inicio · {p.title}
                       </button>
                     ))}
@@ -293,7 +293,7 @@ export default function AlumnosClient({
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button onClick={() => {setSelectedMember(member);setSelectedRoutineId(member.routine_id || null);setSelectedAssignment("");setAssignError("");}}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#00aeef] px-4 py-2.5 text-xs font-bold text-black hover:bg-[#0098d4]"><Dumbbell className="h-4 w-4" />Asignar plan o rutina</button>
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-black hover:bg-primary/90"><Dumbbell className="h-4 w-4" />Asignar plan o rutina</button>
                   <Link href={`/trainer/alumnos/${member.id}/progreso`} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary"><Dumbbell className="h-4 w-4" />Ver progreso</Link>
                   <Link href={`/trainer/alumnos/${member.id}/progreso/historial`} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary"><History className="h-4 w-4" />Historial</Link>
                 </div>
@@ -321,7 +321,7 @@ export default function AlumnosClient({
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setDateEdit(null)} className="rounded-xl border border-border px-4 py-2 text-sm">Cancelar</button>
               <button type="submit" disabled={dateSaving || !newStartDate || newStartDate === dateEdit.original}
-                className="rounded-xl bg-[#00aeef] px-4 py-2 text-sm font-bold text-black disabled:opacity-50">
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-black disabled:opacity-50">
                 {dateSaving ? "Guardando..." : "Confirmar cambio"}
               </button>
             </div>
@@ -389,7 +389,7 @@ export default function AlumnosClient({
                 <button
                   type="submit"
                   disabled={assignLoading || !selectedAssignment || (selectedAssignment.startsWith("plan:") && !!selectedMember.training_plans?.some((p) => p.sourcePlanId === Number(selectedAssignment.split(":")[1])))}
-                  className="px-4 py-2 text-xs font-extrabold bg-[#00aeef] hover:bg-[#0098d4] text-black rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-extrabold bg-primary hover:bg-primary/90 text-black rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {assignLoading ? "Asignando..." : "Confirmar Asignación"}
                 </button>
@@ -416,7 +416,7 @@ export default function AlumnosClient({
                   placeholder="ejemplo@correo.com"
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 focus:border-[#00aeef] text-foreground placeholder:text-muted-foreground"
+                  className="w-full px-3.5 py-2.5 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-foreground placeholder:text-muted-foreground"
                 />
               </div>
 
@@ -440,7 +440,7 @@ export default function AlumnosClient({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-2 text-xs font-extrabold bg-[#00aeef] hover:bg-[#0098d4] text-black rounded-xl shadow-md transition-all disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-extrabold bg-primary hover:bg-primary/90 text-black rounded-xl shadow-md transition-all disabled:opacity-50"
                 >
                   {loading ? "Vinculando..." : "Vincular"}
                 </button>
