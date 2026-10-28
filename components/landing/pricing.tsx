@@ -23,7 +23,7 @@ const roles = [
 
 export function Pricing() {
   return (
-    <section id="roles" className="border-t border-white/[0.06] bg-[#090b10] py-24 text-white">
+    <section id="roles" className="border-t border-white/[0.06] bg-[#071320] py-24 text-white">
       <div className="container mx-auto px-4">
         <div className="mb-14 max-w-3xl">
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Diseñado por rol</span>
@@ -41,19 +41,19 @@ export function Pricing() {
               key={role.title}
               className={`rounded-3xl border p-7 ${
                 index === 0
-                  ? "border-violet-400/20 bg-violet-400/[0.055]"
+                  ? "border-cyan-400/25 bg-cyan-400/[0.06]"
                   : "border-white/[0.07] bg-white/[0.025]"
               }`}
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04]">
-                <role.icon className="h-5 w-5 text-violet-200" />
+                <role.icon className="h-5 w-5 text-cyan-300" />
               </div>
               <h3 className="mt-7 text-2xl font-semibold tracking-tight">{role.title}</h3>
-              <p className="mt-3 min-h-20 text-sm leading-6 text-zinc-500">{role.description}</p>
+              <p className="mt-3 min-h-20 text-sm leading-6 text-zinc-400">{role.description}</p>
               <div className="mt-7 space-y-3 border-t border-white/[0.07] pt-6">
                 {role.items.map((item) => (
                   <div key={item} className="flex items-center gap-3 text-sm text-zinc-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-violet-300" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
                     {item}
                   </div>
                 ))}
