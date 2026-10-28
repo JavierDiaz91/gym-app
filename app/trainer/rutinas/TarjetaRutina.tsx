@@ -69,7 +69,7 @@ export default function TarjetaRutina({ routine, onEdit, onDeleteSuccess }: Tarj
     <div className="bg-card rounded-2xl border border-border shadow-xl hover:border-border/80 transition-all duration-200 overflow-hidden flex flex-col justify-between group relative text-card-foreground">
       
       {/* 1. Barra Acentuada Superior Cyan */}
-      <div className="h-1 bg-gradient-to-r from-[#00aeef] via-[#0081b3] to-[#004e6e] w-full" />
+      <div className="h-1 bg-gradient-to-r from-primary via-[#0081b3] to-[#004e6e] w-full" />
 
       <div className="p-5 flex-1 flex flex-col justify-between">
         
@@ -77,7 +77,7 @@ export default function TarjetaRutina({ routine, onEdit, onDeleteSuccess }: Tarj
         <div>
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-secondary text-[#00aeef] border border-border flex items-center justify-center font-bold text-sm shadow-inner shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-secondary text-primary border border-border flex items-center justify-center font-bold text-sm shadow-inner shrink-0">
                 <Dumbbell className="w-5 h-5" />
               </div>
               <div>
@@ -85,7 +85,7 @@ export default function TarjetaRutina({ routine, onEdit, onDeleteSuccess }: Tarj
                   {routine.title}
                 </h3>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#00aeef] bg-[#00aeef]/10 px-2 py-0.5 rounded-md border border-[#00aeef]/20">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
                     <Layers className="w-3 h-3" />
                     {ejercicios.length} {ejercicios.length === 1 ? "ejercicio" : "ejercicios"}
                   </span>
@@ -121,7 +121,7 @@ export default function TarjetaRutina({ routine, onEdit, onDeleteSuccess }: Tarj
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold text-foreground truncate flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00aeef] shrink-0" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                         {ej.nombre || "Ejercicio sin nombre"}
                       </p>
                       {notas && (
@@ -144,8 +144,8 @@ export default function TarjetaRutina({ routine, onEdit, onDeleteSuccess }: Tarj
                       )}
 
                       {ej.pausa && (
-                        <span className="text-[11px] font-bold text-cyan-600 dark:text-cyan-300 bg-cyan-500/10 px-1.5 py-1 rounded-lg border border-cyan-500/20 flex items-center gap-0.5" title="Pausa">
-                          <Clock className="w-2.5 h-2.5 text-cyan-500 dark:text-cyan-400" />
+                        <span className="text-[11px] font-bold text-primary dark:text-primary bg-primary/10 px-1.5 py-1 rounded-lg border border-primary/20 flex items-center gap-0.5" title="Pausa">
+                          <Clock className="w-2.5 h-2.5 text-primary dark:text-primary" />
                           {ej.pausa}
                         </span>
                       )}
@@ -163,7 +163,7 @@ export default function TarjetaRutina({ routine, onEdit, onDeleteSuccess }: Tarj
             type="button"
             onClick={() => onEdit(routine)}
             disabled={isDeleting}
-            className="w-full flex items-center justify-center gap-2 bg-[#00aeef] hover:bg-[#0098d4] text-black font-extrabold py-2.5 rounded-xl text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-black font-extrabold py-2.5 rounded-xl text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
           >
             <Edit2 className="w-3.5 h-3.5 text-black" />
             <span>Editar Plan de Carga</span>
