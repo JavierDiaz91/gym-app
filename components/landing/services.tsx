@@ -30,7 +30,7 @@ export function Services() {
                 <module.icon className="h-5 w-5 text-cyan-200" />
               </div>
               <h3 className="text-lg font-semibold tracking-tight text-white">{module.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-zinc-500">{module.description}</p>
+              <p className="mt-2 text-sm leading-6 text-zinc-400">{module.description}</p>
             </div>
           ))}
         </div>
