@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 import { loginUser } from "@/app/actions";
 
 const features = [
@@ -87,7 +87,7 @@ export default function LoginPage() {
           <div className="w-full max-w-md">
             <div className="mb-10 flex items-center justify-between lg:hidden">
               <Link href="/" className="flex items-center gap-2 text-lg font-semibold">
-                <Sparkles className="h-5 w-5 text-[#67e8e3]" />
+                <Image src="/icon.svg" alt="Kivra" width={24} height={24} className="h-6 w-6" />
                 Kivra
               </Link>
             </div>
