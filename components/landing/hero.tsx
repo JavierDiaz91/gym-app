@@ -19,11 +19,6 @@ export function Hero() {
 
       <div className="container relative mx-auto grid min-h-[760px] items-center gap-14 px-4 py-24 lg:grid-cols-[1.02fr_.98fr] lg:py-28">
         <div className="max-w-3xl">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/[0.07] px-3 py-1.5 text-xs font-medium text-cyan-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
-            Gestión inteligente para gimnasios
-          </div>
-
           <h1 className="max-w-3xl text-5xl font-semibold leading-[1.02] tracking-[-0.055em] text-white sm:text-6xl lg:text-7xl">
             Tu gimnasio.
             <span className="block bg-gradient-to-r from-sky-400 via-cyan-300 to-[#00d5d0] bg-clip-text text-transparent">
