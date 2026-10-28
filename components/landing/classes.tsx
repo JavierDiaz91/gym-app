@@ -29,11 +29,11 @@ const principles = [
 
 export function Classes() {
   return (
-    <section className="border-t border-white/[0.06] bg-[#0b0e14] py-24 text-white">
+    <section className="border-t border-white/[0.06] bg-[#081827] py-24 text-white">
       <div className="container mx-auto px-4">
         <div className="grid gap-14 lg:grid-cols-[.8fr_1.2fr] lg:items-start">
           <div className="max-w-xl">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">Pensado para escalar</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Pensado para escalar</span>
             <h2 className="mt-4 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
               Una base ordenada para crecer.
             </h2>
@@ -46,13 +46,13 @@ export function Classes() {
             {principles.map((item) => (
               <div key={item.title} className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-400/10">
-                    <item.icon className="h-5 w-5 text-violet-200" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10">
+                    <item.icon className="h-5 w-5 text-cyan-300" />
                   </div>
-                  <span className="text-xs font-semibold tracking-[0.16em] text-zinc-700">{item.number}</span>
+                  <span className="text-xs font-semibold tracking-[0.16em] text-zinc-500">{item.number}</span>
                 </div>
                 <h3 className="mt-6 text-lg font-semibold">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-zinc-500">{item.description}</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-400">{item.description}</p>
               </div>
             ))}
           </div>
