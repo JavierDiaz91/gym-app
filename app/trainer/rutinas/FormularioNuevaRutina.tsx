@@ -154,8 +154,8 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
         {/* Header */}
         <div className="p-5 border-b border-border bg-muted/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-[#00aeef]/10 text-[#00aeef] flex items-center justify-center border border-[#00aeef]/20 shadow-md">
-              <Dumbbell className="h-5 w-5 text-[#00aeef]" />
+            <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shadow-md">
+              <Dumbbell className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h3 className="font-extrabold text-lg tracking-tight text-foreground">
@@ -185,7 +185,7 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
               disabled={isPending}
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl text-sm font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#00aeef] focus:ring-1 focus:ring-[#00aeef] transition-all disabled:opacity-50"
+              className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl text-sm font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all disabled:opacity-50"
               placeholder="Ej. Torso Fuerza / Pierna Hipertrofia"
             />
           </div>
@@ -198,7 +198,7 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
                 disabled={isPending}
                 onClick={agregarEjercicio} 
                 size="sm" 
-                className="bg-[#00aeef]/10 hover:bg-[#00aeef]/20 text-[#00aeef] border border-[#00aeef]/30 rounded-xl text-xs gap-1.5 font-bold transition-all cursor-pointer"
+                className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-xl text-xs gap-1.5 font-bold transition-all cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" /> Añadir Ejercicio
               </Button>
@@ -235,7 +235,7 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
                           placeholder="Buscar o escribir..."
                           value={ej.nombre} 
                           onChange={(e) => handleEjercicioChange(index, "nombre", e.target.value)} 
-                          className="w-full px-3 py-1.5 text-xs font-bold text-foreground bg-background border border-border rounded-lg focus:outline-none focus:border-[#00aeef] disabled:opacity-50" 
+                          className="w-full px-3 py-1.5 text-xs font-bold text-foreground bg-background border border-border rounded-lg focus:outline-none focus:border-primary disabled:opacity-50" 
                         />
                       </div>
 
@@ -248,7 +248,7 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
                           disabled={isPending}
                           value={ej.series} 
                           onChange={(e) => handleEjercicioChange(index, "series", parseInt(e.target.value) || 0)} 
-                          className="w-full px-2.5 py-1.5 text-xs text-center font-black text-foreground bg-background border border-border rounded-lg focus:outline-none focus:border-[#00aeef] disabled:opacity-50" 
+                          className="w-full px-2.5 py-1.5 text-xs text-center font-black text-foreground bg-background border border-border rounded-lg focus:outline-none focus:border-primary disabled:opacity-50" 
                         />
                       </div>
 
@@ -261,7 +261,7 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
                           disabled={isPending}
                           value={ej.reps} 
                           onChange={(e) => handleEjercicioChange(index, "reps", e.target.value)} 
-                          className="w-full px-2.5 py-1.5 text-xs text-center font-black text-foreground bg-background border border-border rounded-lg focus:outline-none focus:border-[#00aeef] disabled:opacity-50" 
+                          className="w-full px-2.5 py-1.5 text-xs text-center font-black text-foreground bg-background border border-border rounded-lg focus:outline-none focus:border-primary disabled:opacity-50" 
                         />
                       </div>
 
@@ -282,8 +282,8 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
 
                       {/* PAUSA */}
                       <div className="md:col-span-2 space-y-1">
-                        <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-300 uppercase tracking-wider flex items-center gap-0.5 justify-center">
-                          <Clock className="h-3 w-3 text-cyan-500 dark:text-cyan-400" /> Pausa
+                        <span className="text-[10px] font-bold text-primary dark:text-primary uppercase tracking-wider flex items-center gap-0.5 justify-center">
+                          <Clock className="h-3 w-3 text-primary dark:text-primary" /> Pausa
                         </span>
                         <input 
                           type="text" 
@@ -291,7 +291,7 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
                           disabled={isPending}
                           value={ej.pausa} 
                           onChange={(e) => handleEjercicioChange(index, "pausa", e.target.value)} 
-                          className="w-full px-2.5 py-1.5 text-xs text-center font-black text-cyan-600 dark:text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-lg focus:outline-none focus:border-cyan-400 disabled:opacity-50" 
+                          className="w-full px-2.5 py-1.5 text-xs text-center font-black text-primary dark:text-primary bg-primary/10 border border-primary/20 rounded-lg focus:outline-none focus:border-primary disabled:opacity-50" 
                         />
                       </div>
                     </div>
@@ -307,7 +307,7 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
                           disabled={isPending}
                           value={ej.notas || ""} 
                           onChange={(e) => handleEjercicioChange(index, "notas", e.target.value)} 
-                          className="w-full px-3 py-1.5 text-xs text-foreground bg-background border border-border rounded-lg focus:outline-none focus:border-[#00aeef] placeholder:text-muted-foreground/60 disabled:opacity-50" 
+                          className="w-full px-3 py-1.5 text-xs text-foreground bg-background border border-border rounded-lg focus:outline-none focus:border-primary placeholder:text-muted-foreground/60 disabled:opacity-50" 
                           placeholder="Ej. Controlar la fase excéntrica 3 segundos / Barra al pecho"
                         />
                       </div>
@@ -322,7 +322,7 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
                           disabled={isPending}
                           value={ej.image_url || ""} 
                           onChange={(e) => handleEjercicioChange(index, "image_url", e.target.value)} 
-                          className="w-full px-3 py-1.5 text-xs text-foreground bg-background border border-border rounded-lg focus:outline-none focus:border-[#00aeef] placeholder:text-muted-foreground/60 disabled:opacity-50" 
+                          className="w-full px-3 py-1.5 text-xs text-foreground bg-background border border-border rounded-lg focus:outline-none focus:border-primary placeholder:text-muted-foreground/60 disabled:opacity-50" 
                           placeholder="https://... (dejar vacío si usa la del catálogo)"
                         />
                       </div>
@@ -347,7 +347,7 @@ export default function FormularioNuevaRutina({ open, setOpen, routineToEdit, on
             <Button 
               type="submit" 
               disabled={isPending}
-              className="bg-[#00aeef] hover:bg-[#0098d4] text-black font-extrabold rounded-xl text-xs h-10 px-5 gap-2 shadow-md disabled:opacity-50 cursor-pointer border-none"
+              className="bg-primary hover:bg-primary/90 text-black font-extrabold rounded-xl text-xs h-10 px-5 gap-2 shadow-md disabled:opacity-50 cursor-pointer border-none"
             >
               {isPending ? (
                 <>
