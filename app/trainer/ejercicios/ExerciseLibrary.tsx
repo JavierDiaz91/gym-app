@@ -50,7 +50,7 @@ export default function ExerciseLibrary({ initial }: {initial: TrainerExercise[]
   };
   return <div className="mx-auto max-w-5xl space-y-6 text-foreground">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><p className="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Trainer Hub</p><h1 className="text-2xl font-bold">Mis Ejercicios</h1><p className="text-sm text-muted-foreground">Creá una vez cada ejercicio y reutilizalo en todas tus planificaciones.</p></div>
+      <div><p className="text-xs font-semibold uppercase tracking-wider text-primary dark:text-primary">Trainer Hub</p><h1 className="text-2xl font-bold">Mis Ejercicios</h1><p className="text-sm text-muted-foreground">Creá una vez cada ejercicio y reutilizalo en todas tus planificaciones.</p></div>
       <Link href="/trainer/rutinas/planes" className="rounded-lg border px-4 py-2 text-sm font-semibold">Ir al planificador →</Link>
     </div>
     {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
@@ -65,7 +65,7 @@ export default function ExerciseLibrary({ initial }: {initial: TrainerExercise[]
       <label className="block space-y-1 text-sm font-medium">Cómo realizarlo<textarea rows={3} maxLength={2000} className={inputClass} value={form.instructions} onChange={e=>setForm({...form,instructions:e.target.value})} placeholder="Instrucciones y técnica para el alumno" /></label>
       {form.imageUrl && <div className="flex items-center gap-3"><div className={imageFrame}><img src={form.imageUrl} alt="Vista previa" className={monochromeImage} /></div><span className="text-xs text-muted-foreground">Vista previa en blanco y negro · el archivo original conserva sus colores.</span></div>}
       <p className="text-xs text-muted-foreground">La imagen original se almacena en Vercel Blob sin modificar. La biblioteca la muestra en blanco y negro sobre un fondo uniforme.</p>
-      <div className="flex gap-2"><button disabled={pending || uploading} type="submit" className="rounded-lg bg-cyan-500 px-5 py-2 font-semibold text-black disabled:opacity-50">{pending?"Guardando...":editingId?"Guardar cambios":"Crear ejercicio"}</button>{editingId && <button type="button" onClick={reset} className="rounded-lg border px-4 py-2">Cancelar</button>}</div>
+      <div className="flex gap-2"><button disabled={pending || uploading} type="submit" className="rounded-lg bg-primary px-5 py-2 font-semibold text-black disabled:opacity-50">{pending?"Guardando...":editingId?"Guardar cambios":"Crear ejercicio"}</button>{editingId && <button type="button" onClick={reset} className="rounded-lg border px-4 py-2">Cancelar</button>}</div>
     </form>
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-bold">Mi biblioteca ({items.length})</h2><input aria-label="Buscar ejercicio" className={inputClass+" max-w-xs"} placeholder="Buscar por nombre..." value={query} onChange={e=>setQuery(e.target.value)} /></div>
