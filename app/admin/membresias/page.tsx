@@ -96,7 +96,7 @@ export default function MembresiasAdminPage() {
             Gestioná los planes y suscripciones de tu gimnasio
           </p>
         </div>
-        <Button onClick={handleOpenCreate} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+        <Button onClick={handleOpenCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground">
           <Plus className="w-4 h-4 mr-2" />
           Nuevo Plan
         </Button>
@@ -106,13 +106,13 @@ export default function MembresiasAdminPage() {
       <div>
         <h2 className="text-xl font-semibold mb-4">Planes de Membresía</h2>
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-500 py-6">
+          <div className="flex items-center gap-2 text-muted-foreground py-6">
             <Loader2 className="w-5 h-5 animate-spin" /> Cargando planes...
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map((plan) => (
-              <Card key={plan.id} className={!plan.is_active ? "opacity-60 bg-slate-50" : ""}>
+              <Card key={plan.id} className={!plan.is_active ? "opacity-60 bg-muted/40" : ""}>
                 <CardHeader className="flex flex-row items-start justify-between pb-2">
                   <div>
                     <CardTitle className="text-lg">{plan.name}</CardTitle>
@@ -126,7 +126,7 @@ export default function MembresiasAdminPage() {
                       variant="ghost" 
                       size="icon" 
                       onClick={() => handleOpenEdit(plan)}
-                      className="text-slate-600 hover:text-cyan-600"
+                      className="text-muted-foreground hover:text-primary"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -134,14 +134,14 @@ export default function MembresiasAdminPage() {
                       variant="ghost" 
                       size="icon" 
                       onClick={() => handleDelete(plan.id)}
-                      className="text-slate-600 hover:text-red-600"
+                      className="text-muted-foreground hover:text-red-600"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-slate-500 mb-3">{plan.description || "Sin descripción"}</p>
+                  <p className="text-xs text-muted-foreground mb-3">{plan.description || "Sin descripción"}</p>
                   <div className="flex items-center gap-2">
                     <Badge variant={plan.is_active ? "default" : "secondary"}>
                       {plan.is_active ? "Activo" : "Inactivo"}
@@ -160,61 +160,61 @@ export default function MembresiasAdminPage() {
       {/* Modal Unificado (Crear / Editar) */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-200">
-            <h2 className="text-xl font-bold text-slate-900">
+          <div className="bg-card text-card-foreground rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl border border-border">
+            <h2 className="text-xl font-bold text-foreground">
               {editingPlan ? "Editar Plan" : "Crear Nuevo Plan"}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700">Nombre del Plan</label>
+                <label className="block text-sm font-medium text-foreground">Nombre del Plan</label>
                 <input
                   name="name"
                   type="text"
                   required
                   defaultValue={editingPlan?.name || ""}
                   placeholder="Ej: Pase Libre Mensual"
-                  className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="mt-1 w-full border border-border bg-background text-foreground rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700">Precio ($)</label>
+                <label className="block text-sm font-medium text-foreground">Precio ($)</label>
                 <input
                   name="price"
                   type="number"
                   required
                   defaultValue={editingPlan?.price || ""}
                   placeholder="15000"
-                  className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="mt-1 w-full border border-border bg-background text-foreground rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700">Duración (Meses)</label>
+                <label className="block text-sm font-medium text-foreground">Duración (Meses)</label>
                 <input
                   name="durationMonths"
                   type="number"
                   defaultValue={editingPlan?.duration_months || 1}
                   required
-                  className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="mt-1 w-full border border-border bg-background text-foreground rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700">Descripción</label>
+                <label className="block text-sm font-medium text-foreground">Descripción</label>
                 <textarea
                   name="description"
                   rows={2}
                   defaultValue={editingPlan?.description || ""}
                   placeholder="Detalles de la membresía..."
-                  className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="mt-1 w-full border border-border bg-background text-foreground rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
               {editingPlan && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">Estado</label>
+                  <label className="block text-sm font-medium text-foreground">Estado</label>
                   <select
                     name="isActive"
                     defaultValue={editingPlan.is_active ? "true" : "false"}
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    className="mt-1 w-full border border-border bg-background text-foreground rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="true">Activo</option>
                     <option value="false">Inactivo</option>
@@ -233,7 +233,7 @@ export default function MembresiasAdminPage() {
                 <Button
                   type="submit"
                   disabled={isPending}
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   {isPending ? "Guardando..." : editingPlan ? "Guardar Cambios" : "Crear Plan"}
                 </Button>
