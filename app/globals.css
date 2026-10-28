@@ -12,17 +12,17 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.03 260);
 
-  /* Identidad Marca - Indigo Eléctrico */
-  --primary: oklch(0.55 0.24 265);
-  --primary-foreground: oklch(0.99 0 0);
+  /* Identidad Kivra - azul profundo y turquesa */
+  --primary: #087f9e;
+  --primary-foreground: #071827;
 
   --secondary: oklch(0.95 0.02 260);
   --secondary-foreground: oklch(0.25 0.03 260);
   --muted: oklch(0.95 0.02 260);
   --muted-foreground: oklch(0.52 0.02 260);
 
-  --accent: oklch(0.62 0.22 295);
-  --accent-foreground: oklch(0.99 0 0);
+  --accent: #d8f8fa;
+  --accent-foreground: #073047;
 
   /* Colores de Contexto / KPIs */
   --success: oklch(0.65 0.20 150); /* Verde Esmeralda (Ingresos) */
@@ -34,7 +34,7 @@
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.91 0.02 260);
   --input: oklch(0.91 0.02 260);
-  --ring: oklch(0.55 0.24 265);
+  --ring: #087f9e;
   --radius: 0.75rem;
 }
 
@@ -48,7 +48,7 @@
   --popover-foreground: oklch(0.98 0 0);
 
   /* Primary reluciente en Dark Mode */
-  --primary: oklch(0.64 0.24 265);
+  --primary: #00d5d0;
   --primary-foreground: oklch(0.99 0 0);
 
   --secondary: oklch(0.22 0.025 260);
@@ -56,7 +56,7 @@
   --muted: oklch(0.22 0.025 260);
   --muted-foreground: oklch(0.68 0.02 260);
 
-  --accent: oklch(0.68 0.22 295);
+  --accent: #113a48;
   --accent-foreground: oklch(0.99 0 0);
 
   /* Colores KPIs en Dark Mode */
@@ -69,7 +69,7 @@
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.24 0.03 260);
   --input: oklch(0.24 0.03 260);
-  --ring: oklch(0.64 0.24 265);
+  --ring: #00d5d0;
 }
 
 @theme inline {
