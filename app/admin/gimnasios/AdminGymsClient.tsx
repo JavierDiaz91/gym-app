@@ -195,12 +195,12 @@ export default function AdminGymsClient({
             placeholder="Buscar por nombre o slug..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-secondary/50 rounded-xl border border-border text-sm text-foreground focus:outline-none focus:border-[#00aeef]"
+            className="w-full pl-9 pr-4 py-2 bg-secondary/50 rounded-xl border border-border text-sm text-foreground focus:outline-none focus:border-primary"
           />
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-[#00aeef] hover:bg-[#0098d4] text-black font-bold px-4 py-2 rounded-xl text-xs shadow-md transition-all cursor-pointer"
+          className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-black font-bold px-4 py-2 rounded-xl text-xs shadow-md transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Nuevo Gimnasio</span>
@@ -249,7 +249,7 @@ export default function AdminGymsClient({
                     >
                       <td className="p-4 font-bold text-foreground">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-[#00aeef]/10 text-[#00aeef] border border-[#00aeef]/20 flex items-center justify-center font-bold">
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold">
                             <Building2 className="w-4 h-4" />
                           </div>
                           {gym.name}
@@ -260,7 +260,7 @@ export default function AdminGymsClient({
                       </td>
                       <td className="p-4 text-center">
                         <span className="inline-flex items-center gap-1 font-semibold text-foreground bg-secondary px-2 py-0.5 rounded-md border border-border">
-                          <Users className="w-3 h-3 text-[#00aeef]" />
+                          <Users className="w-3 h-3 text-primary" />
                           {gym.total_members || 0}
                         </span>
                       </td>
@@ -358,7 +358,7 @@ export default function AdminGymsClient({
                   value={form.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="Ej: PowerGym Rafaela"
-                  className="w-full mt-1 p-2 bg-secondary rounded-lg border border-border text-xs focus:outline-none focus:border-[#00aeef]"
+                  className="w-full mt-1 p-2 bg-secondary rounded-lg border border-border text-xs focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -387,7 +387,7 @@ export default function AdminGymsClient({
                     setForm({ ...form, adminEmail: e.target.value })
                   }
                   placeholder="admin@powergym.com"
-                  className="w-full mt-1 p-2 bg-secondary rounded-lg border border-border text-xs focus:outline-none focus:border-[#00aeef]"
+                  className="w-full mt-1 p-2 bg-secondary rounded-lg border border-border text-xs focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -403,7 +403,7 @@ export default function AdminGymsClient({
                     setForm({ ...form, adminPasswordHash: e.target.value })
                   }
                   placeholder="••••••••"
-                  className="w-full mt-1 p-2 bg-secondary rounded-lg border border-border text-xs focus:outline-none focus:border-[#00aeef]"
+                  className="w-full mt-1 p-2 bg-secondary rounded-lg border border-border text-xs focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -418,7 +418,7 @@ export default function AdminGymsClient({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-1.5 rounded-lg bg-[#00aeef] hover:bg-[#0098d4] text-black font-bold text-xs cursor-pointer disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-black font-bold text-xs cursor-pointer disabled:opacity-50"
                 >
                   {isSubmitting ? "Creando..." : "Crear Gimnasio"}
                 </button>
