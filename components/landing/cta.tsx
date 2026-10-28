@@ -4,13 +4,13 @@ import Link from "next/link";
 
 export function CTA() {
   return (
-    <section className="border-t border-white/[0.06] bg-[#090b10] py-24 text-white">
+    <section className="border-t border-white/[0.06] bg-[#071320] py-24 text-white">
       <div className="container mx-auto px-4">
-        <div className="relative overflow-hidden rounded-[32px] border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.12] via-white/[0.035] to-cyan-400/[0.05] px-6 py-14 sm:px-12 lg:px-16">
-          <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-violet-500/15 blur-[100px]" />
+        <div className="relative overflow-hidden rounded-[32px] border border-white/[0.08] bg-gradient-to-br from-cyan-400/[0.12] via-white/[0.035] to-blue-500/[0.08] px-6 py-14 sm:px-12 lg:px-16">
+          <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-cyan-400/10 blur-[100px]" />
           <div className="relative grid gap-10 lg:grid-cols-[1fr_auto] lg:items-end">
             <div className="max-w-3xl">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-200">Kivra</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Kivra</span>
               <h2 className="mt-4 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
                 Menos administración. Más control.
               </h2>
