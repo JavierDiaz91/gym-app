@@ -19,7 +19,7 @@ export default function ThemeToggleBar() {
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-2">
       {/* Menú desplegable flotante */}
       {isOpen && (
-        <div className="bg-[#1a1e26] border border-gray-800 p-1.5 rounded-2xl shadow-2xl flex flex-col gap-1 backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="bg-[#102233] border border-[#234355] p-1.5 rounded-2xl shadow-2xl flex flex-col gap-1 backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-200">
           <button
             type="button"
             onClick={() => {
@@ -28,7 +28,7 @@ export default function ThemeToggleBar() {
             }}
             className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               theme === "dark"
-                ? "bg-[#00aeef] text-black shadow-md"
+                ? "bg-[#00d5d0] text-[#071827] shadow-md"
                 : "text-gray-400 hover:text-white hover:bg-gray-800/50"
             }`}
           >
@@ -44,7 +44,7 @@ export default function ThemeToggleBar() {
             }}
             className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               theme === "light"
-                ? "bg-[#00aeef] text-black shadow-md"
+                ? "bg-[#00d5d0] text-[#071827] shadow-md"
                 : "text-gray-400 hover:text-white hover:bg-gray-800/50"
             }`}
           >
@@ -60,7 +60,7 @@ export default function ThemeToggleBar() {
             }}
             className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               theme === "system"
-                ? "bg-[#00aeef] text-black shadow-md"
+                ? "bg-[#00d5d0] text-[#071827] shadow-md"
                 : "text-gray-400 hover:text-white hover:bg-gray-800/50"
             }`}
           >
@@ -74,7 +74,7 @@ export default function ThemeToggleBar() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-12 h-12 bg-[#1a1e26] hover:bg-[#222834] text-[#00aeef] border border-gray-800 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+        className="w-12 h-12 bg-[#102233] hover:bg-[#173348] text-[#00d5d0] border border-gray-800 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
         title="Cambiar tema de color"
       >
         {theme === "light" ? (
