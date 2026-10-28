@@ -64,11 +64,11 @@ export function AdminSidebar({ userRole = "admin" }: AdminSidebarProps) {
   const filteredNavItems = navItems.filter((item) => item.roles.includes(userRole));
 
   return (
-    <aside className="w-64 border-r border-cyan-400/10 bg-[#071827] text-slate-200 min-h-screen flex flex-col justify-between select-none">
+    <aside className="w-64 border-r border-primary/10 bg-[#071827] text-slate-200 min-h-screen flex flex-col justify-between select-none">
       <div>
         <div className="p-6 border-b border-white/10">
           <Link href="/admin" className="flex items-center gap-3.5 group">
-            <div className="w-10 h-10 bg-cyan-400/10 border border-cyan-400/30 rounded-xl flex items-center justify-center text-cyan-300 group-hover:scale-105 transition-transform duration-200">
+            <div className="w-10 h-10 bg-primary/10 border border-primary/30 rounded-xl flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-200">
               <Dumbbell className="w-5 h-5 -rotate-45 group-hover:rotate-0 transition-transform duration-300" />
             </div>
             <div>
@@ -78,7 +78,7 @@ export function AdminSidebar({ userRole = "admin" }: AdminSidebarProps) {
               >
                 Kivra
               </span>
-              <span className="text-[11px] font-medium text-cyan-300 uppercase tracking-widest block">
+              <span className="text-[11px] font-medium text-primary uppercase tracking-widest block">
                 {userRole === "superadmin" ? "SuperAdmin SaaS" : "Panel Admin"}
               </span>
             </div>
@@ -101,19 +101,19 @@ export function AdminSidebar({ userRole = "admin" }: AdminSidebarProps) {
                     className={cn(
                       "flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative",
                       isActive
-                        ? "bg-cyan-400/10 text-cyan-300 font-semibold border border-cyan-400/20 shadow-xs"
+                        ? "bg-primary/10 text-primary font-semibold border border-primary/20 shadow-xs"
                         : "text-slate-400 hover:bg-white/[0.06] hover:text-white"
                     )}
                   >
                     {isActive && (
-                      <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-cyan-400 rounded-r-full" />
+                      <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-primary rounded-r-full" />
                     )}
 
                     <Icon
                       className={cn(
                         "w-4 h-4 transition-transform duration-200 group-hover:scale-110",
                         isActive
-                          ? "text-cyan-300"
+                          ? "text-primary"
                           : "text-slate-400 group-hover:text-white"
                       )}
                     />
