@@ -129,7 +129,7 @@ function RegisterForm() {
           <div className="w-full max-w-md">
             <div className="mb-10 flex items-center justify-between lg:hidden">
               <Link href="/" className="flex items-center gap-2 text-lg font-semibold">
-                <Sparkles className="h-5 w-5 text-[#67e8e3]" />
+                <Image src="/icon.svg" alt="Kivra" width={24} height={24} className="h-6 w-6" />
                 Kivra
               </Link>
             </div>
