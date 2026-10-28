@@ -51,7 +51,7 @@ export default function PlanificadorClient({ initialRoutines }: PlanificadorClie
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-black text-white tracking-tight">Mis Rutinas Planificadas</h1>
-            <span className="bg-[#00aeef]/10 text-[#00aeef] text-xs font-semibold px-2.5 py-0.5 rounded-full border border-[#00aeef]/20">
+            <span className="bg-primary/10 text-primary text-xs font-semibold px-2.5 py-0.5 rounded-full border border-primary/20">
               {routines.length} {routines.length === 1 ? "Rutina" : "Rutinas"}
             </span>
           </div>
@@ -62,7 +62,7 @@ export default function PlanificadorClient({ initialRoutines }: PlanificadorClie
 
         <Button 
           onClick={handleCreateNew}
-          className="bg-[#00aeef] hover:bg-[#0098d4] text-black font-extrabold rounded-xl gap-2 shadow-md px-4 h-11 self-start sm:self-auto transition-all active:scale-95 text-xs border-none"
+          className="bg-primary hover:bg-primary/90 text-black font-extrabold rounded-xl gap-2 shadow-md px-4 h-11 self-start sm:self-auto transition-all active:scale-95 text-xs border-none"
         >
           <Plus className="h-5 w-5 text-black" /> Nueva Rutina
         </Button>
@@ -71,8 +71,8 @@ export default function PlanificadorClient({ initialRoutines }: PlanificadorClie
       {/* Grid de Rutinas o Estado Vacío (Empty State) */}
       {routines.length === 0 ? (
         <div className="text-center py-16 px-4 bg-[#14171d] rounded-2xl border border-gray-800/80 shadow-xl space-y-4 max-w-md mx-auto my-8">
-          <div className="h-14 w-14 rounded-2xl bg-[#00aeef]/10 text-[#00aeef] flex items-center justify-center mx-auto border border-[#00aeef]/20 shadow-md">
-            <Dumbbell className="h-7 w-7 text-[#00aeef]" />
+          <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto border border-primary/20 shadow-md">
+            <Dumbbell className="h-7 w-7 text-primary" />
           </div>
           <div>
             <h3 className="text-base font-bold text-white">No tienes rutinas creadas todavía</h3>
@@ -83,9 +83,9 @@ export default function PlanificadorClient({ initialRoutines }: PlanificadorClie
           <Button 
             onClick={handleCreateNew}
             variant="outline"
-            className="border-gray-700 hover:border-[#00aeef]/40 bg-[#1a1e26] hover:bg-[#252b37] text-[#00aeef] rounded-xl font-semibold text-xs gap-2"
+            className="border-gray-700 hover:border-primary/40 bg-[#1a1e26] hover:bg-[#252b37] text-primary rounded-xl font-semibold text-xs gap-2"
           >
-            <Sparkles className="h-4 w-4 text-[#00aeef]" /> Crear primera rutina
+            <Sparkles className="h-4 w-4 text-primary" /> Crear primera rutina
           </Button>
         </div>
       ) : (
