@@ -33,11 +33,15 @@ export function SaaSCheckoutButton({ invoiceId }: { invoiceId: number }) {
     }
   }
   return (
-    <div className="space-y-1">
-      <Button type="button" size="sm" onClick={pay} disabled={busy}>
-        {busy ? "Preparando pago..." : "Pagar con Mercado Pago (prueba)"}
+    <div className="flex flex-col items-end gap-1.5">
+      <Button type="button" size="sm" onClick={pay} disabled={busy} className="min-w-[156px] gap-2 rounded-xl px-4 font-semibold shadow-sm">
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CreditCard className="h-4 w-4" aria-hidden="true" />}
+        {busy ? "Preparando..." : "Pagar ahora"}
       </Button>
-      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+        <ShieldCheck className="h-3 w-3" aria-hidden="true" /> Mercado Pago · Prueba
+      </span>
+      {error && <p role="alert" className="max-w-[240px] text-right text-xs text-destructive">{error}</p>}
     </div>
   );
 }
