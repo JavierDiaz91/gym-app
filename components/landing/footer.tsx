@@ -12,7 +12,7 @@ export function Footer() {
                 <Dumbbell className="absolute h-6 w-6 text-cyan-400 opacity-80" strokeWidth={1.6} />
                 <Activity className="relative h-4 w-4 text-white" strokeWidth={2.6} />
               </div>
-              <span className="text-lg font-semibold tracking-[-0.03em] text-white">kivra<span className="text-cyan-400">.</span></span>
+              <span className="text-lg font-semibold tracking-[-0.03em] text-white">kivra</span>
             </Link>
             <p className="mt-4 text-sm leading-6">
               Gestión inteligente para gimnasios. Una plataforma para administrar la operación diaria con claridad.
