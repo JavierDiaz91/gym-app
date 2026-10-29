@@ -27,9 +27,9 @@ export default async function ComprobantePage({ params }: { params: Promise<{ id
   const paid = invoice.status === "paid";
   return <div className="mx-auto max-w-3xl space-y-5">
     <div className="print:hidden"><PrintButton /></div>
-    <article className="overflow-hidden rounded-2xl border border-border bg-white text-slate-900 shadow-lg print:rounded-none print:border-0 print:shadow-none">
+    <article id="kivra-print-document" className="overflow-hidden rounded-2xl border border-border bg-white text-slate-900 shadow-lg print:rounded-none print:border-0 print:shadow-none">
       <header className="flex flex-wrap items-start justify-between gap-4 bg-[#071827] px-8 py-7 text-white print:bg-[#071827] print:text-white">
-        <div><p className="text-3xl font-extrabold tracking-widest text-[#00D5D0]">KIVRA</p><p className="mt-1 text-sm text-slate-300">Plataforma de gestión de gimnasios</p></div>
+        <div><p className="kivra-brand text-3xl font-extrabold tracking-widest text-[#00D5D0]">KIVRA</p><p className="mt-1 text-sm text-slate-300">Plataforma de gestión de gimnasios</p></div>
         <div className="text-right"><p className="text-lg font-bold">{paid ? "RECIBO DE PAGO" : "AVISO DE PAGO"}</p><p className="text-sm text-slate-300">KIV-{String(invoice.id).padStart(6, "0")}</p></div>
       </header>
       <div className="space-y-7 p-8">
@@ -37,10 +37,10 @@ export default async function ComprobantePage({ params }: { params: Promise<{ id
           <div><p className="text-xs uppercase tracking-wider text-slate-500">Gimnasio</p><p className="mt-1 text-lg font-semibold">{invoice.gym_name}</p></div>
           <div><p className="text-xs uppercase tracking-wider text-slate-500">{paid ? "Fecha de pago registrada" : "Vencimiento"}</p><p className="mt-1 text-lg font-semibold">{date(paid ? invoice.paid_at : invoice.due_date)}</p></div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <div className="kivra-print-section rounded-xl border border-slate-200 bg-slate-50 p-5">
           <p className="text-xs uppercase tracking-wider text-slate-500">Concepto</p>
           <p className="mt-2 font-semibold">Suscripción Kivra SaaS — {invoice.plan_name || "Plan contratado"}</p>
-          <p className="mt-1 text-sm text-slate-600">Período: {date(invoice.period_start)} al {date(invoice.period_end)}</p>
+          <p className="mt-1 text-sm text-slate-600">Período: {invoice.period_start && invoice.period_end ? `${date(invoice.period_start)} al ${date(invoice.period_end)}` : "No especificado"}</p>
           <div className="mt-5 flex items-center justify-between border-t border-slate-200 pt-4"><span className="font-semibold">{paid ? "Total recibido" : "Total a pagar"}</span><span className="text-2xl font-extrabold">{money(invoice.amount)}</span></div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm">Estado: <strong>{paid ? "Pago registrado" : invoice.status === "overdue" ? "Vencido" : "Pendiente"}</strong></p><p className="text-sm text-slate-600">Emitido: {date(invoice.created_at)}</p></div>
