@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CreditCard, Loader2, ShieldCheck } from "lucide-react";
 
 export function SaaSCheckoutButton({ invoiceId }: { invoiceId: number }) {
   const [busy, setBusy] = useState(false);
