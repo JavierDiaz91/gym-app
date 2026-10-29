@@ -364,7 +364,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                 <Button
                   type="submit"
                   disabled={loadingGeneral}
-                  className="bg-[#00aeef] hover:bg-[#0098d4] text-black font-bold gap-2"
+                  className="bg-primary hover:bg-primary/90 text-black font-bold gap-2"
                 >
                   {loadingGeneral && <Loader2 className="w-4 h-4 animate-spin" />}
                   Guardar Cambios
@@ -379,7 +379,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
           <Card className="bg-[#14171d] border-gray-800 text-gray-100 shadow-2xl">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#00aeef]/10 border border-[#00aeef]/30 rounded-xl flex items-center justify-center text-[#00aeef]">
+                <div className="w-10 h-10 bg-primary/10 border border-primary/30 rounded-xl flex items-center justify-center text-primary">
                   <QrCode className="w-5 h-5" />
                 </div>
                 <div>
@@ -436,7 +436,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                   <div className="flex flex-wrap gap-3 pt-2">
                     <Button
                       onClick={handlePrint}
-                      className="bg-[#00aeef] hover:bg-[#0098d4] text-black font-bold gap-2 rounded-xl h-11"
+                      className="bg-primary hover:bg-primary/90 text-black font-bold gap-2 rounded-xl h-11"
                     >
                       <Printer className="w-4 h-4" /> Imprimir Cartel QR
                     </Button>
@@ -595,7 +595,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                 <Button
                   type="submit"
                   disabled={loadingHorarios}
-                  className="bg-[#00aeef] hover:bg-[#0098d4] text-black font-bold gap-2"
+                  className="bg-primary hover:bg-primary/90 text-black font-bold gap-2"
                 >
                   {loadingHorarios && <Loader2 className="w-4 h-4 animate-spin" />}
                   Guardar Horarios y Feriados
@@ -657,7 +657,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                 <Button
                   type="submit"
                   disabled={loadingNotif}
-                  className="bg-[#00aeef] hover:bg-[#0098d4] text-black font-bold gap-2"
+                  className="bg-primary hover:bg-primary/90 text-black font-bold gap-2"
                 >
                   {loadingNotif && <Loader2 className="w-4 h-4 animate-spin" />}
                   Guardar Preferencias

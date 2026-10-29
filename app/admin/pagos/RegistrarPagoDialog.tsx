@@ -312,7 +312,7 @@ export function RegistrarPagoDialog({ members, plans }: Props) {
               </p>
             </div>
 
-            <div className="flex justify-center rounded-xl border bg-white p-5">
+            <div className="flex justify-center rounded-xl border border-border bg-white p-5">
               <QRCodeSVG
                 value={paymentLink}
                 size={220}

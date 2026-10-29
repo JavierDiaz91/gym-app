@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Menu, Sparkles } from "lucide-react";
+import { Menu, Activity, Dumbbell } from "lucide-react";
 import { useState } from "react";
 
 const navLinks = [
@@ -16,13 +16,10 @@ const navLinks = [
 function Brand() {
   return (
     <Link href="/" className="flex items-center gap-3">
-      <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06]">
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/35 to-cyan-400/10" />
-        <Sparkles className="relative h-5 w-5 text-violet-200" />
-      </div>
+      <div className="relative flex h-11 w-11 items-center justify-center rounded-full border-2 border-cyan-400 bg-[#081827] shadow-[0_0_22px_rgba(0,213,208,0.24)]"><Dumbbell className="absolute h-7 w-7 text-cyan-400 opacity-80" strokeWidth={1.6} /><Activity className="relative h-5 w-5 text-white drop-shadow-[0_0_5px_#00d5d0]" strokeWidth={2.6} /></div>
       <div className="leading-none">
-        <span className="block text-xl font-semibold tracking-[-0.04em] text-white">Kivra</span>
-        <span className="mt-1 block text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500">Gym Management</span>
+        <span className="block text-xl font-semibold tracking-[-0.04em] text-white">kivra</span>
+        <span className="mt-1 block text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500">Gym Management Platform</span>
       </div>
     </Link>
   );
@@ -32,7 +29,7 @@ export function Header() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-[#090b10]/75 backdrop-blur-xl">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-[#071320]/85 backdrop-blur-xl">
       <div className="container mx-auto px-4">
         <div className="flex h-18 items-center justify-between">
           <Brand />
@@ -49,7 +46,7 @@ export function Header() {
             <Button variant="ghost" className="rounded-xl text-zinc-300 hover:bg-white/[0.06] hover:text-white" asChild>
               <Link href="/login">Iniciar sesión</Link>
             </Button>
-            <Button className="rounded-xl bg-white text-zinc-950 hover:bg-zinc-200" asChild>
+            <Button className="rounded-xl bg-[#00d5d0] text-[#071320] hover:bg-[#2ae8e2]" asChild>
               <Link href="#producto">Conocer Kivra</Link>
             </Button>
           </div>
@@ -61,7 +58,7 @@ export function Header() {
                 <span className="sr-only">Abrir menú</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[310px] border-white/10 bg-[#0b0e14] text-white">
+            <SheetContent side="right" className="w-[310px] border-white/10 bg-[#081827] text-white">
               <SheetHeader><SheetTitle className="sr-only">Menú de navegación</SheetTitle></SheetHeader>
               <div className="mt-6"><Brand /></div>
               <nav className="mt-10 flex flex-col gap-2">
@@ -74,7 +71,7 @@ export function Header() {
                   <Button variant="outline" className="rounded-xl border-white/10 bg-transparent text-white" asChild>
                     <Link href="/login">Iniciar sesión</Link>
                   </Button>
-                  <Button className="rounded-xl bg-white text-zinc-950" asChild>
+                  <Button className="rounded-xl bg-[#00d5d0] text-[#071320]" asChild>
                     <Link href="#producto">Conocer Kivra</Link>
                   </Button>
                 </div>

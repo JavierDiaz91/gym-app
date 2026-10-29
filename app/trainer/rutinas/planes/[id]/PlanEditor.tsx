@@ -100,7 +100,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     });
   };
   return <main className="mx-auto max-w-6xl space-y-5 p-4 md:p-8 text-foreground">
-    <Link href="/trainer/rutinas/planes" className="text-sm text-cyan-500">← Volver a plantillas</Link>
+    <Link href="/trainer/rutinas/planes" className="text-sm text-primary">← Volver a plantillas</Link>
     <div className="flex flex-wrap justify-between gap-3">
       <div><h1 className="text-2xl font-bold">{plan.title}</h1><p className="text-sm text-muted-foreground">{plan.durationWeeks} semanas · {plan.status === "draft" ? "Borrador" : "Publicado"}{plan.status === "published" && personalize ? " · Personalización para alumno (sin modificar plantilla)" : ""}</p></div>
       <div className="flex flex-wrap gap-2">
@@ -112,7 +112,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       <span className="text-sm font-medium" role="status" aria-live="polite">{pending ? "Guardando..." : hasUnsavedChanges ? "● Cambios sin guardar" : "✓ Cambios guardados"}</span>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={button} disabled={pending || !hasUnsavedChanges} onClick={saveDraft}>{pending ? "Guardando..." : "Guardar cambios"}</button>
-        <button type="button" className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={saveAndPublish}>Guardar y publicar</button>
+        <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={saveAndPublish}>Guardar y publicar</button>
       </div>
     </div>}
     {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta plantilla ya está publicada. Para modificar la plantilla y guardar una nueva versión, usá «Duplicar plantilla»; para ajustar únicamente la rutina de un alumno, activá «Personalizar ejercicios y cargas» antes de asignarla. Esos ajustes se guardan al asignar y no cambian la plantilla original.</p>}
@@ -121,7 +121,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       <div className="space-y-1"><h2 className="text-base font-bold">1. Elegí la semana y el día</h2><p className="text-xs text-muted-foreground">Trabajá sobre un día a la vez. Cada semana conserva sus propias cargas.</p></div>
       <div className="flex flex-wrap gap-2 items-center">
       <span className="text-sm font-semibold">Semana:</span>
-      {Array.from({ length: plan.durationWeeks }, (_, i) => <button key={i} type="button" className={button + (week === i ? " border-cyan-500 text-cyan-500" : "")} onClick={() => setWeek(i)}>{i + 1}</button>)}
+      {Array.from({ length: plan.durationWeeks }, (_, i) => <button key={i} type="button" className={button + (week === i ? " border-primary text-primary" : "")} onClick={() => setWeek(i)}>{i + 1}</button>)}
     </div>
     {editable && <details className="rounded-xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Progresión semanal avanzada">
       <summary className="cursor-pointer list-item text-sm font-semibold">Progresión semanal <span className="ml-2 font-normal text-muted-foreground">· Opcional, configurar cuando la semana 1 esté lista</span></summary>
@@ -147,7 +147,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       <p className="text-xs text-muted-foreground">La progresión parte de la Semana 1. Ajusta repeticiones numéricas y RIR; conserva tiempos, distancias y descansos.</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={button} disabled={pending || plan.durationWeeks < 2} onClick={() => setPreview(makeProgression())}>Vista previa de progresión</button>
-        {preview && <button type="button" className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-black" onClick={applyProgression}>Aplicar progresión</button>}
+        {preview && <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-black" onClick={applyProgression}>Aplicar progresión</button>}
         {preview && <button type="button" className={button} onClick={() => setPreview(null)}>Cancelar</button>}
       </div>
       {preview && <div className="max-h-80 overflow-auto rounded-lg border p-3 text-sm">
@@ -167,10 +167,10 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       <div role="status" className="rounded-xl border border-dashed border-slate-500/60 bg-slate-900/20 px-5 py-8 text-center dark:bg-slate-900/30">
         <p className="text-base font-semibold">Todavía no agregaste días de entrenamiento</p>
         <p className="mt-2 text-sm text-muted-foreground">Comenzá creando el primer día de tu planificación. Después vas a poder organizar bloques y ejercicios.</p>
-        {editable && <button type="button" className={button + " mt-4 border-cyan-500/60 text-cyan-600 dark:text-cyan-300"} onClick={() => { setSelectedDay(0); change({ days: [{ title: "Día 1", modality: "strength", blocks: [] }] }); }}>+ Crear primer día</button>}
+        {editable && <button type="button" className={button + " mt-4 border-primary/60 text-primary dark:text-primary"} onClick={() => { setSelectedDay(0); change({ days: [{ title: "Día 1", modality: "strength", blocks: [] }] }); }}>+ Crear primer día</button>}
       </div>
     ) : <nav aria-label="Seleccionar día de entrenamiento" className="flex flex-wrap gap-2 rounded-xl border border-slate-300 p-3 dark:border-slate-700">
-      {draft.days.map((day, di) => <button type="button" key={di} onClick={() => setSelectedDay(di)} aria-current={selectedDay === di ? "step" : undefined} className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${selectedDay === di ? "border-cyan-500 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300" : "border-slate-300 hover:bg-muted dark:border-slate-600"}`}>Día {di + 1} · {day.title}</button>)}
+      {draft.days.map((day, di) => <button type="button" key={di} onClick={() => setSelectedDay(di)} aria-current={selectedDay === di ? "step" : undefined} className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${selectedDay === di ? "border-primary bg-primary/10 text-primary dark:text-primary" : "border-slate-300 hover:bg-muted dark:border-slate-600"}`}>Día {di + 1} · {day.title}</button>)}
     </nav>}
     </section>
     {draft.days.map((day, di) => selectedDay !== di ? null : <section key={di} className="rounded-2xl border border-slate-300 bg-muted/5 p-4 space-y-5 dark:border-slate-700">
@@ -191,7 +191,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         </div>
         {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <div key={item.key} className="rounded-xl border-2 border-slate-200 bg-background p-3 space-y-3 shadow-sm dark:border-slate-700">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><p className="text-xs font-semibold text-cyan-600 dark:text-cyan-400">Ejercicio {ii + 1}</p><h3 className="text-base font-bold">{item.title || "Ejercicio sin nombre"}</h3></div>
+            <div><p className="text-xs font-semibold text-primary dark:text-primary">Ejercicio {ii + 1}</p><h3 className="text-base font-bold">{item.title || "Ejercicio sin nombre"}</h3></div>
             <div className="flex flex-wrap gap-2 text-xs font-semibold">
               {rx.sets !== undefined && <span className="rounded-lg bg-muted px-3 py-2">{rx.sets} series</span>}
               {rx.reps && <span className="rounded-lg bg-muted px-3 py-2">{rx.reps} rep.</span>}
@@ -200,7 +200,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </div>
           </div>
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-cyan-300">Editar ejercicio, instrucciones e imagen</summary>
+            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Editar ejercicio, instrucciones e imagen</summary>
             <div className="mt-3">
           <div className="flex flex-wrap gap-2 items-start">
             {item.imageUrl && <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-300 bg-slate-100 p-2 dark:border-slate-600"><img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-full w-full object-contain grayscale" /></div>}
@@ -209,7 +209,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
                 <option value="">Elegir de Mis Ejercicios (biblioteca personal)</option>
                 {exercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
               </select>
-              <Link href="/trainer/ejercicios" className="inline-block text-xs font-semibold text-cyan-600 underline dark:text-cyan-400">+ Crear o administrar mis ejercicios</Link>
+              <Link href="/trainer/ejercicios" className="inline-block text-xs font-semibold text-primary underline dark:text-primary">+ Crear o administrar mis ejercicios</Link>
               <input aria-label="Ejercicio" placeholder="Ej. Sentadilla o intervalos 400 m" className={field} disabled={!editable} value={item.title} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, title: e.target.value }))}/>
               <input aria-label="URL de imagen" placeholder="https://... imagen demostrativa" className={field} disabled={!editable} value={item.imageUrl || ""} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, imageUrl: e.target.value }))}/>
               <textarea aria-label="Instrucciones" placeholder="Indicaciones técnicas" className={field} disabled={!editable} value={item.instructions || ""} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, instructions: e.target.value }))}/>
@@ -235,7 +235,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
                     return <tr key={key} className="border-t border-slate-200 dark:border-slate-700">
                       <th scope="row" className="sticky left-0 z-10 bg-background p-3 font-medium">{label}</th>
                       {Array.from({ length: plan.durationWeeks }, (_, wi) => <td key={wi} className={`p-1.5 ${wi === week ? "bg-cyan-50 dark:bg-cyan-950/40" : ""}`}>
-                        <input aria-label={`${label}, semana ${wi + 1}, ${item.title || "ejercicio"}`} className="w-full min-w-20 rounded-md border border-slate-300 bg-background px-2 py-2 text-center text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-cyan-500 disabled:opacity-70 dark:border-slate-600" disabled={!editable} type={isNumeric ? "number" : "text"} min={isNumeric ? 0 : undefined} value={item.prescriptions[wi]?.[key] ?? ""} onChange={(e) => {
+                        <input aria-label={`${label}, semana ${wi + 1}, ${item.title || "ejercicio"}`} className="w-full min-w-20 rounded-md border border-slate-300 bg-background px-2 py-2 text-center text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-70 dark:border-slate-600" disabled={!editable} type={isNumeric ? "number" : "text"} min={isNumeric ? 0 : undefined} value={item.prescriptions[wi]?.[key] ?? ""} onChange={(e) => {
                           const value = isNumeric ? (e.target.value === "" ? undefined : Number(e.target.value)) : e.target.value;
                           updateItem(di, bi, ii, (current) => ({ ...current, prescriptions: Array.from({ length: plan.durationWeeks }, (_, index) => index === wi ? { ...(current.prescriptions[index] || {}), [key]: value } : (current.prescriptions[index] || {})) }));
                         }}/>
@@ -256,7 +256,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           </div>
           </details>
         </div>; })}
-        {editable && <button type="button" className={button + " border-cyan-500/50 text-cyan-600 dark:text-cyan-300"} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio / intervalo</button>}
+        {editable && <button type="button" className={button + " border-primary/50 text-primary dark:text-primary"} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio / intervalo</button>}
       </div>)}
       {editable && <button type="button" className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: [...d.blocks, { title: "Bloque principal", type: "main", items: [] }] }))}>+ Agregar bloque</button>}
     </section>)}

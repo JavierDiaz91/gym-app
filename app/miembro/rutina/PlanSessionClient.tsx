@@ -33,7 +33,7 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
   }
   return (
     <div className="space-y-7">
-      <section className="rounded-2xl border-2 border-slate-300 bg-white p-5 shadow-sm space-y-4 dark:border-slate-600 dark:bg-slate-950">
+      <section className="rounded-2xl border-2 border-border bg-card p-5 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold text-primary uppercase tracking-wide">Semana {week} · Día {day}</p>
@@ -62,18 +62,18 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
             const p = item.prescriptions?.[week - 1] || {};
             const checked = completed.includes(item.key);
             return (
-              <article key={item.key || itemIndex} className={`overflow-hidden rounded-2xl border-2 bg-white shadow-md ring-1 ring-black/5 transition-colors dark:bg-slate-950 dark:ring-white/5 ${checked ? "border-emerald-500 dark:border-emerald-400" : "border-slate-300 dark:border-slate-600"}`}>
+              <article key={item.key || itemIndex} className={`overflow-hidden rounded-2xl border-2 bg-card shadow-md ring-1 ring-border transition-colors ${checked ? "border-emerald-500 dark:border-emerald-400" : "border-border"}`}>
                 {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className="border-b p-3"><details className="group"><summary className="cursor-pointer text-sm font-semibold text-primary">Ver demostración del ejercicio</summary><img src={item.imageUrl} alt={`Demostración verificada de ${item.title}`} loading="lazy" className="mt-3 h-36 w-48 max-w-full rounded-xl border border-slate-300 bg-slate-100 p-2 object-contain grayscale dark:border-slate-600" /></details></div>}
                 <div className="p-4 sm:p-5 space-y-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div><p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p><h4 className="text-lg font-bold text-slate-950 dark:text-white">{item.title}</h4></div>
+                    <div><p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p><h4 className="text-lg font-bold text-foreground">{item.title}</h4></div>
                     {status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-sm font-semibold cursor-pointer"><input type="checkbox" disabled={pending || readOnly || status === "completed"} checked={checked} onChange={e => {
                       const next = e.target.checked;
                       run(() => markPlanExercise(assignmentId, week, day, item.key, next), () => setCompleted(old => next ? [...old.filter(k => k !== item.key), item.key] : old.filter(k => k !== item.key)));
                     }} className="h-5 w-5 accent-emerald-600" />Hecho</label>}
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {p.sets != null && <div className="rounded-xl border border-slate-200 bg-slate-100 p-3 dark:border-slate-700 dark:bg-slate-900"><p className="text-xs text-muted-foreground">Series</p><p className="text-lg font-bold">{p.sets}</p></div>}
+                    {p.sets != null && <div className="rounded-xl border border-border bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Series</p><p className="text-lg font-bold">{p.sets}</p></div>}
                     {p.reps && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Repeticiones</p><p className="text-lg font-bold">{p.reps}</p></div>}
                     {p.durationSeconds != null && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Duración</p><p className="text-lg font-bold">{p.durationSeconds} seg</p></div>}
                     {p.rir && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">RIR</p><p className="text-lg font-bold">{p.rir}</p></div>}

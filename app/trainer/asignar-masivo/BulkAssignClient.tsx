@@ -176,7 +176,7 @@ export default function BulkAssignClient({
       {/* Barra de Filtros */}
       <div className="bg-card border border-border rounded-2xl p-5 shadow-xl space-y-4">
         <div className="flex items-center gap-2 font-extrabold text-xs uppercase tracking-wider text-foreground">
-          <Filter className="w-4 h-4 text-[#00aeef]" />
+          <Filter className="w-4 h-4 text-primary" />
           <span>Filtros de Segmentación</span>
         </div>
 
@@ -187,7 +187,7 @@ export default function BulkAssignClient({
             <select
               value={genderFilter}
               onChange={(e) => setGenderFilter(e.target.value)}
-              className="w-full text-xs font-medium p-2.5 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 focus:border-[#00aeef] transition-colors cursor-pointer"
+              className="w-full text-xs font-medium p-2.5 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
             >
               <option value="all" className="bg-card text-card-foreground">Todos los géneros</option>
               <option value="female" className="bg-card text-card-foreground">Mujeres</option>
@@ -201,7 +201,7 @@ export default function BulkAssignClient({
             <select
               value={activityFilter}
               onChange={(e) => setActivityFilter(e.target.value)}
-              className="w-full text-xs font-medium p-2.5 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 focus:border-[#00aeef] transition-colors cursor-pointer"
+              className="w-full text-xs font-medium p-2.5 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
             >
               <option value="all" className="bg-card text-card-foreground">Todas las actividades</option>
               <option value="running_fuerza" className="bg-card text-card-foreground">Running + Fuerza</option>
@@ -217,7 +217,7 @@ export default function BulkAssignClient({
             <select
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
-              className="w-full text-xs font-medium p-2.5 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 focus:border-[#00aeef] transition-colors cursor-pointer"
+              className="w-full text-xs font-medium p-2.5 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
             >
               <option value="all" className="bg-card text-card-foreground">Todos los niveles</option>
               <option value="principiante" className="bg-card text-card-foreground">Principiante</option>
@@ -234,10 +234,10 @@ export default function BulkAssignClient({
           <button
             type="button"
             onClick={toggleSelectAll}
-            className="flex items-center gap-2 text-xs font-bold text-[#00aeef] hover:text-[#0098d4] transition-colors cursor-pointer"
+            className="flex items-center gap-2 text-xs font-bold text-primary hover:text-primary/80 transition-colors cursor-pointer"
           >
             {selectedMembers.length === filteredMembers.length && filteredMembers.length > 0 ? (
-              <CheckSquare className="w-4 h-4 text-[#00aeef]" />
+              <CheckSquare className="w-4 h-4 text-primary" />
             ) : (
               <Square className="w-4 h-4 text-muted-foreground" />
             )}
@@ -264,12 +264,12 @@ export default function BulkAssignClient({
                   key={m.id}
                   onClick={() => toggleSelectMember(m.id)}
                   className={`p-3.5 text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                    isSelected ? "bg-[#00aeef]/10" : "hover:bg-accent/50"
+                    isSelected ? "bg-primary/10" : "hover:bg-accent/50"
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     {isSelected ? (
-                      <CheckSquare className="w-4 h-4 text-[#00aeef]" />
+                      <CheckSquare className="w-4 h-4 text-primary" />
                     ) : (
                       <Square className="w-4 h-4 text-muted-foreground" />
                     )}
@@ -292,7 +292,7 @@ export default function BulkAssignClient({
       {/* Panel de Asignación */}
       <div className="bg-card border border-border rounded-2xl p-5 shadow-xl space-y-4">
         <div className="flex items-center gap-2 font-extrabold text-xs uppercase tracking-wider text-foreground">
-          <Dumbbell className="w-4 h-4 text-[#00aeef]" />
+          <Dumbbell className="w-4 h-4 text-primary" />
           <span>Elegir plan de entrenamiento a asignar</span>
         </div>
 
@@ -300,7 +300,7 @@ export default function BulkAssignClient({
           <select
             value={selectedRoutine}
             onChange={(e) => setSelectedRoutine(e.target.value)}
-            className="flex-1 text-xs font-medium p-3 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-[#00aeef]/30 focus:border-[#00aeef] transition-colors cursor-pointer"
+            className="flex-1 text-xs font-medium p-3 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
           >
             <option value="" className="bg-card text-card-foreground">-- Seleccionar plan o rutina --</option>
             {trainingPlans.map((p) => (
@@ -315,7 +315,7 @@ export default function BulkAssignClient({
             type="button"
             onClick={handleAssign}
             disabled={isPending || eligibleMembers.length === 0 || !selectedRoutine}
-            className="px-6 py-3 text-xs font-extrabold text-black bg-[#00aeef] hover:bg-[#0098d4] disabled:bg-muted disabled:text-muted-foreground rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed shadow-md"
+            className="px-6 py-3 text-xs font-extrabold text-black bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed shadow-md"
           >
             {isPending ? (
               <>

@@ -11,10 +11,10 @@ const modules = [
 
 export function Services() {
   return (
-    <section id="modulos" className="border-t border-white/[0.06] bg-[#0b0e14] py-24 text-white">
+    <section id="modulos" className="border-t border-white/[0.06] bg-[#081827] py-24 text-white">
       <div className="container mx-auto px-4">
         <div className="mx-auto mb-14 max-w-3xl text-center">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">Una sola plataforma</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Una sola plataforma</span>
           <h2 className="mt-4 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
             Todo lo que necesitás para operar mejor.
           </h2>
@@ -25,12 +25,12 @@ export function Services() {
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {modules.map((module) => (
-            <div key={module.title} className="group rounded-2xl border border-white/[0.07] bg-white/[0.025] p-6 transition-all hover:-translate-y-1 hover:border-violet-400/20 hover:bg-white/[0.04]">
-              <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.08] bg-gradient-to-br from-violet-500/15 to-cyan-400/[0.04]">
-                <module.icon className="h-5 w-5 text-violet-200" />
+            <div key={module.title} className="group rounded-2xl border border-white/[0.07] bg-white/[0.025] p-6 transition-all hover:-translate-y-1 hover:border-cyan-400/25 hover:bg-white/[0.04]">
+              <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.08] bg-gradient-to-br from-cyan-500/20 to-blue-400/[0.05]">
+                <module.icon className="h-5 w-5 text-cyan-200" />
               </div>
               <h3 className="text-lg font-semibold tracking-tight text-white">{module.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-zinc-500">{module.description}</p>
+              <p className="mt-2 text-sm leading-6 text-zinc-400">{module.description}</p>
             </div>
           ))}
         </div>
