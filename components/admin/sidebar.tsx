@@ -43,6 +43,7 @@ const navItems = [
   // Funciones operativas de un gimnasio: requieren tenant (gym_id).
   { href: "/admin/miembros", label: "Miembros", icon: Users, roles: ["admin"] },
   { href: "/admin/pagos", label: "Pagos y Cobros", icon: DollarSign, roles: ["admin"] },
+  { href: "/admin/mi-suscripcion", label: "Mi suscripción Kivra", icon: Receipt, roles: ["admin"] },
   { href: "/admin/asistencias", label: "Asistencias", icon: CheckSquare, roles: ["admin"] },
   { href: "/admin/membresias", label: "Membresías", icon: CreditCard, roles: ["admin"] },
   { href: "/admin/clases", label: "Clases", icon: Calendar, roles: ["admin"] },
