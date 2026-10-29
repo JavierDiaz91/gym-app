@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SaaSCheckoutButton } from "./SaaSCheckoutButton";
 import { redirect } from "next/navigation";
 import { getSession } from "@/app/actions";
 import { sql } from "@/lib/db";
@@ -49,8 +50,8 @@ export default async function MiSuscripcionPage() {
           <td className="py-3">{date(i.period_start)} – {date(i.period_end)}</td>
           <td className="py-3">{money(i.amount)}</td>
           <td className="py-3">{i.status === "paid" ? "Pagado" : i.status === "overdue" ? "Vencido" : i.status === "cancelled" ? "Cancelado" : "Pendiente"}</td>
-          <td className="py-3 text-right">{i.status === "cancelled" ? "—" :
-            <Link className="font-semibold text-primary hover:underline" href={`/admin/mi-suscripcion/comprobante/${i.id}`}>{i.status === "paid" ? "Ver recibo" : "Ver aviso"}</Link>}</td>
+          <td className="py-3 text-right"><div className="flex flex-col items-end gap-2">{process.env.KIVRA_SAAS_TEST_CHECKOUT_ENABLED === "true" && (i.status === "pending" || i.status === "overdue") && <SaaSCheckoutButton invoiceId={Number(i.id)} />}{i.status === "cancelled" ? "—" :
+            <Link className="font-semibold text-primary hover:underline" href={`/admin/mi-suscripcion/comprobante/${i.id}`}>{i.status === "paid" ? "Ver recibo" : "Ver aviso"}</Link>}</div></td>
         </tr>)}</tbody>
       </table></div>}
     </section>
