@@ -115,3 +115,37 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+/* Impresion de comprobantes SaaS: aislar el documento de los layouts anidados. */
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  html, body { width: 100% !important; margin: 0 !important; padding: 0 !important; background: white !important; }
+  body * { visibility: hidden !important; }
+  #kivra-print-document, #kivra-print-document * { visibility: visible !important; }
+  #kivra-print-document {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    background: white !important;
+    color: #0f172a !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  #kivra-print-document header {
+    background-color: #071827 !important;
+    color: white !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  #kivra-print-document .kivra-brand { color: #00d5d0 !important; }
+  #kivra-print-document .kivra-print-section { break-inside: avoid; }
+}
