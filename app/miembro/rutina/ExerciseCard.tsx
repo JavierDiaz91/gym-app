@@ -113,11 +113,11 @@ export default function ExerciseCard(props: ExerciseCardProps) {
   };
 
   return (
-    <Card className="border border-slate-700/60 bg-[#0B132B]/80 text-white shadow-xl overflow-hidden rounded-2xl mb-6">
+    <Card className="border border-border bg-card text-card-foreground shadow-xl overflow-hidden rounded-2xl mb-6">
       <div className="flex flex-col md:flex-row min-h-[220px]">
         
         {/* Panel Izquierdo: Imagen / Demostración */}
-        <div className="relative w-full md:w-64 bg-[#090D16] shrink-0 flex flex-col items-center justify-center p-6 border-b md:border-b-0 md:border-r border-slate-800">
+        <div className="relative w-full md:w-64 bg-muted/50 shrink-0 flex flex-col items-center justify-center p-6 border-b md:border-b-0 md:border-r border-slate-800">
           <Badge className="absolute top-4 left-4 bg-slate-900/90 text-slate-200 border border-slate-700/50 px-2.5 py-1 text-xs font-semibold rounded-md z-10">
             Ejercicio #{safeIndex + 1}
           </Badge>
@@ -129,7 +129,7 @@ export default function ExerciseCard(props: ExerciseCardProps) {
               <div className="p-3.5 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20">
                 <Dumbbell className="w-8 h-8" />
               </div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                 Sin demostración
               </span>
             </div>
@@ -149,8 +149,8 @@ export default function ExerciseCard(props: ExerciseCardProps) {
           <div>
             {/* Título y Contador de Series */}
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-2xl font-bold text-slate-100">{title}</h3>
-              <span className="text-sm font-semibold text-slate-300 bg-slate-800/80 px-3 py-1 rounded-full border border-slate-700/50">
+              <h3 className="text-2xl font-bold text-foreground">{title}</h3>
+              <span className="text-sm font-semibold text-muted-foreground bg-muted px-3 py-1 rounded-full border border-slate-700/50">
                 {completedCount} / {totalSeries} Series
               </span>
             </div>
@@ -158,7 +158,7 @@ export default function ExerciseCard(props: ExerciseCardProps) {
             {/* Métricas del Ejercicio */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
               {/* Series */}
-              <div className="bg-white text-slate-900 p-3 rounded-xl shadow-xs">
+              <div className="border border-border bg-muted/50 text-foreground p-3 rounded-xl shadow-xs">
                 <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-1">
                   <Hash className="w-3.5 h-3.5 text-emerald-600" />
                   Series
@@ -167,7 +167,7 @@ export default function ExerciseCard(props: ExerciseCardProps) {
               </div>
 
               {/* Reps */}
-              <div className="bg-white text-slate-900 p-3 rounded-xl shadow-xs">
+              <div className="border border-border bg-muted/50 text-foreground p-3 rounded-xl shadow-xs">
                 <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-1">
                   <Dumbbell className="w-3.5 h-3.5 text-emerald-600" />
                   Reps
@@ -176,7 +176,7 @@ export default function ExerciseCard(props: ExerciseCardProps) {
               </div>
 
               {/* RIR */}
-              <div className="bg-white text-slate-900 p-3 rounded-xl shadow-xs">
+              <div className="border border-border bg-muted/50 text-foreground p-3 rounded-xl shadow-xs">
                 <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-1">
                   <Flame className="w-3.5 h-3.5 text-orange-500" />
                   RIR
@@ -185,9 +185,9 @@ export default function ExerciseCard(props: ExerciseCardProps) {
               </div>
 
               {/* Pausa */}
-              <div className="bg-white text-slate-900 p-3 rounded-xl shadow-xs">
+              <div className="border border-border bg-muted/50 text-foreground p-3 rounded-xl shadow-xs">
                 <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-1">
-                  <Timer className="w-3.5 h-3.5 text-blue-500" />
+                  <Timer className="w-3.5 h-3.5 text-primary" />
                   Pausa
                 </div>
                 <span className="text-lg font-extrabold">{renderPausa(pausaVal)}</span>
@@ -211,7 +211,7 @@ export default function ExerciseCard(props: ExerciseCardProps) {
                         ? "bg-slate-800/80 text-emerald-400 border border-emerald-500/30 cursor-default opacity-90"
                         : isDone
                         ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/40 cursor-pointer"
-                        : "bg-white text-slate-800 hover:bg-slate-100 cursor-pointer"
+                        : "border border-border bg-secondary text-secondary-foreground hover:bg-accent cursor-pointer"
                     }`}
                   >
                     <CheckCircle2
