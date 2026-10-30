@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import {
   generateSaaSInvoiceAction,
+  createSaaSTestInvoiceAction,
   markSaaSInvoicePaidAction,
 } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +82,10 @@ export default function SaaSBillingClient({
     Array.isArray(initialInvoices) ? initialInvoices : []
   );
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [testSubscriptionId, setTestSubscriptionId] = useState(String(initialSubscriptions[0]?.id ?? ""));
+  const [testAmount, setTestAmount] = useState("1750");
+  const [testDueDate, setTestDueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [showTestForm, setShowTestForm] = useState(false);
 
   const totalPending = useMemo(
     () =>
@@ -113,6 +118,23 @@ export default function SaaSBillingClient({
 
     toast.success("Factura SaaS generada.");
     router.refresh();
+  }
+
+  async function createTestInvoice() {
+    const amount = Number(testAmount);
+    if (!testSubscriptionId || !Number.isFinite(amount) || amount < 1 || amount > 10000 || !testDueDate) {
+      toast.error("Completá gimnasio, importe de 1 a 10.000 y vencimiento.");
+      return;
+    }
+    if (!window.confirm("¿Crear factura de PRUEBA sin modificar las cuotas mensuales?")) return;
+    setBusyId("test-invoice");
+    try {
+      const result = await createSaaSTestInvoiceAction(Number(testSubscriptionId), amount, testDueDate);
+      if (!result.success) { toast.error(result.error || "No se pudo crear la factura."); return; }
+      toast.success("Factura de prueba #" + result.invoiceId + " creada.");
+      setShowTestForm(false);
+      router.refresh();
+    } finally { setBusyId(null); }
   }
 
   async function markPaid(invoiceId: number) {
@@ -164,6 +186,22 @@ export default function SaaSBillingClient({
           </CardContent>
         </Card>
       </div>
+
+      {process.env.NEXT_PUBLIC_VERCEL_ENV === "preview" && (
+        <Card className="border-primary/30">
+          <CardHeader><CardTitle>Facturas de prueba</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <Button variant="outline" onClick={() => setShowTestForm(!showTestForm)}>{showTestForm ? "Ocultar formulario" : "Crear factura de prueba"}</Button>
+            {showTestForm && <div className="flex flex-wrap items-end gap-3">
+              <label className="space-y-1 text-sm">Gimnasio<select aria-label="Gimnasio" className="block rounded-md border border-input bg-background p-2" value={testSubscriptionId} onChange={e => setTestSubscriptionId(e.target.value)}>{subscriptions.map(s => <option key={s.id} value={s.id}>{s.gym_name}</option>)}</select></label>
+              <label className="space-y-1 text-sm">Importe (ARS)<input aria-label="Importe de prueba" type="number" min="1" max="10000" step="0.01" className="block rounded-md border border-input bg-background p-2" value={testAmount} onChange={e => setTestAmount(e.target.value)} /></label>
+              <label className="space-y-1 text-sm">Vencimiento<input aria-label="Vencimiento de prueba" type="date" className="block rounded-md border border-input bg-background p-2" value={testDueDate} onChange={e => setTestDueDate(e.target.value)} /></label>
+              <Button disabled={busyId === "test-invoice"} onClick={createTestInvoice}>{busyId === "test-invoice" ? "Creando..." : "Generar prueba"}</Button>
+            </div>}
+            <p className="text-xs text-muted-foreground">Solo disponible en Preview. No modifica períodos de suscripción.</p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
