@@ -3440,6 +3440,48 @@ export async function createSaaSTestInvoiceAction(subscriptionId: number, amount
   }
 }
 
+export async function createSaaSManualInvoiceAction(subscriptionId: number, amount: number, dueDate: string) {
+  try {
+    const session = await requireSuperAdminSession();
+    if (!Number.isSafeInteger(subscriptionId) || subscriptionId <= 0 ||
+        !Number.isFinite(amount) || amount < 1 || amount > 100000000 ||
+        Math.round(amount * 100) !== amount * 100 ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) ||
+        Number.isNaN(Date.parse(dueDate + "T00:00:00Z"))) {
+      return { success: false, error: "Revisá el gimnasio, importe (1 a 100.000.000) y vencimiento." };
+    }
+    const [subscription] = await sql`
+      SELECT id, gym_id FROM public.gym_saas_subscriptions
+      WHERE id = ${subscriptionId} AND status = 'active' LIMIT 1
+    `;
+    if (!subscription) return { success: false, error: "No se encontró una suscripción SaaS activa." };
+
+    const reference = "KIVRA-MANUAL-" + crypto.randomUUID();
+    const [invoice] = await sql`
+      INSERT INTO public.saas_invoices
+        (gym_id, subscription_id, period_start, period_end, amount, status, due_date, external_reference)
+      VALUES
+        (${Number(subscription.gym_id)}, ${subscriptionId}, NULL, NULL, ${amount}, 'pending',
+         ${dueDate}::date, ${reference})
+      RETURNING id
+    `;
+    await sql`
+      INSERT INTO public.saas_audit_log
+        (actor_user_id, action, entity_type, entity_id, gym_id, details)
+      VALUES
+        (${session.id}, 'saas_manual_invoice_created', 'saas_invoice', ${String(invoice.id)},
+         ${Number(subscription.gym_id)}, ${JSON.stringify({ amount, dueDate, manual: true })}::jsonb)
+    `;
+    revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/mi-suscripcion");
+    revalidatePath("/admin/actividad");
+    return { success: true, invoiceId: Number(invoice.id) };
+  } catch (error) {
+    console.error("Error al crear factura SaaS manual:", error);
+    return { success: false, error: "No se pudo crear la factura manual." };
+  }
+}
+
 export async function markSaaSInvoicePaidAction(invoiceId: number) {
   try {
     const session = await requireSuperAdminSession();
