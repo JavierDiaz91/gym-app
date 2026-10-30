@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   generateSaaSInvoiceAction,
   createSaaSTestInvoiceAction,
+  createSaaSManualInvoiceAction,
   markSaaSInvoicePaidAction,
 } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
@@ -137,6 +138,23 @@ export default function SaaSBillingClient({
     } finally { setBusyId(null); }
   }
 
+  async function createManualInvoice() {
+    const amount = Number(testAmount);
+    if (!testSubscriptionId || !Number.isFinite(amount) || amount < 1 || amount > 100000000 || !testDueDate) {
+      toast.error("Completá gimnasio, importe y vencimiento.");
+      return;
+    }
+    if (!window.confirm("¿Generar una factura manual por $" + amount.toLocaleString("es-AR") + "? Se registrará como pendiente de cobro.")) return;
+    setBusyId("manual-invoice");
+    try {
+      const result = await createSaaSManualInvoiceAction(Number(testSubscriptionId), amount, testDueDate);
+      if (!result.success) { toast.error(result.error || "No se pudo generar la factura."); return; }
+      toast.success("Factura manual #" + result.invoiceId + " creada.");
+      setShowTestForm(false);
+      router.refresh();
+    } finally { setBusyId(null); }
+  }
+
   async function markPaid(invoiceId: number) {
     const key = "invoice-" + invoiceId;
     setBusyId(key);
@@ -186,6 +204,20 @@ export default function SaaSBillingClient({
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-primary/30">
+        <CardHeader><CardTitle>Generar factura manual</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <Button variant="outline" onClick={() => setShowTestForm(!showTestForm)}>{showTestForm ? "Ocultar formulario" : "Nueva factura manual"}</Button>
+          {showTestForm && <div className="flex flex-wrap items-end gap-3">
+            <label className="space-y-1 text-sm">Gimnasio<select aria-label="Gimnasio" className="block rounded-md border border-input bg-background p-2" value={testSubscriptionId} onChange={e => setTestSubscriptionId(e.target.value)}>{subscriptions.map(s => <option key={s.id} value={s.id}>{s.gym_name}</option>)}</select></label>
+            <label className="space-y-1 text-sm">Importe (ARS)<input aria-label="Importe manual" type="number" min="1" max="100000000" step="0.01" className="block rounded-md border border-input bg-background p-2" value={testAmount} onChange={e => setTestAmount(e.target.value)} /></label>
+            <label className="space-y-1 text-sm">Vencimiento<input aria-label="Vencimiento manual" type="date" className="block rounded-md border border-input bg-background p-2" value={testDueDate} onChange={e => setTestDueDate(e.target.value)} /></label>
+            <Button disabled={busyId === "manual-invoice"} onClick={createManualInvoice}>{busyId === "manual-invoice" ? "Generando..." : "Generar factura"}</Button>
+          </div>}
+          <p className="text-xs text-muted-foreground">Disponible para Superadmin. La factura queda pendiente y se registra en auditoría; no modifica el período contratado.</p>
+        </CardContent>
+      </Card>
 
       {process.env.NEXT_PUBLIC_VERCEL_ENV === "preview" && (
         <Card className="border-primary/30">
