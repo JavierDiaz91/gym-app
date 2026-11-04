@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { sql } from "@/lib/db";
+import StudentProgressChart, { type StudentOption, type StudentProgressRow } from "@/components/trainer/StudentProgressChart";
 import { 
   Users, 
   Dumbbell, 
@@ -19,6 +21,48 @@ export default async function TrainerDashboardPage() {
   }
 
   const { totalAlumnos, totalRutinas } = await getTrainerStats(session.id);
+  // Restrict every student and training record to this trainer and tenant.
+  const linkedStudents = session.gymId == null ? [] : await sql`
+    SELECT DISTINCT m.id, m.first_name, m.last_name
+    FROM trainers t
+    JOIN trainer_members tm ON tm.trainer_id = t.id
+    JOIN members m ON m.id = tm.member_id AND m.gym_id = t.gym_id
+    WHERE t.user_id = ${session.id} AND t.gym_id = ${session.gymId}
+    ORDER BY m.first_name, m.last_name, m.id
+  `;
+  const students: StudentOption[] = linkedStudents.map(row => ({
+    id: Number(row.id),
+    name: `${String(row.first_name)} ${String(row.last_name || "")}`.trim(),
+  }));
+  const studentIds = students.map(student => student.id);
+  const progressRows = studentIds.length && session.gymId != null ? await sql`
+    SELECT ws.member_id,
+           to_char(date_trunc('week', ws.started_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS week,
+           COUNT(DISTINCT ws.id) FILTER (WHERE ws.status = 'completed')::int AS completed,
+           SUM(GREATEST(wsl.actual_load, 0) * GREATEST(wsl.actual_reps, 0))
+             FILTER (WHERE wsl.actual_load IS NOT NULL AND wsl.actual_reps IS NOT NULL) AS volume,
+           MAX(wsl.actual_load) FILTER (WHERE wsl.actual_load >= 0) AS max_load
+    FROM workout_sessions ws
+    JOIN member_training_plans mtp
+      ON mtp.id = ws.member_training_plan_id
+      AND mtp.member_id = ws.member_id
+      AND mtp.gym_id = ${session.gymId}
+    JOIN trainers t ON t.id = mtp.trainer_id
+      AND t.user_id = ${session.id} AND t.gym_id = ${session.gymId}
+    LEFT JOIN workout_set_logs wsl ON wsl.workout_session_id = ws.id
+    WHERE ws.member_id = ANY(${studentIds}::bigint[])
+      AND ws.started_at >= NOW() - INTERVAL '13 weeks'
+    GROUP BY ws.member_id, date_trunc('week', ws.started_at AT TIME ZONE 'UTC')
+    ORDER BY week
+  ` : [];
+  const progress: StudentProgressRow[] = progressRows.map(row => ({
+    memberId: Number(row.member_id),
+    week: String(row.week),
+    completed: Number(row.completed || 0),
+    volume: row.volume == null ? null : Number(row.volume),
+    maxLoad: row.max_load == null ? null : Number(row.max_load),
+  }));
+
 
   const stats = [
     {
@@ -97,6 +141,8 @@ export default async function TrainerDashboardPage() {
           );
         })}
       </div>
+
+      <StudentProgressChart students={students} rows={progress} />
 
       {/* Secciones Principales / Accesos Directos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
