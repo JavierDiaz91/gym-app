@@ -5,8 +5,7 @@ import {
   TrendingUp, 
   ArrowRight, 
   UserPlus, 
-  PlusCircle,
-  Sparkles
+  PlusCircle
 } from "lucide-react";
 import { getTrainerStats } from "@/app/actions";
 import { getSession } from "@/app/actions";
@@ -49,10 +48,6 @@ export default async function TrainerDashboardPage() {
       <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border shadow-xl relative overflow-hidden">
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20 mb-3">
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              <span>Panel de Control Pro</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">
               ¡Hola de nuevo, Profe! 👋
             </h1>
