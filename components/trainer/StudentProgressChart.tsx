@@ -45,16 +45,16 @@ export default function StudentProgressChart({ students, rows }: { students: Stu
   }, [rows, studentId, metric, weeks]);
   const hasMeasurements = points.some(p => p.value !== null && (metric === "completed" ? p.value > 0 : true));
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-lg sm:p-6" aria-label="Seguimiento de alumnos">
-      <div className="mb-5 flex items-start gap-3">
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-lg sm:p-5" aria-label="Seguimiento de alumnos">
+      <div className="mb-4 flex items-start gap-3">
         <div className="rounded-xl border border-primary/20 bg-primary/10 p-2.5 text-primary"><BarChart3 className="h-5 w-5" /></div>
-        <div><h2 className="text-xl font-bold">Evolución del alumno</h2><p className="text-sm text-muted-foreground">Seguimiento semanal de entrenamientos registrados.</p></div>
+        <div><h2 className="text-lg font-bold">Seguimiento de alumnos</h2><p className="text-xs text-muted-foreground">Evolución y actividad de tus atletas.</p></div>
       </div>
       {students.length === 0 ? (
         <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">Todavía no tenés alumnos vinculados. Vinculá un alumno para ver su evolución.</div>
       ) : (
         <>
-          <div className="mb-5 grid gap-3 sm:grid-cols-3">
+          <div className="mb-4 grid gap-3 sm:grid-cols-2">
             <label className="text-xs font-semibold text-muted-foreground">Alumno
               <select value={studentId} onChange={e => setStudentId(Number(e.target.value))} className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground">
                 {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -67,14 +67,14 @@ export default function StudentProgressChart({ students, rows }: { students: Stu
                 <option value="maxLoad">Carga máxima (kg)</option>
               </select>
             </label>
-            <label className="text-xs font-semibold text-muted-foreground">Período
+            {hasMeasurements && <label className="text-xs font-semibold text-muted-foreground">Período
               <select value={weeks} onChange={e => setWeeks(Number(e.target.value))} className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground">
                 <option value={4}>Últimas 4 semanas</option><option value={8}>Últimas 8 semanas</option><option value={12}>Últimas 12 semanas</option>
               </select>
-            </label>
+            </label>}
           </div>
           {hasMeasurements ? (
-            <div className="h-72 w-full" role="img" aria-label={`Gráfico de ${metricNames[metric]} por semana`}>
+            <div className="h-64 w-full" role="img" aria-label={`Gráfico de ${metricNames[metric]} por semana`}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={points} margin={{ top: 12, right: 18, left: 0, bottom: 4 }}>
                   <CartesianGrid stroke="currentColor" strokeOpacity={0.09} vertical={false} />
@@ -86,14 +86,13 @@ export default function StudentProgressChart({ students, rows }: { students: Stu
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="flex min-h-64 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border text-center">
-              <Activity className="h-6 w-6 text-primary" />
-              <p className="font-semibold">Sin registros para este indicador</p>
-              <p className="max-w-sm text-sm text-muted-foreground">Cuando el alumno registre entrenamientos, su evolución aparecerá acá.</p>
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 px-4 py-4 sm:py-5">
+              <Activity className="h-5 w-5 shrink-0 text-primary" />
+              <div><p className="text-sm font-semibold">Todavía no hay entrenamientos registrados</p><p className="mt-1 text-xs text-muted-foreground">El gráfico aparecerá cuando el alumno registre sesiones para este indicador.</p></div>
             </div>
           )}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-            <p className="text-xs text-muted-foreground">{metric === "completed" ? "Semanas sin sesiones completadas se muestran en cero." : "Las semanas sin mediciones se dejan sin valor; no se inventan cargas."}</p>
+            {hasMeasurements && <p className="text-xs text-muted-foreground">{metric === "completed" ? "Semanas sin sesiones completadas se muestran en cero." : "Las semanas sin mediciones se dejan sin valor; no se inventan cargas."}</p>}
             <Link href={`/trainer/alumnos/${studentId}/progreso`} className="text-sm font-semibold text-primary hover:underline">Ver progreso completo →</Link>
           </div>
         </>
