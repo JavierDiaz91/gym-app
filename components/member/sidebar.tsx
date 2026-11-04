@@ -8,7 +8,6 @@ import {
   History, 
   User, 
   LogOut, 
-  Activity, 
   Menu,
   X 
 } from "lucide-react";
@@ -57,14 +56,14 @@ export default function MemberSidebar({ user }: MemberSidebarProps) {
       <header className="md:hidden bg-[#071827] text-zinc-300 p-4 flex items-center justify-between border-b border-primary/10 sticky top-0 z-40">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 bg-primary/10 text-primary rounded-lg border border-primary/20">
-            <Activity className="w-4 h-4" />
+            <Dumbbell className="w-4 h-4 -rotate-45" />
           </div>
           <div>
             <h1 className="font-bold text-white text-sm leading-none tracking-tight">
               Kivra
             </h1>
             <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">
-              Member App
+              Panel Alumno
             </span>
           </div>
         </div>
@@ -100,20 +99,17 @@ export default function MemberSidebar({ user }: MemberSidebarProps) {
           <div className="p-6 flex items-center justify-between border-b border-primary/10">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-primary/10 text-primary rounded-xl border border-primary/20">
-                <Activity className="w-5 h-5" />
+                <Dumbbell className="w-5 h-5 -rotate-45" />
               </div>
               <div>
                 <h1 className="font-bold text-white text-base leading-none tracking-tight">
                   Kivra
                 </h1>
                 <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
-                  Member App
+                  Panel Alumno
                 </span>
               </div>
             </div>
-            <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20 font-medium">
-              MEMBER
-            </span>
           </div>
 
           {/* Navigation */}
