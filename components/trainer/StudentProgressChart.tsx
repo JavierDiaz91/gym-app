@@ -9,6 +9,7 @@ export type StudentProgressRow = {
   memberId: number;
   week: string;
   completed: number;
+  inProgress: number;
   volume: number | null;
   maxLoad: number | null;
 };
@@ -43,6 +44,9 @@ export default function StudentProgressChart({ students, rows }: { students: Stu
       };
     });
   }, [rows, studentId, metric, weeks]);
+  const activity = rows.filter(row => row.memberId === studentId && points.some(point => point.week === row.week));
+  const completedSessions = activity.reduce((sum, row) => sum + row.completed, 0);
+  const activeSessions = activity.reduce((sum, row) => sum + row.inProgress, 0);
   const hasMeasurements = points.some(p => p.value !== null && (metric === "completed" ? p.value > 0 : true));
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-lg sm:p-5" aria-label="Seguimiento de alumnos">
@@ -73,6 +77,10 @@ export default function StudentProgressChart({ students, rows }: { students: Stu
               </select>
             </label>}
           </div>
+          <div className="mb-4 flex flex-wrap gap-2 text-xs">
+            <span className="rounded-lg border border-border bg-background px-3 py-2"><strong className="text-foreground">{completedSessions}</strong> sesiones finalizadas</span>
+            <span className="rounded-lg border border-border bg-background px-3 py-2"><strong className="text-foreground">{activeSessions}</strong> en curso</span>
+          </div>
           {hasMeasurements ? (
             <div className="h-64 w-full" role="img" aria-label={`Gráfico de ${metricNames[metric]} por semana`}>
               <ResponsiveContainer width="100%" height="100%">
@@ -88,7 +96,7 @@ export default function StudentProgressChart({ students, rows }: { students: Stu
           ) : (
             <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 px-4 py-4 sm:py-5">
               <Activity className="h-5 w-5 shrink-0 text-primary" />
-              <div><p className="text-sm font-semibold">Todavía no hay entrenamientos registrados</p><p className="mt-1 text-xs text-muted-foreground">El gráfico aparecerá cuando el alumno registre sesiones para este indicador.</p></div>
+              <div><p className="text-sm font-semibold">Todavía no hay datos suficientes para graficar este indicador</p><p className="mt-1 text-xs text-muted-foreground">El gráfico aparecerá cuando existan sesiones finalizadas o mediciones registradas para este indicador.</p></div>
             </div>
           )}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
