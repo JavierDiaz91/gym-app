@@ -39,6 +39,7 @@ export default async function TrainerDashboardPage() {
     SELECT ws.member_id,
            to_char(date_trunc('week', ws.started_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS week,
            COUNT(DISTINCT ws.id) FILTER (WHERE ws.status = 'completed')::int AS completed,
+           COUNT(DISTINCT ws.id) FILTER (WHERE ws.status = 'in_progress')::int AS in_progress,
            SUM(GREATEST(wsl.actual_load, 0) * GREATEST(wsl.actual_reps, 0))
              FILTER (WHERE wsl.actual_load IS NOT NULL AND wsl.actual_reps IS NOT NULL) AS volume,
            MAX(wsl.actual_load) FILTER (WHERE wsl.actual_load >= 0) AS max_load
@@ -59,6 +60,7 @@ export default async function TrainerDashboardPage() {
     memberId: Number(row.member_id),
     week: String(row.week),
     completed: Number(row.completed || 0),
+    inProgress: Number(row.in_progress || 0),
     volume: row.volume == null ? null : Number(row.volume),
     maxLoad: row.max_load == null ? null : Number(row.max_load),
   }));
@@ -142,8 +144,6 @@ export default async function TrainerDashboardPage() {
         })}
       </div>
 
-      <StudentProgressChart students={students} rows={progress} />
-
       {/* Secciones Principales / Accesos Directos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
@@ -197,6 +197,9 @@ export default async function TrainerDashboardPage() {
         </div>
 
       </div>
+
+      {/* Seguimiento al final: primero los accesos de uso diario. */}
+      <StudentProgressChart students={students} rows={progress} />
     </div>
   );
 }
