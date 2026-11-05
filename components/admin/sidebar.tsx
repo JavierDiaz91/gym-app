@@ -28,6 +28,7 @@ import { logoutUser } from "@/app/actions";
 interface AdminSidebarProps {
   userRole?: string;
   userEmail?: string;
+  gymName?: string;
 }
 
 const navItems = [
@@ -54,8 +55,8 @@ const navItems = [
   { href: "/admin/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
 ];
 
-export function AdminSidebar({ userRole = "admin", userEmail = "" }: AdminSidebarProps) {
-  const accountLabel = userEmail.trim() || "Usuario";
+export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: AdminSidebarProps) {
+  const accountLabel = (userRole === "admin" ? gymName?.trim() : undefined) || userEmail.trim() || "Usuario";
   const initials = accountLabel.includes("@")
     ? accountLabel.slice(0, 2).toUpperCase()
     : accountLabel.split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join("").toUpperCase();
