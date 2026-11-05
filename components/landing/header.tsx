@@ -19,7 +19,7 @@ function Brand() {
       <div className="relative flex h-11 w-11 items-center justify-center rounded-full border-2 border-cyan-400 bg-[#081827] shadow-[0_0_22px_rgba(0,213,208,0.24)]"><Dumbbell className="absolute h-7 w-7 text-cyan-400 opacity-80" strokeWidth={1.6} /><Activity className="relative h-5 w-5 text-white drop-shadow-[0_0_5px_#00d5d0]" strokeWidth={2.6} /></div>
       <div className="leading-none">
         <span className="block text-xl font-semibold tracking-[-0.04em] text-white">kivra</span>
-        <span className="mt-1 block text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500">Gym Management Platform</span>
+        <span className="mt-1 block text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500">Gestión inteligente de gimnasios</span>
       </div>
     </Link>
   );
@@ -47,7 +47,7 @@ export function Header() {
               <Link href="/login">Iniciar sesión</Link>
             </Button>
             <Button className="rounded-xl bg-[#00d5d0] text-[#071320] hover:bg-[#2ae8e2]" asChild>
-              <Link href="#producto">Conocer Kivra</Link>
+              <Link href="#contacto">Solicitar una demo</Link>
             </Button>
           </div>
 
@@ -72,7 +72,7 @@ export function Header() {
                     <Link href="/login">Iniciar sesión</Link>
                   </Button>
                   <Button className="rounded-xl bg-[#00d5d0] text-[#071320]" asChild>
-                    <Link href="#producto">Conocer Kivra</Link>
+                    <Link href="#contacto">Solicitar una demo</Link>
                   </Button>
                 </div>
               </nav>
