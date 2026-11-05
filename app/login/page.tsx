@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -20,24 +19,42 @@ const features = [
 export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (loading) return;
+
     setError("");
     setLoading(true);
-    const formData = new FormData(e.currentTarget);
-    const result = await loginUser(formData);
 
-    if (result.error) {
-      setError(result.error);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const result = await loginUser(formData);
+
+      if (result.error) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+
+      if (!result.success || !result.user) {
+        setError("No se pudo completar el inicio de sesión. Intentá nuevamente.");
+        setLoading(false);
+        return;
+      }
+
+      const destination =
+        result.user.role === "superadmin" ? "/admin/gimnasios" :
+        result.user.role === "admin" ? "/admin" :
+        result.user.role === "trainer" ? "/trainer" : "/miembro";
+
+      // Full navigation guarantees that the newly set session cookie is
+      // included in the first protected page request.
+      window.location.replace(destination);
+    } catch (error) {
+      console.error("Error al enviar el inicio de sesión:", error);
+      setError("No se pudo conectar con el servidor. Intentá nuevamente.");
       setLoading(false);
-    } else if (result.success) {
-      setLoading(false);
-      if (result.user?.role === "superadmin") router.push("/admin/gimnasios");
-      else if (result.user?.role === "admin") router.push("/admin");
-      else if (result.user?.role === "trainer") router.push("/trainer");
-      else router.push("/miembro");
     }
   }
 
@@ -122,7 +139,7 @@ export default function LoginPage() {
 
               <Button type="submit" className="h-12 w-full rounded-xl bg-[#00d5d0] font-semibold text-[#071320] hover:bg-[#2ae8e2]" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Iniciar sesión
+                {loading ? "Ingresando..." : "Iniciar sesión"}
               </Button>
             </form>
 
