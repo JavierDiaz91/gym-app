@@ -35,7 +35,7 @@ export default async function AdminLayout({
       />
 
       {/* Sidebar Navigation */}
-      <AdminSidebar userRole={session.role} />
+      <AdminSidebar userRole={session.role} userEmail={session.email} />
 
       {/* Contenido Principal */}
       <main className="relative z-10 flex-1 p-6 md:p-8 overflow-y-auto">
