@@ -11,7 +11,7 @@ export default function MemberClasses({schedules,bookings,occupancy,memberships}
  const router=useRouter();const [busy,start]=useTransition();const [msg,setMsg]=useState("");
  const today=new Date();today.setHours(12,0,0,0);
  const dates=schedules.flatMap(s=>Array.from({length:5},(_,i)=>{const d=new Date(today);d.setDate(d.getDate()+(s.day-today.getDay()+7)%7+i*7);return {...s,date:fmt(d)}})).sort((a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start));
- const eligible=(date:string)=>memberships.some(m=>m.start<=date&&date<m.end&&(m.mode!=="entry_pack"||m.entries>0));
+ const eligible=(date:string)=>memberships.some(m=>m.start<=date&&date<m.end);
  function run(f:()=>Promise<{error?:string;success?:boolean}>){setMsg("");start(async()=>{try{const r=await f();setMsg(r.error||"Operación realizada correctamente.");if(r.success)router.refresh()}catch{setMsg("No se pudo completar la operación.")}})}
  return <div className="mx-auto max-w-5xl space-y-6 p-4"><div><h1 className="text-3xl font-bold">Mis clases</h1><p className="text-muted-foreground">Consultá horarios, cupos y reservá tu lugar.</p></div>
  {msg&&<p role="status" className="rounded-xl border p-3">{msg}</p>}
