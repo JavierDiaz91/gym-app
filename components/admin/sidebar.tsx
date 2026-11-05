@@ -27,6 +27,7 @@ import { logoutUser } from "@/app/actions";
 
 interface AdminSidebarProps {
   userRole?: string;
+  userEmail?: string;
 }
 
 const navItems = [
@@ -53,7 +54,11 @@ const navItems = [
   { href: "/admin/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
 ];
 
-export function AdminSidebar({ userRole = "admin" }: AdminSidebarProps) {
+export function AdminSidebar({ userRole = "admin", userEmail = "" }: AdminSidebarProps) {
+  const accountLabel = userEmail.trim() || "Usuario";
+  const initials = accountLabel.includes("@")
+    ? accountLabel.slice(0, 2).toUpperCase()
+    : accountLabel.split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join("").toUpperCase();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -127,7 +132,15 @@ export function AdminSidebar({ userRole = "admin" }: AdminSidebarProps) {
         </nav>
       </div>
 
-      <div className="p-3 border-t border-white/10">
+      <div className="p-3 border-t border-white/10 space-y-2">
+        <div className="flex items-center gap-3 rounded-xl bg-[#0d2837]/70 border border-zinc-800/40 p-2 min-w-0">
+          <div className="h-8 w-8 shrink-0 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center text-xs font-bold text-white">{initials}</div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-white" title={accountLabel}>{accountLabel}</p>
+            <p className="text-[10px] text-zinc-400">{userRole === "superadmin" ? "Superadministrador Kivra" : "Administrador del gimnasio"}</p>
+          </div>
+          <button type="button" title="Cerrar sesión" aria-label="Cerrar sesión" onClick={handleLogout} className="shrink-0 rounded-lg p-1.5 text-zinc-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"><LogOut className="h-4 w-4" /></button>
+        </div>
         <Button
           variant="ghost"
           className="w-full justify-start text-slate-400 hover:text-rose-300 hover:bg-destructive/10 transition-colors duration-200"
