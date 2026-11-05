@@ -27,15 +27,15 @@ export function Hero() {
           </h1>
 
           <p className="mt-7 max-w-2xl text-lg leading-8 text-zinc-400 md:text-xl">
-            Miembros, pagos, entrenamientos, clases y gestión en una sola plataforma. Más tiempo para lo importante: tus personas.
+            Administrá socios, organizá clases y entrenamientos, y gestioná cobros desde un solo lugar. Simplificá la operación diaria de tu gimnasio con Kivra.
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <Button size="lg" className="h-12 rounded-xl bg-[#00d5d0] px-6 font-semibold text-[#071320] hover:bg-[#2ae8e2]" asChild>
-              <Link href="/login">Comenzar ahora<ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link href="#contacto">Solicitar una demo<ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
             <Button size="lg" variant="outline" className="h-12 rounded-xl border-cyan-400/35 bg-white/[0.03] px-6 text-white hover:bg-white/[0.07]" asChild>
-              <Link href="#modulos">Explorar la plataforma</Link>
+              <Link href="#modulos">Conocer las funcionalidades</Link>
             </Button>
           </div>
 
@@ -49,8 +49,8 @@ export function Hero() {
         <div className="relative mx-auto w-full max-w-2xl">
           <div className="absolute -inset-6 rounded-[36px] bg-gradient-to-br from-sky-500/20 to-cyan-400/10 blur-3xl" />
           <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#0b1b2b]/95 p-4 shadow-2xl shadow-black/50">
-            <div className="mb-4 flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.025] px-4 py-3">
-              <div><p className="text-xs text-zinc-500">Panel general</p><p className="mt-1 text-sm font-medium text-zinc-200">Resumen del gimnasio</p></div>
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] px-4 py-3">
+              <div><p className="text-xs text-zinc-500">Vista ilustrativa · Datos de ejemplo</p><p className="mt-1 text-sm font-medium text-zinc-200">Resumen del gimnasio</p></div>
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10"><Dumbbell className="h-4 w-4 text-violet-300" /></div>
             </div>
 
