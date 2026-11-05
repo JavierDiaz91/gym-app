@@ -20,7 +20,8 @@ import { logoutUser } from "@/app/actions";
 const navigation = [
   { name: "Dashboard", href: "/trainer", icon: LayoutDashboard },
   { name: "Mis Alumnos", href: "/trainer/alumnos", icon: Users },
-  { name: "Rutinas", href: "/trainer/rutinas", icon: Dumbbell },
+  { name: "Planificador deportivo", href: "/trainer/rutinas/planes", icon: BookOpen },
+  { name: "Crear rutinas", href: "/trainer/rutinas/legacy", icon: Dumbbell },
   { name: "Mis Ejercicios", href: "/trainer/ejercicios", icon: BookOpen },
   { name: "Mis Categorías", href: "/trainer/mis-categorias", icon: Settings2 },
   { name: "Asignación Masiva", href: "/trainer/asignar-masivo", icon: UserCheck },
@@ -115,7 +116,7 @@ export default function TrainerSidebar() {
               const isActive =
                 item.href === "/trainer"
                   ? pathname === "/trainer"
-                  : pathname.startsWith(item.href);
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
               return (
                 <Link
