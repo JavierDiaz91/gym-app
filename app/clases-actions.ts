@@ -53,7 +53,7 @@ export async function saveGymClass(data: {id?:number;name:string;description:str
 
 export async function saveGymSchedule(data:{id?:number;classId:number;day:number;start:string;end:string;room:string}) {
   const ctx=await context();
-  if (!Number.isInteger(data.day) || data.day<0 || data.day>6 || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(data.start) || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(data.end) || data.end<=data.start) return {error:"Horario inválido"};
+  if (!Number.isInteger(data.day) || data.day<0 || data.day>6 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.end) || data.end<=data.start) return {error:"Horario inválido"};
   const own=await sql`SELECT c.id FROM classes c JOIN trainers t ON t.id=c.trainer_id WHERE c.id=${data.classId} AND t.gym_id=${ctx.gymId} AND (${ctx.role==="admin"} OR t.id=${ctx.trainerId})`;
   if (!own.length) return {error:"Clase no disponible"};
   if(data.id) {
