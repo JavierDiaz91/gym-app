@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { 
   Dumbbell, 
   History, 
+  CalendarDays, 
   User, 
   LogOut, 
   Menu,
@@ -22,6 +23,7 @@ interface MemberSidebarProps {
 
 const navigation = [
   { name: "Mi Rutina", href: "/miembro", icon: Dumbbell },
+  { name: "Mis clases", href: "/miembro/clases", icon: CalendarDays },
   { name: "Historial", href: "/miembro/historial", icon: History },
   { name: "Mi Perfil", href: "/miembro/perfil", icon: User },
 ];
