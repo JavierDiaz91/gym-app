@@ -19,7 +19,6 @@ BEGIN
   WHERE s.member_id=p_member_id AND m.gym_id=p_gym_id
     AND s.status IN ('active','scheduled') AND s.payment_status='paid'
     AND s.start_date<=p_booking_date AND s.end_date>p_booking_date
-    AND (p.access_mode <> 'entry_pack' OR COALESCE(s.entries_remaining,0)>0)
  ) THEN
   RETURN QUERY SELECT NULL::integer, 'NO_MEMBERSHIP'::text; RETURN;
  END IF;
