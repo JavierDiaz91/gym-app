@@ -27,7 +27,10 @@ const navigation = [
   { name: "Asignación Masiva", href: "/trainer/asignar-masivo", icon: UserCheck },
 ];
 
-export default function TrainerSidebar() {
+export default function TrainerSidebar({ displayName }: { displayName: string }) {
+  const initials = displayName.includes("@")
+    ? displayName.slice(0, 2).toUpperCase()
+    : displayName.trim().split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join("").toUpperCase();
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -146,11 +149,11 @@ export default function TrainerSidebar() {
           <div className="flex items-center justify-between p-2 rounded-xl bg-[#0d2837]/70 border border-zinc-800/40">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 text-white font-bold text-xs flex items-center justify-center shadow-inner">
-                JD
+                {initials}
               </div>
               <div className="flex flex-col">
                 <span className="text-xs font-semibold text-white leading-tight">
-                  Javier Díaz
+                  {displayName}
                 </span>
                 <span className="text-[10px] text-zinc-400">Entrenador</span>
               </div>
