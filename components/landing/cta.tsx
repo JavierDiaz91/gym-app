@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, QrCode } from "lucide-react";
+import { ArrowRight, Layers3 } from "lucide-react";
 import Link from "next/link";
 
 export function CTA() {
@@ -15,21 +15,21 @@ export function CTA() {
                 Menos administración. Más control.
               </h2>
               <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-400 md:text-lg">
-                Accedé a la plataforma o registrá tu cuenta de miembro desde el QR de tu gimnasio.
+                ¿Querés conocer cómo Kivra puede ayudarte a administrar tu gimnasio? Contactanos para coordinar una demostración personalizada.
               </p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button size="lg" className="h-12 rounded-xl bg-white px-6 font-semibold text-zinc-950 hover:bg-zinc-200" asChild>
-                <Link href="/login">
-                  Iniciar sesión
+                <Link href="#contacto">
+                  Solicitar una demo
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
               <Button size="lg" variant="outline" className="h-12 rounded-xl border-white/10 bg-transparent px-6 text-white hover:bg-white/[0.06]" asChild>
-                <Link href="/registro">
-                  <QrCode className="mr-2 h-4 w-4" />
-                  Registro de miembro
+                <Link href="#modulos">
+                  <Layers3 className="mr-2 h-4 w-4" />
+                  Conocer funcionalidades
                 </Link>
               </Button>
             </div>
