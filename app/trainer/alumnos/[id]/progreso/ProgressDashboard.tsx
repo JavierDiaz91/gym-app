@@ -148,31 +148,35 @@ export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) 
   const completedPct = (week: number) => plan.daysPerWeek ? Math.round((plan.weeklyCompleted[week - 1] || 0) / plan.daysPerWeek * 100) : 0;
   return (
     <section className="space-y-5 rounded-2xl border bg-card p-4 shadow-sm sm:p-6">
-      <div className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /><h2 className="text-xl font-bold">Dashboard de evolución</h2></div>
+      <div className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /><h2 className="text-xl font-bold">Resumen del entrenamiento</h2></div>
       <div>
         <label htmlFor="progress-plan" className="mb-1 block text-sm font-medium">Plan de entrenamiento</label>
         <select id="progress-plan" value={plan.id} onChange={e => { setPlanId(Number(e.target.value)); setExercise(""); }} className="w-full rounded-lg border bg-background p-2 text-sm">
           {plans.map(p => <option key={p.id} value={p.id}>{p.title} · Asignación #{p.id}</option>)}
         </select>
       </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          { label: "Cumplimiento", value: `${percent}%`, icon: Activity },
-          { label: "Sesiones finalizadas", value: `${plan.completed} / ${total}`, icon: BarChart3 },
-          { label: "En curso", value: String(plan.inProgress), icon: TrendingUp },
-          { label: "Ejercicios completados", value: String(plan.completedExercises), icon: Dumbbell },
-        ].map(k => <div key={k.label} className="rounded-xl bg-muted/60 p-4"><k.icon className="mb-2 h-4 w-4 text-primary" /><p className="text-xs text-muted-foreground">{k.label}</p><p className="text-2xl font-bold">{k.value}</p></div>)}
+      <div className="rounded-xl border bg-muted/20 p-4">
+        <div className="mb-2 flex items-center justify-between gap-3 text-sm"><span className="font-semibold">Progreso del plan</span><strong className="text-primary">{percent}%</strong></div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Progreso del plan" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, percent)}%` }} /></div>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {[
+            { label: "Sesiones completadas", value: `${plan.completed} / ${total}` },
+            { label: "Ejercicios completados", value: String(plan.completedExercises) },
+            { label: "Sesiones en curso", value: String(plan.inProgress) },
+          ].map(item => <div key={item.label} className="rounded-lg bg-background p-3"><p className="text-xl font-bold text-primary">{item.value}</p><p className="mt-1 text-xs text-muted-foreground">{item.label}</p></div>)}
+        </div>
       </div>
-      <div className="h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, percent)}%` }} /></div>
       <div className="space-y-3">
-        <h3 className="font-semibold">Cumplimiento por semana</h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <h3 className="font-semibold">Progreso semanal</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {Array.from({ length: plan.weeks }, (_, i) => {
             const percentage = completedPct(i + 1);
-            return <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between text-sm"><span>Semana {i + 1}</span><strong>{percentage}%</strong></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, percentage)}%` }} /></div><p className="mt-2 text-xs text-muted-foreground">{plan.weeklyCompleted[i] || 0} de {plan.daysPerWeek} sesiones</p></div>;
+            return <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between gap-1 text-xs"><span>Semana {i + 1}</span><strong>{percentage}%</strong></div><div className="h-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, percentage)}%` }} /></div><p className="mt-2 text-xs text-muted-foreground">{plan.weeklyCompleted[i] || 0} de {plan.daysPerWeek} sesiones</p></div>;
           })}
         </div>
       </div>
+      <details className="group rounded-xl border bg-muted/10 p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-primary">Ver análisis detallado <span className="ml-1 text-xs font-normal text-muted-foreground">(cargas, repeticiones y RIR)</span></summary>
       <div className="space-y-3 border-t pt-5">
         <h3 className="font-semibold">Evolución de rendimiento por ejercicio</h3>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -244,6 +248,7 @@ export default function ProgressDashboard({ plans }: { plans: ProgressPlan[] }) 
         </div>
         <p className="text-xs text-muted-foreground">Todos los valores provienen de los registros del alumno. La variación compara máximos semanales y no implica necesariamente una mejora (especialmente en RIR). El cumplimiento se calcula únicamente con sesiones finalizadas.</p>
       </div>
+      </details>
     </section>
   );
 }
