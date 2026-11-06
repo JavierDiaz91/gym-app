@@ -26,7 +26,8 @@ export default function PlanesClient({ plans, categories, setupError }: { plans:
       }
       const result = await createTrainingPlan(completed);
       if (!result.success) { setError(result.error || "No se pudo guardar"); return; }
-      setShowForm(false); setForm(initial); router.refresh();
+      if (result.id) { router.push(`/trainer/rutinas/planes/${result.id}`); return; }
+      setError("La rutina se creó, pero no se pudo abrir automáticamente. Actualizá el listado."); router.refresh();
     });
   }
   return (
