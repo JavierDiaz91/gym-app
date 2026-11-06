@@ -33,6 +33,16 @@ export default function PlanesClient({ plans, categories, setupError }: { plans:
   return (
     <main className="mx-auto max-w-6xl space-y-7 p-4 text-foreground md:p-8">
       <header className="flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-sky-500/5 to-transparent p-6 md:p-7"><div className="space-y-2"><p className="text-xs font-bold uppercase tracking-widest text-primary">PANEL ENTRENADOR · PLANIFICADOR</p><h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">Mis rutinas</h1><p className="max-w-xl text-sm leading-relaxed text-muted-foreground">Creá una rutina, organizá los ejercicios y asignala a tus alumnos.</p><p className="text-xs font-semibold text-primary">{plans.length} {plans.length === 1 ? "rutina disponible" : "rutinas disponibles"}</p></div><button type="button" disabled={!!setupError} onClick={() => setShowForm((v) => !v)} className="rounded-xl bg-primary px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-primary disabled:opacity-50">{showForm ? "Cancelar" : "+ Crear rutina"}</button></header>
+      {!showForm && <section aria-label="Elegí cómo crear tu entrenamiento" className="grid gap-3 md:grid-cols-2">
+        <div className="flex flex-col justify-between gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-5">
+          <div><h2 className="text-lg font-bold">Plan de entrenamiento</h2><p className="mt-1 text-sm text-muted-foreground">Organizá ejercicios por semanas y asigná el programa a tus alumnos.</p></div>
+          <button type="button" disabled={!!setupError} onClick={() => setShowForm(true)} className="w-fit rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-slate-950 disabled:opacity-50">Crear plan de entrenamiento</button>
+        </div>
+        <div className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-700/60 bg-muted/10 p-5">
+          <div><h2 className="text-lg font-bold">Rutina rápida</h2><p className="mt-1 text-sm text-muted-foreground">Prepará una sesión puntual con ejercicios, series, repeticiones y descansos, sin configurar semanas.</p></div>
+          <Link href="/trainer/rutinas/legacy" className="w-fit rounded-xl border border-primary/40 px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary/10">Crear rutina rápida →</Link>
+        </div>
+      </section>}
       <nav aria-label="Pasos para crear una rutina" className="grid gap-2 sm:grid-cols-3">{["1. Crear rutina", "2. Organizar ejercicios", "3. Asignar a alumnos"].map((step, index) => <div key={step} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${index === 0 ? "border-primary/50 bg-primary/10 text-primary" : "border-slate-700/40 text-muted-foreground"}`}>{step}</div>)}</nav>
       {setupError && <p role="alert" className="rounded-lg border border-amber-500 p-4 text-sm">{setupError}</p>}
       {!setupError && categories.length===0 && <p className="rounded-lg border p-4">Para crear una rutina, primero necesitás categorías básicas. <Link className="font-bold text-primary underline" href="/trainer/mis-categorias">Configurar categorías</Link> antes de crear una plantilla.</p>}
