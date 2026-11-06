@@ -40,7 +40,7 @@ export default async function MemberHistoryPage() {
    const day=Array.isArray(days)?days[Number(log.day_index)-1]:undefined;
    entries.push({id:`plan-${log.id}`,title:String(log.plan_title),subtitle:`Semana ${log.week_number} · Día ${log.day_index}${day?.title?` · ${day.title}`:""}`,completedAt:String(log.finished_at),href:`/miembro/rutina?plan=${log.member_training_plan_id}`,kind:"plan"});
   }
-  const targets=await sql`SELECT COALESCE(MAX(jsonb_array_length(mtp.snapshot_jsonb->\'days\')),0)::int AS days_per_week FROM member_training_plans mtp WHERE mtp.member_id=${memberId} AND mtp.gym_id=${session.gymId} AND mtp.status=\'active\' AND jsonb_typeof(mtp.snapshot_jsonb->\'days\')=\'array\'`;
+  const targets=await sql`SELECT COALESCE(MAX(CASE WHEN jsonb_typeof(mtp.snapshot_jsonb->'days')='array' THEN jsonb_array_length(mtp.snapshot_jsonb->'days') ELSE 0 END),0)::int AS days_per_week FROM member_training_plans mtp WHERE mtp.member_id=${memberId} AND mtp.gym_id=${session.gymId} AND mtp.status='active'`;
   weeklyTarget=Math.max(0,Number(targets[0]?.days_per_week)||0);
   entries.sort((a,b)=>new Date(b.completedAt).getTime()-new Date(a.completedAt).getTime());
  }
