@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import ClassBookings from "./ClassBookings";
+import StaffClassCalendar from "./StaffClassCalendar";
 import { saveGymClass,saveGymSchedule,setGymClassActive } from "@/app/clases-actions";
 
 type ClassItem={id:number;name:string;description:string|null;trainer_id:number;capacity:number;duration_minutes:number;category:string|null;difficulty:string|null;is_active:boolean;first_name:string;last_name:string};
@@ -9,7 +9,7 @@ type ScheduleItem={id:number;class_id:number;day_of_week:number;start_time:strin
 type TrainerItem={id:number;first_name:string;last_name:string};
 const days=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 export default function ClassesManager({initial,role}:{initial:{classes:ClassItem[];schedules:ScheduleItem[];trainers:TrainerItem[]};role:"admin"|"trainer"}) {
- const router=useRouter();const [tab,setTab]=useState<"class"|"schedule"|null>(null);const [editing,setEditing]=useState<number|undefined>();const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");const [bookingTarget,setBookingTarget]=useState<{scheduleId:number;date:string;key:number}|null>(null);
+ const router=useRouter();const [tab,setTab]=useState<"class"|"schedule"|null>(null);const [editing,setEditing]=useState<number|undefined>();const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");
  const [form,setForm]=useState({name:"",description:"",trainerId:initial.trainers[0]?.id||0,capacity:20,duration:60,category:"",difficulty:"beginner"});
  const [slot,setSlot]=useState({classId:initial.classes.find(c=>c.is_active)?.id||0,day:1,start:"08:00",end:"09:00",room:""});
  const refresh=()=>{setTab(null);setEditing(undefined);setMessage("");router.refresh()};
@@ -17,7 +17,6 @@ export default function ClassesManager({initial,role}:{initial:{classes:ClassIte
  const editSchedule=(s:ScheduleItem)=>{setEditing(s.id);setSlot({classId:s.class_id,day:s.day_of_week,start:s.start_time.slice(0,5),end:s.end_time.slice(0,5),room:s.room||""});setTab("schedule")};
  async function submitClass(e:React.FormEvent){e.preventDefault();setBusy(true);try{const r=await saveGymClass({...form,id:editing});if(r.error)setMessage(r.error);else refresh()}catch{setMessage("No se pudo guardar la clase")}finally{setBusy(false)}}
  async function submitSchedule(e:React.FormEvent){e.preventDefault();setBusy(true);try{const r=await saveGymSchedule({...slot,id:editing});if(r.error)setMessage(r.error);else refresh()}catch{setMessage("No se pudo guardar el horario")}finally{setBusy(false)}}
- const openBookings=(s:ScheduleItem)=>{const d=new Date();const diff=(s.day_of_week-d.getDay()+7)%7;d.setDate(d.getDate()+diff);const date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");setBookingTarget(prev=>({scheduleId:s.id,date,key:(prev?.key??0)+1}));};
  const btn="rounded-xl bg-cyan-400 px-4 py-2 font-semibold text-slate-950 hover:bg-cyan-300 disabled:opacity-50";
  const input="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-white";
  return <div className="space-y-8">
@@ -27,7 +26,6 @@ export default function ClassesManager({initial,role}:{initial:{classes:ClassIte
   <form className="grid gap-4 md:grid-cols-2" onSubmit={submitSchedule}><label>Clase<select className={input} value={slot.classId} onChange={e=>setSlot({...slot,classId:Number(e.target.value)})}>{initial.classes.filter(c=>c.is_active).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Día<select className={input} value={slot.day} onChange={e=>setSlot({...slot,day:Number(e.target.value)})}>{days.map((d,i)=><option key={d} value={i}>{d}</option>)}</select></label><label>Desde<input type="time" required className={input} value={slot.start} onChange={e=>setSlot({...slot,start:e.target.value})}/></label><label>Hasta<input type="time" required className={input} value={slot.end} onChange={e=>setSlot({...slot,end:e.target.value})}/></label><label>Sala<input maxLength={50} className={input} value={slot.room} onChange={e=>setSlot({...slot,room:e.target.value})}/></label><div className="self-end"><button disabled={busy} className={btn}>Guardar horario</button></div></form>}
   {message&&<p role="alert" className="mt-3 text-rose-400">{message}</p>}</section>}
   <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5"><h2 className="mb-4 text-xl font-bold">Tipos de clases</h2>{!initial.classes.length?<p className="text-slate-400">Todavía no hay clases. Creá la primera para comenzar.</p>:<div className="grid gap-3 md:grid-cols-2">{initial.classes.map(c=><div key={c.id} className="rounded-xl border border-slate-800 p-4"><div className="flex justify-between gap-2"><h3 className="font-semibold">{c.name}</h3><span className="text-xs text-cyan-400">{c.is_active?"Activa":"Inactiva"}</span></div><p className="mt-2 text-sm text-slate-400">{c.first_name} {c.last_name} · {c.capacity} cupos · {c.duration_minutes} min</p><p className="mt-1 text-sm text-slate-400">{c.description}</p><div className="mt-3 flex gap-3"><button className="text-cyan-400" onClick={()=>editClass(c)}>Editar</button>{role==="admin"&&<button className="text-slate-400" onClick={async()=>{if(!confirm("¿Cambiar el estado de esta clase?"))return;const r=await setGymClassActive(c.id,!c.is_active);if(r.error)setMessage(r.error);else router.refresh()}}>{c.is_active?"Desactivar":"Activar"}</button>}</div></div>)}</div>}</section>
-  <ClassBookings schedules={initial.schedules} classes={initial.classes} target={bookingTarget}/>
-  <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5"><h2 className="mb-4 text-xl font-bold">Calendario semanal</h2><div className="grid gap-3 md:grid-cols-7">{[1,2,3,4,5,6,0].map(day=><div key={day} className="min-h-28 rounded-xl border border-slate-800 p-3"><h3 className="mb-3 font-semibold text-cyan-400">{days[day]}</h3>{initial.schedules.filter(s=>s.day_of_week===day&&s.is_active).map(s=><button key={s.id} className="mb-2 w-full rounded-lg bg-slate-800 p-2 text-left text-xs hover:bg-slate-700" onClick={()=>openBookings(s)} aria-label={`Consultar reservas de ${initial.classes.find(c=>c.id===s.class_id)?.name} el ${days[day]}`}><strong>{initial.classes.find(c=>c.id===s.class_id)?.name}</strong><div>{s.start_time.slice(0,5)}–{s.end_time.slice(0,5)}</div><div>{s.room}</div></button>)}</div>)}</div><p className="mt-3 text-xs text-slate-400">Los horarios se repiten semanalmente. Seleccioná una clase para consultar sus reservas y cupos.</p></section>
+  <StaffClassCalendar schedules={initial.schedules} classes={initial.classes} onEdit={editSchedule}/>
  </div>;
 }
