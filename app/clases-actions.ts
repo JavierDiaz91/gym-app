@@ -72,3 +72,20 @@ export async function setGymClassActive(id:number,active:boolean) {
   if(!rows.length)return {error:"Clase no encontrada"};
   revalidatePath("/admin/clases");revalidatePath("/trainer/clases");return {success:true};
 }
+
+export async function getWeeklyClassOccupancy(startDate:string) {
+ const ctx=await context();
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||Number.isNaN(Date.parse(startDate))) return [];
+ const rows=await sql`
+ SELECT b.schedule_id,to_char(b.booking_date,'YYYY-MM-DD') AS date,count(*)::int AS occupied
+ FROM class_bookings b
+ JOIN class_schedule s ON s.id=b.schedule_id
+ JOIN classes c ON c.id=s.class_id
+ JOIN trainers t ON t.id=c.trainer_id
+ WHERE t.gym_id=${ctx.gymId} AND (${ctx.role==="admin"} OR t.id=${ctx.trainerId})
+ AND b.status='confirmed' AND b.booking_date>=${startDate}::date
+ AND b.booking_date<(${startDate}::date+7)
+ GROUP BY b.schedule_id,b.booking_date
+ `;
+ return rows.map(r=>({scheduleId:Number(r.schedule_id),date:String(r.date),occupied:Number(r.occupied)}));
+}
