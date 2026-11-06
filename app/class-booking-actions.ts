@@ -15,12 +15,12 @@ export async function getClassBookings(scheduleId:number, date:string) {
  FROM class_schedule s JOIN classes c ON c.id=s.class_id JOIN trainers t ON t.id=c.trainer_id
  WHERE s.id=${scheduleId} AND t.gym_id=${session.gymId} AND (${session.role==="admin"} OR t.user_id=${session.id})`;
  if(!schedule) throw new Error("Horario no disponible");
- const rows=await sql`SELECT b.id,b.member_id,m.first_name,m.last_name,b.status
- FROM class_bookings b JOIN members m ON m.id=b.member_id
+ const rows=await sql`SELECT b.id,b.member_id,m.first_name,m.last_name,b.status,a.status AS attendance_status
+ FROM class_bookings b JOIN members m ON m.id=b.member_id LEFT JOIN public.class_attendance a ON a.booking_id=b.id
  WHERE b.schedule_id=${scheduleId} AND b.booking_date=${date} AND b.status='confirmed' AND m.gym_id=${session.gymId}
  ORDER BY m.last_name,m.first_name`;
  const members=await sql`SELECT id,first_name,last_name FROM members WHERE gym_id=${session.gymId} ORDER BY last_name,first_name`;
- return {name:String(schedule.name),capacity:Number(schedule.capacity),bookings:rows.map(r=>({id:Number(r.id),memberId:Number(r.member_id),name:`${r.first_name} ${r.last_name}`})),members:members.map(m=>({id:Number(m.id),name:`${m.first_name} ${m.last_name}`}))};
+ return {name:String(schedule.name),capacity:Number(schedule.capacity),bookings:rows.map(r=>({id:Number(r.id),memberId:Number(r.member_id),name:`${r.first_name} ${r.last_name}`,attendanceStatus:r.attendance_status?String(r.attendance_status):null})),members:members.map(m=>({id:Number(m.id),name:`${m.first_name} ${m.last_name}`}))};
 }
 export async function reserveGymClass(scheduleId:number,memberId:number,date:string) {
  const session=await requireStaff();
@@ -46,4 +46,23 @@ export async function cancelGymClassBooking(bookingId:number) {
  RETURNING b.id`;
  if(!rows.length)return {error:"Reserva no encontrada o sin permisos"};
  revalidatePath("/admin/clases");revalidatePath("/trainer/clases");return {success:true};
+}
+
+export async function markClassAttendance(bookingId:number,status:"present"|"absent"){
+ const session=await requireStaff();
+ if(!Number.isSafeInteger(bookingId)||bookingId<=0||!["present","absent"].includes(status))return {error:"Datos de asistencia inválidos"};
+ try{
+ const eligible=await sql`SELECT b.id FROM class_bookings b
+ JOIN class_schedule s ON s.id=b.schedule_id JOIN classes c ON c.id=s.class_id
+ JOIN trainers t ON t.id=c.trainer_id JOIN members m ON m.id=b.member_id
+ WHERE b.id=${bookingId} AND b.status='confirmed'
+ AND b.booking_date<=CURRENT_DATE AND m.gym_id=${session.gymId}
+ AND t.gym_id=${session.gymId} AND (${session.role==="admin"} OR t.user_id=${session.id}) LIMIT 1`;
+ if(!eligible.length)return {error:"La reserva no existe, no corresponde a tu gimnasio o es futura"};
+ await sql`INSERT INTO public.class_attendance(booking_id,status,marked_by_user_id,marked_at)
+ VALUES(${bookingId},${status},${session.id},NOW())
+ ON CONFLICT(booking_id) DO UPDATE SET status=EXCLUDED.status,marked_by_user_id=EXCLUDED.marked_by_user_id,marked_at=NOW()`;
+ revalidatePath("/admin/clases");revalidatePath("/trainer/clases");
+ return {success:true};
+ }catch(e){console.error("Class attendance failed",e);return {error:"No se pudo registrar la asistencia. Verificá que la migración SQL esté aplicada."}}
 }
