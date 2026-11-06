@@ -22,7 +22,6 @@ const navigation = [
   { name: "Mis Alumnos", href: "/trainer/alumnos", icon: Users },
   { name: "Mis clases", href: "/trainer/clases", icon: BookOpen },
   { name: "Planificador deportivo", href: "/trainer/rutinas/planes", icon: BookOpen },
-  { name: "Crear rutinas", href: "/trainer/rutinas/legacy", icon: Dumbbell },
   { name: "Mis Ejercicios", href: "/trainer/ejercicios", icon: BookOpen },
   { name: "Mis Categorías", href: "/trainer/mis-categorias", icon: Settings2 },
   { name: "Asignación Masiva", href: "/trainer/asignar-masivo", icon: UserCheck },
