@@ -100,31 +100,31 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     });
   };
   return <main className="mx-auto max-w-6xl space-y-5 p-4 md:p-8 text-foreground">
-    <Link href="/trainer/rutinas/planes" className="text-sm text-primary">← Volver a plantillas</Link>
+    <Link href="/trainer/rutinas/planes" className="text-sm text-primary">← Volver a mis rutinas</Link>
     <div className="flex flex-wrap justify-between gap-3">
       <div><h1 className="text-2xl font-bold">{plan.title}</h1><p className="text-sm text-muted-foreground">{plan.durationWeeks} semanas · {plan.status === "draft" ? "Borrador" : "Publicado"}{plan.status === "published" && personalize ? " · Personalización para alumno (sin modificar plantilla)" : ""}</p></div>
       <div className="flex flex-wrap gap-2">
-        <button className={button} disabled={pending} onClick={() => run(() => duplicateTrainingPlan(plan.id), (id) => id && router.push("/trainer/rutinas/planes/" + id))}>Duplicar plantilla</button>
+        <button className={button} disabled={pending} onClick={() => run(() => duplicateTrainingPlan(plan.id), (id) => id && router.push("/trainer/rutinas/planes/" + id))}>Duplicar rutina</button>
 
       </div>
     </div>
-    {plan.status === "draft" && <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-300 bg-background/95 p-3 shadow-md backdrop-blur dark:border-slate-700" role="region" aria-label="Acciones de la plantilla">
+    {plan.status === "draft" && <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-300 bg-background/95 p-3 shadow-md backdrop-blur dark:border-slate-700" role="region" aria-label="Acciones de la rutina">
       <span className="text-sm font-medium" role="status" aria-live="polite">{pending ? "Guardando..." : hasUnsavedChanges ? "● Cambios sin guardar" : "✓ Cambios guardados"}</span>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={button} disabled={pending || !hasUnsavedChanges} onClick={saveDraft}>{pending ? "Guardando..." : "Guardar cambios"}</button>
-        <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={saveAndPublish}>Guardar y publicar</button>
+        <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={saveAndPublish}>Guardar y finalizar rutina</button>
       </div>
     </div>}
-    {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta plantilla ya está publicada. Para modificar la plantilla y guardar una nueva versión, usá «Duplicar plantilla»; para ajustar únicamente la rutina de un alumno, activá «Personalizar ejercicios y cargas» antes de asignarla. Esos ajustes se guardan al asignar y no cambian la plantilla original.</p>}
+    {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta rutina ya está lista para asignar. Si querés modificarla, duplicala; también podés personalizarla para un alumno sin alterar la original.</p>}
     {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
     <section className="space-y-3 rounded-2xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Seleccionar semana y día">
-      <div className="space-y-1"><h2 className="text-base font-bold">1. Elegí la semana y el día</h2><p className="text-xs text-muted-foreground">Trabajá sobre un día a la vez. Cada semana conserva sus propias cargas.</p></div>
+      <div className="space-y-1"><h2 className="text-base font-bold">Paso 2 · Organizá los entrenamientos</h2><p className="text-xs text-muted-foreground">Trabajá sobre un día a la vez. Cada semana conserva sus propias cargas.</p></div>
       <div className="flex flex-wrap gap-2 items-center">
       <span className="text-sm font-semibold">Semana:</span>
       {Array.from({ length: plan.durationWeeks }, (_, i) => <button key={i} type="button" className={button + (week === i ? " border-primary text-primary" : "")} onClick={() => setWeek(i)}>{i + 1}</button>)}
     </div>
     {editable && <details className="rounded-xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Progresión semanal avanzada">
-      <summary className="cursor-pointer list-item text-sm font-semibold">Progresión semanal <span className="ml-2 font-normal text-muted-foreground">· Opcional, configurar cuando la semana 1 esté lista</span></summary>
+      <summary className="cursor-pointer list-item text-sm font-semibold">Opciones avanzadas de progresión <span className="ml-2 font-normal text-muted-foreground">· Opcional, configurar cuando la semana 1 esté lista</span></summary>
       <div className="mt-4 space-y-3">
       <h2 className="font-semibold">Automatización semanal</h2>
       <p className="text-sm text-muted-foreground">Las semanas mantienen parámetros independientes. Los cambios se guardan al presionar Guardar borrador.</p>
@@ -162,7 +162,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       </div>}
       </div>
     </details>}
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-bold">2. Organizá los ejercicios</h2>{editable && <button type="button" className={button} disabled={draft.days.length >= 7} onClick={() => { setSelectedDay(draft.days.length); change({ days: [...draft.days, { title: "Día " + (draft.days.length + 1), modality: "strength", blocks: [] }] }); }}>+ Agregar día</button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-bold">Días y ejercicios</h2>{editable && <button type="button" className={button} disabled={draft.days.length >= 7} onClick={() => { setSelectedDay(draft.days.length); change({ days: [...draft.days, { title: "Día " + (draft.days.length + 1), modality: "strength", blocks: [] }] }); }}>+ Agregar día</button>}</div>
     {draft.days.length === 0 ? (
       <div role="status" className="rounded-xl border border-dashed border-slate-500/60 bg-slate-900/20 px-5 py-8 text-center dark:bg-slate-900/30">
         <p className="text-base font-semibold">Todavía no agregaste días de entrenamiento</p>
