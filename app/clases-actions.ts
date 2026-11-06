@@ -56,6 +56,22 @@ export async function saveGymSchedule(data:{id?:number;classId:number;day:number
   if (!Number.isInteger(data.day) || data.day<0 || data.day>6 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.end) || data.end<=data.start) return {error:"Horario inválido"};
   const own=await sql`SELECT c.id FROM classes c JOIN trainers t ON t.id=c.trainer_id WHERE c.id=${data.classId} AND t.gym_id=${ctx.gymId} AND (${ctx.role==="admin"} OR t.id=${ctx.trainerId})`;
   if (!own.length) return {error:"Clase no disponible"};
+  // Prevent a trainer from being assigned overlapping active weekly slots.
+  const conflicts=await sql`
+    SELECT s.id
+    FROM class_schedule s
+    JOIN classes c ON c.id=s.class_id
+    JOIN trainers t ON t.id=c.trainer_id
+    WHERE t.gym_id=${ctx.gymId}
+      AND c.trainer_id=(SELECT trainer_id FROM classes WHERE id=${data.classId})
+      AND c.is_active=true AND s.is_active=true
+      AND s.day_of_week=${data.day}
+      AND s.start_time < ${data.end}::time
+      AND s.end_time > ${data.start}::time
+      AND (${data.id??null}::integer IS NULL OR s.id <> ${data.id??null}::integer)
+    LIMIT 1
+  `;
+  if(conflicts.length) return {error:"El entrenador ya tiene otra clase en ese día y horario. Elegí otro horario."};
   if(data.id) {
     const updated=await sql`UPDATE class_schedule s SET class_id=${data.classId},day_of_week=${data.day},start_time=${data.start},end_time=${data.end},room=${data.room.trim()} WHERE s.id=${data.id} AND EXISTS(SELECT 1 FROM classes c JOIN trainers t ON t.id=c.trainer_id WHERE c.id=s.class_id AND t.gym_id=${ctx.gymId} AND (${ctx.role==="admin"} OR t.id=${ctx.trainerId})) RETURNING s.id`;
     if(!updated.length) return {error:"Horario no encontrado"};
