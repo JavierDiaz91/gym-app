@@ -35,6 +35,11 @@ export default function WeeklyProgress({sessions,weeklyTarget}:Props) {
   },[sessions]);
   const values=weekDays.map(day=>counts.get(day)||0);
   const completed=values.reduce((a,b)=>a+b,0);
+  const previousMonday=addDays(monday,-7);
+  const previousCompleted=Array.from({length:7},(_,i)=>counts.get(dayKey(addDays(previousMonday,i)))||0).reduce((a,b)=>a+b,0);
+  const change=previousCompleted>0?Math.round((completed-previousCompleted)/previousCompleted*100):null;
+  const changeLabel=change===null?(completed>0?"Sin base previa":"Sin actividad"):change===0?"Sin cambios":`${change>0?"+":""}${change}%`;
+  const changeColor=change===null?"text-slate-400":change>0?"text-emerald-400":change<0?"text-rose-400":"text-slate-300";
   const goal=Math.max(1,weeklyTarget);
   const percent=Math.min(100,Math.round(completed/goal*100));
   const total=sessions.length;
@@ -68,6 +73,15 @@ export default function WeeklyProgress({sessions,weeklyTarget}:Props) {
     </div>
     <p className="mt-3 text-xs text-slate-400">{completed} de {goal} sesiones de referencia esta semana. {weeklyTarget===0?"Meta inicial sugerida: 3 sesiones.":"Meta basada en los días de tus planes asignados."}</p>
     <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+      <h3 className="text-sm font-semibold text-slate-100">Evolución respecto de la semana anterior</h3>
+      <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+        <div><p className="text-xs text-slate-400">Semana anterior</p><p className="mt-1 text-xl font-bold text-slate-100">{previousCompleted}</p><p className="text-xs text-slate-500">Sesiones</p></div>
+        <div><p className="text-xs text-slate-400">Semana seleccionada</p><p className="mt-1 text-xl font-bold text-cyan-400">{completed}</p><p className="text-xs text-slate-500">Sesiones</p></div>
+        <div><p className="text-xs text-slate-400">Variación</p><p className={`mt-1 text-xl font-bold ${changeColor}`}>{changeLabel}</p><p className="text-xs text-slate-500">Intersemanal</p></div>
+      </div>
+      {change===null&&<p className="mt-3 text-xs text-slate-400">No se calcula un porcentaje porque la semana anterior tuvo cero sesiones.</p>}
+    </div>
+    <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2"><Trophy className="h-4 w-4 text-cyan-400"/><span className="text-sm font-semibold">Nivel de constancia · {rank.name}</span></div>
         <span className="text-xs font-semibold text-cyan-400">{progress}%</span>
