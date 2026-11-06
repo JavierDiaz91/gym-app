@@ -93,11 +93,11 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     run(() => saveTrainingPlanDraft(plan.id, draft), () => setSavedSnapshot(snapshot));
   };
   const saveAndPublish = () => {
-    if (!window.confirm("¿Guardar los cambios y publicar esta plantilla?")) return;
+    if (!window.confirm("¿Finalizar la rutina para poder asignarla a tus alumnos?")) return;
     run(async () => {
       const saved = await saveTrainingPlanDraft(plan.id, draft);
       return saved.success ? publishTrainingPlan(plan.id) : saved;
-    });
+    }, () => router.refresh());
   };
   return <main className="mx-auto max-w-6xl space-y-5 p-4 md:p-8 text-foreground">
     <Link href="/trainer/rutinas/planes" className="text-sm text-primary">← Volver a mis rutinas</Link>
@@ -115,6 +115,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={saveAndPublish}>Guardar y finalizar rutina</button>
       </div>
     </div>}
+    {plan.status === "published" && <a href="#asignar-alumno" className="inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-bold text-slate-950">Continuar: asignar a un alumno ↓</a>}
     {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta rutina ya está lista para asignar. Si querés modificarla, duplicala; también podés personalizarla para un alumno sin alterar la original.</p>}
     {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
     <section className="space-y-3 rounded-2xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Seleccionar semana y día">
@@ -260,12 +261,12 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       </div>)}
       {editable && <button type="button" className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: [...d.blocks, { title: "Bloque principal", type: "main", items: [] }] }))}>+ Agregar bloque</button>}
     </section>)}
-    {plan.status === "published" && <section className="rounded-xl border p-4 space-y-3">
-      <h2 className="font-semibold">Asignar al alumno</h2>
-      <p className="text-sm text-muted-foreground">La asignación conserva una copia independiente de la plantilla.</p>
+    {plan.status === "published" && <section id="asignar-alumno" className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-3">
+      <p className="text-xs font-bold uppercase tracking-wider text-primary">Paso 3 de 3</p><h2 className="text-lg font-bold">Asignar a alumnos</h2>
+      <p className="text-sm text-muted-foreground">Elegí el alumno que va a recibir esta rutina. La asignación no modifica la rutina original.</p>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={personalize} onChange={(e) => { setPersonalize(e.target.checked); setDraft(structuredClone(plan.draft)); }}/> Personalizar ejercicios y cargas para este alumno antes de asignar</label>
       <select aria-label="Alumno" className={field} value={memberId} onChange={(e) => setMemberId(Number(e.target.value))}>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-      <button className={button} disabled={pending || !memberId} onClick={() => run(() => assignTrainingPlan(plan.id, memberId, personalize ? draft : undefined))}>Asignar planificación</button>
+      <button className={button} disabled={pending || !memberId} onClick={() => run(() => assignTrainingPlan(plan.id, memberId, personalize ? draft : undefined))}>Confirmar asignación</button>
     </section>}
   </main>;
 }
