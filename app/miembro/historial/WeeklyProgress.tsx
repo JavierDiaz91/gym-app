@@ -46,6 +46,27 @@ export default function WeeklyProgress({sessions,weeklyTarget}:Props) {
   const rank=level(total);
   const progress=rank.next===null?100:Math.min(100,Math.round((total-rank.min)/(rank.next-rank.min)*100));
   const activeDays=values.filter(x=>x>0).length;
+  // Consecutive active calendar weeks; the current week may still be in progress.
+  const activeWeeks=new Set<string>();
+  for(const [day,count] of counts){if(count>0)activeWeeks.add(dayKey(mondayOf(day)));}
+  const orderedWeeks=[...activeWeeks].sort();
+  let bestStreak=0;
+  let runningStreak=0;
+  let previousWeek:string|null=null;
+  for(const week of orderedWeeks){
+    runningStreak=previousWeek&&dayKey(addDays(mondayOf(previousWeek),7))===week?runningStreak+1:1;
+    bestStreak=Math.max(bestStreak,runningStreak);
+    previousWeek=week;
+  }
+  const currentWeekKey=dayKey(currentMonday);
+  const lastWeekKey=dayKey(addDays(currentMonday,-7));
+  let cursor=activeWeeks.has(currentWeekKey)?currentWeekKey:lastWeekKey;
+  let currentStreak=0;
+  while(activeWeeks.has(cursor)){
+    currentStreak++;
+    cursor=dayKey(addDays(mondayOf(cursor),-7));
+  }
+
   const max=Math.max(1,...values);
   return <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -80,6 +101,14 @@ export default function WeeklyProgress({sessions,weeklyTarget}:Props) {
         <div><p className="text-xs text-slate-400">Variación</p><p className={`mt-1 text-xl font-bold ${changeColor}`}>{changeLabel}</p><p className="text-xs text-slate-500">Intersemanal</p></div>
       </div>
       {change===null&&<p className="mt-3 text-xs text-slate-400">No se calcula un porcentaje porque la semana anterior tuvo cero sesiones.</p>}
+    </div>
+    <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+      <div className="flex items-center gap-2"><Flame className="h-4 w-4 text-cyan-400"/><h3 className="text-sm font-semibold text-slate-100">Mi constancia</h3></div>
+      <p className="mt-1 text-xs text-slate-400">Rachas de semanas consecutivas con al menos una sesión finalizada.</p>
+      <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+        {[{value:currentStreak,label:"Racha actual",unit:"semanas"},{value:bestStreak,label:"Mejor racha",unit:"semanas"},{value:total,label:"Sesiones acumuladas",unit:"sesiones"}].map(item=><div key={item.label} className="rounded-lg border border-slate-800 bg-slate-950/40 p-3"><p className="text-xl font-bold text-cyan-400">{item.value}</p><p className="mt-1 text-xs font-medium text-slate-200">{item.label}</p><p className="text-[11px] text-slate-500">{item.unit}</p></div>)}
+      </div>
+      <p className="mt-3 text-xs text-slate-400">La semana en curso no interrumpe la racha hasta que termina. Las rachas miden regularidad, no rendimiento físico.</p>
     </div>
     <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
       <div className="flex items-center justify-between gap-2">
