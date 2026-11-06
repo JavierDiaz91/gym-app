@@ -191,17 +191,34 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           {editable && <button className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: d.blocks.filter((_, i) => i !== bi) }))}>Eliminar bloque</button>}
         </div>
         {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <div key={item.key} className="rounded-xl border-2 border-slate-200 bg-background p-3 space-y-3 shadow-sm dark:border-slate-700">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><p className="text-xs font-semibold text-primary dark:text-primary">Ejercicio {ii + 1}</p><h3 className="text-base font-bold">{item.title || "Ejercicio sin nombre"}</h3></div>
-            <div className="flex flex-wrap gap-2 text-xs font-semibold">
-              {rx.sets !== undefined && <span className="rounded-lg bg-muted px-3 py-2">{rx.sets} series</span>}
-              {rx.reps && <span className="rounded-lg bg-muted px-3 py-2">{rx.reps} rep.</span>}
-              {rx.rir && <span className="rounded-lg bg-muted px-3 py-2">RIR {rx.rir}</span>}
-              {rx.restSeconds !== undefined && <span className="rounded-lg bg-muted px-3 py-2">{rx.restSeconds}s descanso</span>}
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-primary">Ejercicio {ii + 1} · Semana {week + 1}</p>
+            {editable && <button type="button" className="text-xs text-rose-400 hover:underline" onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar ejercicio</button>}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,110px))]">
+            <label className="text-xs font-medium text-muted-foreground">Nombre del ejercicio
+              <input list={`exercise-catalog-${di}-${bi}-${ii}`} className={field + " mt-1"} disabled={!editable} placeholder="Buscar o escribir ejercicio" value={item.title} onChange={(e) => {
+                const name = e.target.value;
+                const ex = exercises.find(x => x.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+                updateItem(di, bi, ii, current => ({ ...current, title: name, imageUrl: ex?.imageUrl ?? current.imageUrl, instructions: ex?.instructions ?? current.instructions }));
+              }}/>
+              <datalist id={`exercise-catalog-${di}-${bi}-${ii}`}>{exercises.map(ex => <option key={ex.id} value={ex.name}/>)}</datalist>
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">Series
+              <input aria-label="Series" type="number" min={0} className={field + " mt-1"} disabled={!editable} value={rx.sets ?? ""} onChange={e => updateRx(di,bi,ii,{sets:e.target.value === "" ? undefined : Number(e.target.value)})}/>
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">Repeticiones
+              <input aria-label="Repeticiones" className={field + " mt-1"} disabled={!editable} value={rx.reps ?? ""} onChange={e => updateRx(di,bi,ii,{reps:e.target.value})}/>
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">RIR
+              <input aria-label="RIR" className={field + " mt-1"} disabled={!editable} value={rx.rir ?? ""} onChange={e => updateRx(di,bi,ii,{rir:e.target.value})}/>
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">Pausa (seg)
+              <input aria-label="Pausa en segundos" type="number" min={0} className={field + " mt-1"} disabled={!editable} value={rx.restSeconds ?? ""} onChange={e => updateRx(di,bi,ii,{restSeconds:e.target.value === "" ? undefined : Number(e.target.value)})}/>
+            </label>
           </div>
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Editar ejercicio, instrucciones e imagen</summary>
+            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Notas técnicas e imagen (opcional)</summary>
             <div className="mt-3">
           <div className="flex flex-wrap gap-2 items-start">
             {item.imageUrl && <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-300 bg-slate-100 p-2 dark:border-slate-600"><img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-full w-full object-contain grayscale" /></div>}
@@ -220,7 +237,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </div>
           </details>
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold">Ajustar cargas por semana <span className="font-normal text-muted-foreground">· {plan.durationWeeks} semanas · Opcional</span></summary>
+            <summary className="cursor-pointer text-sm font-semibold">Configuración avanzada por semanas <span className="font-normal text-muted-foreground">· {plan.durationWeeks} semanas · Opcional</span></summary>
           <div className="mt-3 space-y-3">
             <p className="text-xs text-muted-foreground">Editá directamente cada celda para configurar las cargas por semana. Los cambios quedan en el borrador hasta guardar.</p>
             <div className="overflow-x-auto rounded-xl border border-slate-300 bg-background dark:border-slate-700">
