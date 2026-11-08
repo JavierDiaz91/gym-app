@@ -230,16 +230,22 @@ export async function getMembers(query: string = ""): Promise<Member[]> {
         m.*,
         mp.name AS plan_name,
         s.status AS subscription_status,
+        s.payment_status AS subscription_payment_status,
         s.end_date AS subscription_end
       FROM members m
-      LEFT JOIN subscriptions s 
-        ON m.id = s.member_id
-               AND s.status IN ('active', 'scheduled')
-               AND s.payment_status = 'paid'
-               AND s.start_date <= CURRENT_DATE
-               AND s.end_date > CURRENT_DATE
-      LEFT JOIN membership_plans mp 
-        ON s.plan_id = mp.id
+      LEFT JOIN LATERAL (
+        SELECT sub.plan_id, sub.status, sub.payment_status, sub.start_date, sub.end_date
+        FROM subscriptions sub
+        WHERE sub.member_id = m.id
+          AND sub.start_date <= CURRENT_DATE
+          AND sub.end_date > CURRENT_DATE
+          AND sub.status IN ('active', 'scheduled')
+        ORDER BY CASE WHEN sub.payment_status = 'paid' THEN 0 ELSE 1 END,
+                 sub.start_date DESC, sub.id DESC
+        LIMIT 1
+      ) s ON TRUE
+      LEFT JOIN membership_plans mp
+        ON s.plan_id = mp.id AND mp.gym_id = m.gym_id
       WHERE m.gym_id = ${session.gymId}
         AND (
           ${query === ''} OR 
@@ -266,17 +272,23 @@ export async function getMemberById(id: number): Promise<Member | null> {
         m.*,
         mp.name AS plan_name,
         s.status AS subscription_status,
+        s.payment_status AS subscription_payment_status,
         s.start_date AS subscription_start,
         s.end_date AS subscription_end
       FROM members m
-      LEFT JOIN subscriptions s 
-        ON m.id = s.member_id
-               AND s.status IN ('active', 'scheduled')
-               AND s.payment_status = 'paid'
-               AND s.start_date <= CURRENT_DATE
-               AND s.end_date > CURRENT_DATE
-      LEFT JOIN membership_plans mp 
-        ON s.plan_id = mp.id
+      LEFT JOIN LATERAL (
+        SELECT sub.plan_id, sub.status, sub.payment_status, sub.start_date, sub.end_date
+        FROM subscriptions sub
+        WHERE sub.member_id = m.id
+          AND sub.start_date <= CURRENT_DATE
+          AND sub.end_date > CURRENT_DATE
+          AND sub.status IN ('active', 'scheduled')
+        ORDER BY CASE WHEN sub.payment_status = 'paid' THEN 0 ELSE 1 END,
+                 sub.start_date DESC, sub.id DESC
+        LIMIT 1
+      ) s ON TRUE
+      LEFT JOIN membership_plans mp
+        ON s.plan_id = mp.id AND mp.gym_id = m.gym_id
       WHERE m.id = ${id}
         AND m.gym_id = ${session.gymId}
     `;
