@@ -31,7 +31,7 @@ export class MembershipController {
   static async createPlan(req: AuthenticatedRequest, res: Response) {
     try {
       const gymId = resolveGymId(req);
-      const { name, price, durationMonths, description } = req.body;
+      const { name, price, durationMonths, description, includesClasses, weeklyClassLimit } = req.body;
 
       if (!gymId || !name || price === undefined) {
         return res.status(400).json({ error: "Campos requeridos faltantes" });
@@ -43,6 +43,8 @@ export class MembershipController {
         price: Number(price),
         durationMonths: durationMonths ? Number(durationMonths) : 1,
         description: description || "",
+        includesClasses: includesClasses === true,
+        weeklyClassLimit: weeklyClassLimit == null ? 0 : Number(weeklyClassLimit),
       });
 
       return res.json({ success: true, plan });
@@ -112,7 +114,7 @@ export class MembershipController {
       if (!gymId) return res.status(400).json({ error: "gymId requerido" });
 
       const { id } = req.params;
-      const { name, price, durationMonths, description, isActive } = req.body;
+      const { name, price, durationMonths, description, isActive, includesClasses, weeklyClassLimit } = req.body;
 
       const plan = await updateGymPlan(gymId, Number(id), {
         name,
@@ -121,6 +123,8 @@ export class MembershipController {
           durationMonths === undefined ? undefined : Number(durationMonths),
         description,
         isActive: isActive === undefined ? undefined : isActive === true,
+        includesClasses: includesClasses === undefined ? undefined : includesClasses === true,
+        weeklyClassLimit: weeklyClassLimit === undefined ? undefined : Number(weeklyClassLimit),
       });
 
       if (!plan) return res.status(404).json({ error: "Plan no encontrado" });
