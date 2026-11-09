@@ -2160,12 +2160,14 @@ export async function createPlanAction(formData: FormData) {
   const price = formData.get("price");
   const durationMonths = formData.get("durationMonths");
   const description = formData.get("description") as string;
+  const includesClasses = formData.get("includesClasses") === "true";
+  const weeklyClassLimit = includesClasses ? Number(formData.get("weeklyClassLimit") || 0) : 0;
 
   try {
     const res = await fetch(apiUrl("/memberships/plans"), {
       method: "POST",
       headers: await getApiAuthHeaders(),
-      body: JSON.stringify({ name, price, durationMonths, description }),
+      body: JSON.stringify({ name, price, durationMonths, description, includesClasses, weeklyClassLimit }),
     });
 
     const text = await res.text();
@@ -2190,12 +2192,14 @@ export async function updatePlanAction(id: number, formData: FormData) {
   const durationMonths = formData.get("durationMonths");
   const description = formData.get("description") as string;
   const isActive = formData.get("isActive") === "true";
+  const includesClasses = formData.get("includesClasses") === "true";
+  const weeklyClassLimit = includesClasses ? Number(formData.get("weeklyClassLimit") || 0) : 0;
 
   try {
     const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "PUT",
       headers: await getApiAuthHeaders(),
-      body: JSON.stringify({ name, price, durationMonths, description, isActive }),
+      body: JSON.stringify({ name, price, durationMonths, description, isActive, includesClasses, weeklyClassLimit }),
     });
     return await res.json();
   } catch (error) {
