@@ -30,9 +30,13 @@ export async function reserveGymClass(scheduleId:number,memberId:number,date:str
   if(!allowed.length)return {error:"No tenés permiso para esta clase"};
  }
  try{
- const [result]=await sql`SELECT * FROM public.book_gym_class(${scheduleId},${memberId},${date}::date,${session.gymId})`;
+ const [result]=await sql`SELECT * FROM public.book_gym_class_member(${scheduleId},${memberId},${date}::date,${session.gymId})`;
+ if(result?.result_code==="NO_CLASS_ACCESS")return {error:"El plan del alumno no incluye clases o no está pagado."};
+ if(result?.result_code==="WEEKLY_LIMIT")return {error:"El alumno alcanzó su límite semanal de clases."};
+ if(result?.result_code==="MEMBER_INACTIVE")return {error:"El alumno está suspendido o inactivo."};
  if(result?.result_code==="FULL")return {error:"No quedan cupos disponibles"};
  if(result?.result_code==="ALREADY_BOOKED")return {error:"El alumno ya está inscripto"};
+ if(result?.result_code!=="BOOKED")return {error:"No se pudo confirmar la reserva."};
  revalidatePath("/admin/clases");revalidatePath("/trainer/clases");return {success:true};
  }catch(e){console.error("Class booking failed",e);return {error:"No se pudo reservar. Verificá la fecha y que la migración esté aplicada."}}
 }
