@@ -18,6 +18,8 @@ export async function bookMyClass(scheduleId:number,date:string) {
   const {memberId,gymId}=await currentMember();
   if(!Number.isSafeInteger(scheduleId)||scheduleId<=0||!validDate(date)) return {error:"Horario o fecha inválidos"};
   const [r]=await sql`SELECT * FROM public.book_gym_class_member(${scheduleId},${memberId},${date}::date,${gymId})`;
+  if(r?.result_code==="NO_CLASS_ACCESS")return {error:"Tu plan no incluye clases grupales o no está pagado para esa fecha."};
+  if(r?.result_code==="WEEKLY_LIMIT")return {error:"Alcanzaste el límite semanal de clases de tu plan."};
   if(r?.result_code==="NO_MEMBERSHIP")return {error:"Necesitás una membresía pagada y vigente para la fecha de la clase."};
   if(r?.result_code==="MEMBER_INACTIVE")return {error:"Tu perfil de alumno no está activo."};
   if(r?.result_code==="FULL")return {error:"No quedan cupos disponibles."};
