@@ -18,7 +18,7 @@ export default async function MemberLayout({
     JOIN membership_plans p ON p.id = sub.plan_id AND p.gym_id = m.gym_id
     WHERE m.user_id = ${session.id} AND m.gym_id = ${session.gymId}
       AND p.includes_classes = true
-      AND sub.status IN ('active', 'scheduled')
+      AND sub.status IN ('active', 'scheduled') AND sub.payment_status = 'paid'
       AND sub.end_date > CURRENT_DATE
     LIMIT 1`;
 
