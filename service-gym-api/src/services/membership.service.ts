@@ -3,7 +3,7 @@ import { sql } from "../db/neon";
 export async function getGymPlans(gymId: number) {
   return await sql`
     SELECT id, name, price, duration_months, is_active, description,
-           access_mode, duration_days, max_entries
+           access_mode, duration_days, max_entries, includes_classes, weekly_class_limit
     FROM membership_plans
     WHERE gym_id = ${gymId}
     ORDER BY created_at DESC
@@ -16,16 +16,19 @@ export async function createGymPlan(data: {
   price: number;
   durationMonths: number;
   description?: string;
+  includesClasses: boolean;
+  weeklyClassLimit: number;
 }) {
+  if (!Number.isInteger(data.weeklyClassLimit) || data.weeklyClassLimit < 0 || data.weeklyClassLimit > 7) throw new Error("Límite semanal inválido.");
   const [newPlan] = await sql`
-    INSERT INTO membership_plans (gym_id, name, price, duration_months, description, is_active)
+    INSERT INTO membership_plans (gym_id, name, price, duration_months, description, is_active, includes_classes, weekly_class_limit)
     VALUES (
       ${data.gymId},
       ${data.name},
       ${data.price},
       ${data.durationMonths},
       ${data.description || ""},
-      true
+      true, ${data.includesClasses}, ${data.includesClasses && data.weeklyClassLimit > 0 ? data.weeklyClassLimit : null}
     )
     RETURNING *
   `;
@@ -79,8 +82,11 @@ export async function updateGymPlan(
     durationMonths?: number;
     description?: string;
     isActive?: boolean;
+    includesClasses?: boolean;
+    weeklyClassLimit?: number;
   }
 ) {
+  if (data.weeklyClassLimit !== undefined && (!Number.isInteger(data.weeklyClassLimit) || data.weeklyClassLimit < 0 || data.weeklyClassLimit > 7)) throw new Error("Límite semanal inválido.");
   const [updated] = await sql`
     UPDATE membership_plans
     SET
@@ -89,6 +95,8 @@ export async function updateGymPlan(
       duration_months = COALESCE(${data.durationMonths ?? null}, duration_months),
       description = COALESCE(${data.description ?? null}, description),
       is_active = COALESCE(${data.isActive ?? null}, is_active),
+      includes_classes = COALESCE(${data.includesClasses ?? null}, includes_classes),
+      weekly_class_limit = CASE WHEN ${data.includesClasses ?? null}::boolean = false THEN NULL WHEN ${data.weeklyClassLimit ?? null}::integer = 0 THEN NULL ELSE COALESCE(${data.weeklyClassLimit ?? null}::integer, weekly_class_limit) END,
       updated_at = NOW()
     WHERE id = ${id}
       AND gym_id = ${gymId}
