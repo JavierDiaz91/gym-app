@@ -19,6 +19,8 @@ interface Plan {
   duration_months: number;
   description?: string;
   is_active: boolean;
+  includes_classes?: boolean;
+  weekly_class_limit?: number | null;
 }
 
 export default function MembresiasAdminPage() {
@@ -27,6 +29,8 @@ export default function MembresiasAdminPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [includesClasses, setIncludesClasses] = useState(false);
+  const [weeklyLimit, setWeeklyLimit] = useState("0");
 
   const loadData = async () => {
     setLoading(true);
@@ -41,17 +45,23 @@ export default function MembresiasAdminPage() {
 
   const handleOpenCreate = () => {
     setEditingPlan(null);
+    setIncludesClasses(false);
+    setWeeklyLimit("0");
     setShowModal(true);
   };
 
   const handleOpenEdit = (plan: Plan) => {
     setEditingPlan(plan);
+    setIncludesClasses(Boolean(plan.includes_classes));
+    setWeeklyLimit(String(plan.weekly_class_limit ?? 0));
     setShowModal(true);
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    formData.set("includesClasses", String(includesClasses));
+    formData.set("weeklyClassLimit", includesClasses ? weeklyLimit : "0");
 
     startTransition(async () => {
       try {
@@ -149,6 +159,7 @@ export default function MembresiasAdminPage() {
                     <Badge variant="outline">
                       {plan.duration_months} {plan.duration_months === 1 ? "mes" : "meses"}
                     </Badge>
+                    <Badge variant="outline">{plan.includes_classes ? `Clases: ${plan.weekly_class_limit ? `${plan.weekly_class_limit}/semana` : "sin límite"}` : "Sin clases grupales"}</Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -160,7 +171,7 @@ export default function MembresiasAdminPage() {
       {/* Modal Unificado (Crear / Editar) */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card text-card-foreground rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl border border-border">
+          <div className="bg-card text-card-foreground rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-xl border border-border">
             <h2 className="text-xl font-bold text-foreground">
               {editingPlan ? "Editar Plan" : "Crear Nuevo Plan"}
             </h2>
@@ -208,6 +219,12 @@ export default function MembresiasAdminPage() {
                 />
               </div>
 
+              <fieldset className="rounded-xl border border-border p-4 space-y-3">
+                <legend className="px-1 text-sm font-semibold">Clases grupales</legend>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={includesClasses} onChange={e => setIncludesClasses(e.target.checked)} className="accent-primary" /> Este plan incluye clases grupales</label>
+                {includesClasses && <div><label htmlFor="weeklyClassLimit" className="block text-sm font-medium">Límite de clases por semana</label><select id="weeklyClassLimit" value={weeklyLimit} onChange={e=>setWeeklyLimit(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"><option value="0">Sin límite</option><option value="1">1 clase</option><option value="2">2 clases</option><option value="3">3 clases</option><option value="5">5 clases</option></select></div>}
+                <p className="text-xs text-muted-foreground">La descripción del plan no otorga acceso a clases; este permiso se valida al reservar.</p>
+              </fieldset>
               {editingPlan && (
                 <div>
                   <label className="block text-sm font-medium text-foreground">Estado</label>

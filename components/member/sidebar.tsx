@@ -15,6 +15,7 @@ import {
 import { logoutUser } from "@/app/actions";
 
 interface MemberSidebarProps {
+  showClasses?: boolean;
   user?: {
     name?: string;
     email?: string;
@@ -28,7 +29,7 @@ const navigation = [
   { name: "Mi Perfil", href: "/miembro/perfil", icon: User },
 ];
 
-export default function MemberSidebar({ user }: MemberSidebarProps) {
+export default function MemberSidebar({ user, showClasses = false }: MemberSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -120,7 +121,7 @@ export default function MemberSidebar({ user }: MemberSidebarProps) {
               Menú Alumno
             </p>
 
-            {navigation.map((item) => {
+            {navigation.filter(item => showClasses || item.href !== "/miembro/clases").map((item) => {
               const Icon = item.icon;
               const isActive =
                 item.href === "/miembro"
