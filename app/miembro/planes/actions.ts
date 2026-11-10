@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 
 export async function requestMembershipPlan(planId: number): Promise<{ success: boolean; message: string }> {
   const session = await getSession();
-  if (!session || session.role !== "member" || !Number.isSafeInteger(session.gymId) || !Number.isSafeInteger(planId) || planId <= 0) {
+  if (!session || session.role !== "member" || session.gymId == null || !Number.isSafeInteger(planId) || planId <= 0) {
     return { success: false, message: "Solicitud no autorizada." };
   }
 
