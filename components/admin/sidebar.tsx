@@ -22,7 +22,6 @@ import {
   Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { logoutUser } from "@/app/actions";
 
 interface AdminSidebarProps {
@@ -142,14 +141,6 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
           </div>
           <button type="button" title="Cerrar sesión" aria-label="Cerrar sesión" onClick={handleLogout} className="shrink-0 rounded-lg p-1.5 text-zinc-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"><LogOut className="h-4 w-4" /></button>
         </div>
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-slate-400 hover:text-rose-300 hover:bg-destructive/10 transition-colors duration-200"
-          onClick={handleLogout}
-        >
-          <LogOut className="w-4 h-4 mr-3" />
-          Cerrar Sesión
-        </Button>
       </div>
     </aside>
   );
