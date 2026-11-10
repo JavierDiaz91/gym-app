@@ -137,6 +137,12 @@ export default function LoginPage() {
                 <Input id="password" name="password" type="password" placeholder="Ingresá tu contraseña" required className="h-12 rounded-xl border-white/[0.08] bg-white/[0.035] text-white placeholder:text-zinc-400 focus-visible:border-[#00d5d0]/50 focus-visible:ring-[#00d5d0]/20" />
               </div>
 
+              <div className="flex justify-end">
+                <Link href="/recuperar-contrasena" className="text-sm font-medium text-[#67e8e3] hover:text-white">
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
+
               <Button type="submit" className="h-12 w-full rounded-xl bg-[#00d5d0] font-semibold text-[#071320] hover:bg-[#2ae8e2]" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {loading ? "Ingresando..." : "Iniciar sesión"}
