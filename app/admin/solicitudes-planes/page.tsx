@@ -2,6 +2,7 @@ import { getSession } from "@/app/actions";
 import { sql } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { ResolveButtons } from "./ResolveButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function GymPlanRequestsPage() {
                 <p className="text-sm text-muted-foreground">{r.plan_name} · {Number(r.price).toLocaleString("es-AR", { style: "currency", currency: "ARS" })}</p>
                 <p className="text-xs text-muted-foreground">Alumno #{r.member_id} · Solicitud #{r.id}</p>
               </div>
-              <Link href="/admin/miembros" className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted">Gestionar alumno</Link>
+              <div className="space-y-2"><ResolveButtons requestId={Number(r.id)} /><Link href="/admin/miembros" className="inline-block text-xs text-primary underline">Ver alumnos</Link></div>
             </div>
           ))}
         </div>
