@@ -1,5 +1,6 @@
 import { getSession } from "@/app/actions";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { sql } from "@/lib/db";
 import { CreditCard, Calendar, CheckCircle2, AlertTriangle, Clock, History, Lock } from "lucide-react";
 import { PayButton } from "./PayButton"; // Creamos este cliente para el botón de pago
@@ -171,6 +172,14 @@ if (subscription?.access_mode === "entry_pack" && Number.isSafeInteger(Number(su
           Estado de tu plan, fechas de vencimiento e historial de pagos
         </p>
       </div>
+
+      {!subscription && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 sm:p-5 space-y-3">
+          <h2 className="font-semibold">Empezá a entrenar en tu gimnasio</h2>
+          <p className="text-sm text-muted-foreground">Explorá los planes disponibles y solicitá el que prefieras. Tu gimnasio confirmará la asignación y el pago.</p>
+          <Link href="/miembro/planes" className="inline-flex rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">Ver planes de mi gimnasio</Link>
+        </div>
+      )}
 
       {/* Tarjeta de Estado del Plan */}
       <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm space-y-6">
