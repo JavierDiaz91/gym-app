@@ -27,7 +27,7 @@ export function RequestDecisionButtons({ id }: { id: number }) {
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={busy || done} onClick={() => act("approved")}
           className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-          {busy ? "Procesando..." : "Confirmar plan pagado"}
+          {busy ? "Procesando..." : "Aprobar y generar pago pendiente"}
         </button>
         <button type="button" disabled={busy || done} onClick={() => act("rejected")}
           className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">
