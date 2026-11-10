@@ -191,10 +191,10 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
   const isFullyActive = !isExpired && !isSuspended && ["active", "scheduled"].includes(memberData?.sub_status || "") && memberData?.payment_status === "paid";
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 p-6">
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8 px-0 py-2 sm:p-4 lg:p-6">
       {/* Saludo y bienvenida */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
           ¡Hola, {memberData?.first_name || "Atleta"}! 👋
         </h1>
         <p className="text-muted-foreground mt-1">
@@ -203,41 +203,41 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
       </div>
 
       {/* Tarjetas de Resumen Rápido */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
         
         {/* 1. Estado del Plan */}
-        <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-card text-card-foreground border rounded-xl p-4 sm:p-5 lg:p-6 shadow-sm flex flex-col justify-between gap-3 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Suscripción
             </span>
             {isFullyActive ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+              <span className="inline-flex max-w-full items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                 <CheckCircle2 className="w-3.5 h-3.5" /> Activa
               </span>
             ) : memberData?.payment_status === "pending" ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
+              <span className="inline-flex max-w-full items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
                 <AlertTriangle className="w-3.5 h-3.5" /> Pendiente de pago
               </span>
             ) : isSuspended ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">
+              <span className="inline-flex max-w-full items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">
                 <AlertTriangle className="w-3.5 h-3.5" /> Suspendida
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
+              <span className="inline-flex max-w-full items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
                 <AlertTriangle className="w-3.5 h-3.5" /> Vencida / Sin Plan
               </span>
             )}
           </div>
 
           <div>
-            <h3 className="text-xl font-bold text-foreground">
+            <h3 className="text-lg sm:text-xl font-bold text-foreground">
               {memberData?.plan_name || "Sin Plan Asignado"}
             </h3>
             <p className="text-xs text-muted-foreground mt-1">
               {isFullyActive 
                 ? "Tenés acceso completo a las instalaciones" 
-                : memberData?.payment_status === "pending" ? "Tenés una cuota pendiente. Pagala para habilitar tus entrenamientos." : "Regularizá tu cuota para volver a entrenar"}
+                : memberData?.payment_status === "pending" ? "Tenés una cuota pendiente. Pagala para habilitar tus entrenamientos." : "Todavía no tenés un plan asignado. Consultá las opciones de tu gimnasio."}
             </p>
           </div>
 
@@ -250,8 +250,8 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
         </div>
 
         {/* 2. Días Restantes */}
-        <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-card text-card-foreground border rounded-xl p-4 sm:p-5 lg:p-6 shadow-sm flex flex-col justify-between gap-3 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Vencimiento
             </span>
@@ -289,8 +289,8 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
         </div>
 
         {/* 3. Perfil y Accesos */}
-        <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-card text-card-foreground border rounded-xl p-4 sm:p-5 lg:p-6 shadow-sm flex flex-col justify-between gap-3 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Mi Cuenta
             </span>
@@ -317,8 +317,8 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
       </div>
 
       {/* Tarjeta de Rutinas Asignadas */}
-      <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-card text-card-foreground border rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 font-semibold text-sm">
             <Dumbbell className="w-5 h-5 text-primary" />
             <span>Mis Rutinas de Entrenamiento</span>
@@ -332,23 +332,23 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
 
         {!isFullyActive ? (
           /* Bloqueo por cuenta suspendida o vencida */
-          <div className="p-6 rounded-xl bg-red-500/5 border border-red-500/20 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-red-500/10 text-red-500 rounded-lg">
+          <div className="p-4 sm:p-5 rounded-xl bg-red-500/5 border border-red-500/20 text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="shrink-0 p-2.5 bg-red-500/10 text-red-500 rounded-lg">
                 <Lock className="w-6 h-6" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h4 className="font-bold text-foreground text-sm">Acceso bloqueado a las rutinas</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Aboná tu cuota para reactivar tu membresía y visualizar los planes de entrenamiento.
+                  {memberData?.plan_name ? "Tu membresía no está habilitada. Consultá el estado del pago para acceder a tus entrenamientos." : "Todavía no tenés un plan asignado. Consultá tu membresía para comenzar a entrenar."}
                 </p>
               </div>
             </div>
             <Link
               href="/miembro/membresia"
-              className="px-4 py-2 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors whitespace-nowrap shadow-sm"
+              className="inline-flex w-full sm:w-auto justify-center px-4 py-2.5 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors whitespace-nowrap shadow-sm"
             >
-              Pagar Cuota
+              {memberData?.payment_status === "pending" ? "Ver pago pendiente" : "Consultar membresía"}
             </Link>
           </div>
         ) : assignedPlans.length > 0 || assignedRoutines.length > 0 ? (
@@ -423,14 +423,14 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
       </div>
 
       {/* Banner promocional / Aviso del Gimnasio */}
-      <div className="bg-muted/40 border border-border rounded-xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-primary/10 rounded-lg text-primary">
+      <div className="bg-muted/40 border border-border rounded-xl p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
+          <div className="shrink-0 p-2.5 sm:p-3 bg-primary/10 rounded-lg text-primary">
             <Activity className="w-6 h-6" />
           </div>
           <div>
             <h4 className="font-semibold text-foreground text-sm">
-              ¿Querés registrar un nuevo pago o consultar tu historial?
+              Consultá tu membresía y tus pagos
             </h4>
             <p className="text-xs text-muted-foreground">
               Revisá las transacciones anteriores y el desglose de tu membresía.
@@ -439,7 +439,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
         </div>
         <Link
           href="/miembro/membresia"
-          className="px-4 py-2 text-xs font-semibold border rounded-lg hover:bg-muted transition-colors whitespace-nowrap"
+          className="inline-flex w-full sm:w-auto justify-center px-4 py-2.5 text-xs font-semibold border rounded-lg hover:bg-muted transition-colors whitespace-nowrap"
         >
           Ir a Membresía
         </Link>
