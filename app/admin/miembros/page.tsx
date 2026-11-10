@@ -10,16 +10,16 @@ export default async function MiembrosPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold">Miembros</h1>
           <p className="text-muted-foreground">Gestiona los miembros del gimnasio</p>
         </div>
-        <Button asChild>
+        <div className="flex flex-wrap items-center gap-2"><Button variant="outline" asChild><Link href="/admin/solicitudes-planes">Solicitudes de planes</Link></Button><Button asChild>
           <Link href="/admin/miembros/nuevo">
             <Plus className="w-4 h-4 mr-2" /> Nuevo Miembro
           </Link>
-        </Button>
+        </Button></div>
       </div>
 
       <Card>
