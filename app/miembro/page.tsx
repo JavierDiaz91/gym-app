@@ -348,7 +348,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
               href="/miembro/membresia"
               className="inline-flex w-full sm:w-auto justify-center px-4 py-2.5 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors whitespace-nowrap shadow-sm"
             >
-              {memberData?.plan_name ? "Ver pago pendiente" : "Consultar membresía"}
+              {memberData?.payment_status === "pending" ? "Ver pago pendiente" : "Consultar membresía"}
             </Link>
           </div>
         ) : assignedPlans.length > 0 || assignedRoutines.length > 0 ? (
