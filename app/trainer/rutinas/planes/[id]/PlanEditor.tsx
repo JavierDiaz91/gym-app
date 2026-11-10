@@ -93,38 +93,39 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     run(() => saveTrainingPlanDraft(plan.id, draft), () => setSavedSnapshot(snapshot));
   };
   const saveAndPublish = () => {
-    if (!window.confirm("¿Guardar los cambios y publicar esta plantilla?")) return;
+    if (!window.confirm("¿Finalizar la rutina para poder asignarla a tus alumnos?")) return;
     run(async () => {
       const saved = await saveTrainingPlanDraft(plan.id, draft);
       return saved.success ? publishTrainingPlan(plan.id) : saved;
-    });
+    }, () => router.refresh());
   };
   return <main className="mx-auto max-w-6xl space-y-5 p-4 md:p-8 text-foreground">
-    <Link href="/trainer/rutinas/planes" className="text-sm text-primary">← Volver a plantillas</Link>
+    <Link href="/trainer/rutinas/planes" className="text-sm text-primary">← Volver a mis rutinas</Link>
     <div className="flex flex-wrap justify-between gap-3">
       <div><h1 className="text-2xl font-bold">{plan.title}</h1><p className="text-sm text-muted-foreground">{plan.durationWeeks} semanas · {plan.status === "draft" ? "Borrador" : "Publicado"}{plan.status === "published" && personalize ? " · Personalización para alumno (sin modificar plantilla)" : ""}</p></div>
       <div className="flex flex-wrap gap-2">
-        <button className={button} disabled={pending} onClick={() => run(() => duplicateTrainingPlan(plan.id), (id) => id && router.push("/trainer/rutinas/planes/" + id))}>Duplicar plantilla</button>
+        <button className={button} disabled={pending} onClick={() => run(() => duplicateTrainingPlan(plan.id), (id) => id && router.push("/trainer/rutinas/planes/" + id))}>Duplicar rutina</button>
 
       </div>
     </div>
-    {plan.status === "draft" && <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-300 bg-background/95 p-3 shadow-md backdrop-blur dark:border-slate-700" role="region" aria-label="Acciones de la plantilla">
+    {plan.status === "draft" && <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-300 bg-background/95 p-3 shadow-md backdrop-blur dark:border-slate-700" role="region" aria-label="Acciones de la rutina">
       <span className="text-sm font-medium" role="status" aria-live="polite">{pending ? "Guardando..." : hasUnsavedChanges ? "● Cambios sin guardar" : "✓ Cambios guardados"}</span>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={button} disabled={pending || !hasUnsavedChanges} onClick={saveDraft}>{pending ? "Guardando..." : "Guardar cambios"}</button>
-        <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={saveAndPublish}>Guardar y publicar</button>
+        <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" disabled={pending} onClick={saveAndPublish}>Guardar y finalizar rutina</button>
       </div>
     </div>}
-    {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta plantilla ya está publicada. Para modificar la plantilla y guardar una nueva versión, usá «Duplicar plantilla»; para ajustar únicamente la rutina de un alumno, activá «Personalizar ejercicios y cargas» antes de asignarla. Esos ajustes se guardan al asignar y no cambian la plantilla original.</p>}
+    {plan.status === "published" && <a href="#asignar-alumno" className="inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-bold text-slate-950">Continuar: asignar a un alumno ↓</a>}
+    {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta rutina ya está lista para asignar. Si querés modificarla, duplicala; también podés personalizarla para un alumno sin alterar la original.</p>}
     {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
     <section className="space-y-3 rounded-2xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Seleccionar semana y día">
-      <div className="space-y-1"><h2 className="text-base font-bold">1. Elegí la semana y el día</h2><p className="text-xs text-muted-foreground">Trabajá sobre un día a la vez. Cada semana conserva sus propias cargas.</p></div>
+      <div className="space-y-1"><h2 className="text-base font-bold">Paso 2 · Organizá los entrenamientos</h2><p className="text-xs text-muted-foreground">Trabajá sobre un día a la vez. Cada semana conserva sus propias cargas.</p></div>
       <div className="flex flex-wrap gap-2 items-center">
       <span className="text-sm font-semibold">Semana:</span>
       {Array.from({ length: plan.durationWeeks }, (_, i) => <button key={i} type="button" className={button + (week === i ? " border-primary text-primary" : "")} onClick={() => setWeek(i)}>{i + 1}</button>)}
     </div>
     {editable && <details className="rounded-xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Progresión semanal avanzada">
-      <summary className="cursor-pointer list-item text-sm font-semibold">Progresión semanal <span className="ml-2 font-normal text-muted-foreground">· Opcional, configurar cuando la semana 1 esté lista</span></summary>
+      <summary className="cursor-pointer list-item text-sm font-semibold">Opciones avanzadas de progresión <span className="ml-2 font-normal text-muted-foreground">· Opcional, configurar cuando la semana 1 esté lista</span></summary>
       <div className="mt-4 space-y-3">
       <h2 className="font-semibold">Automatización semanal</h2>
       <p className="text-sm text-muted-foreground">Las semanas mantienen parámetros independientes. Los cambios se guardan al presionar Guardar borrador.</p>
@@ -162,7 +163,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       </div>}
       </div>
     </details>}
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-bold">2. Organizá los ejercicios</h2>{editable && <button type="button" className={button} disabled={draft.days.length >= 7} onClick={() => { setSelectedDay(draft.days.length); change({ days: [...draft.days, { title: "Día " + (draft.days.length + 1), modality: "strength", blocks: [] }] }); }}>+ Agregar día</button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-bold">Días y ejercicios</h2>{editable && <button type="button" className={button} disabled={draft.days.length >= 7} onClick={() => { setSelectedDay(draft.days.length); change({ days: [...draft.days, { title: "Día " + (draft.days.length + 1), modality: "strength", blocks: [] }] }); }}>+ Agregar día</button>}</div>
     {draft.days.length === 0 ? (
       <div role="status" className="rounded-xl border border-dashed border-slate-500/60 bg-slate-900/20 px-5 py-8 text-center dark:bg-slate-900/30">
         <p className="text-base font-semibold">Todavía no agregaste días de entrenamiento</p>
@@ -190,17 +191,34 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           {editable && <button className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: d.blocks.filter((_, i) => i !== bi) }))}>Eliminar bloque</button>}
         </div>
         {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <div key={item.key} className="rounded-xl border-2 border-slate-200 bg-background p-3 space-y-3 shadow-sm dark:border-slate-700">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><p className="text-xs font-semibold text-primary dark:text-primary">Ejercicio {ii + 1}</p><h3 className="text-base font-bold">{item.title || "Ejercicio sin nombre"}</h3></div>
-            <div className="flex flex-wrap gap-2 text-xs font-semibold">
-              {rx.sets !== undefined && <span className="rounded-lg bg-muted px-3 py-2">{rx.sets} series</span>}
-              {rx.reps && <span className="rounded-lg bg-muted px-3 py-2">{rx.reps} rep.</span>}
-              {rx.rir && <span className="rounded-lg bg-muted px-3 py-2">RIR {rx.rir}</span>}
-              {rx.restSeconds !== undefined && <span className="rounded-lg bg-muted px-3 py-2">{rx.restSeconds}s descanso</span>}
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-primary">Ejercicio {ii + 1} · Semana {week + 1}</p>
+            {editable && <button type="button" className="text-xs text-rose-400 hover:underline" onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar ejercicio</button>}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,110px))]">
+            <label className="text-xs font-medium text-muted-foreground">Nombre del ejercicio
+              <input list={`exercise-catalog-${di}-${bi}-${ii}`} className={field + " mt-1"} disabled={!editable} placeholder="Buscar o escribir ejercicio" value={item.title} onChange={(e) => {
+                const name = e.target.value;
+                const ex = exercises.find(x => x.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+                updateItem(di, bi, ii, current => ({ ...current, title: name, imageUrl: ex?.imageUrl ?? current.imageUrl, instructions: ex?.instructions ?? current.instructions }));
+              }}/>
+              <datalist id={`exercise-catalog-${di}-${bi}-${ii}`}>{exercises.map(ex => <option key={ex.id} value={ex.name}/>)}</datalist>
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">Series
+              <input aria-label="Series" type="number" min={0} className={field + " mt-1"} disabled={!editable} value={rx.sets ?? ""} onChange={e => updateRx(di,bi,ii,{sets:e.target.value === "" ? undefined : Number(e.target.value)})}/>
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">Repeticiones
+              <input aria-label="Repeticiones" className={field + " mt-1"} disabled={!editable} value={rx.reps ?? ""} onChange={e => updateRx(di,bi,ii,{reps:e.target.value})}/>
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">RIR
+              <input aria-label="RIR" className={field + " mt-1"} disabled={!editable} value={rx.rir ?? ""} onChange={e => updateRx(di,bi,ii,{rir:e.target.value})}/>
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">Pausa (seg)
+              <input aria-label="Pausa en segundos" type="number" min={0} className={field + " mt-1"} disabled={!editable} value={rx.restSeconds ?? ""} onChange={e => updateRx(di,bi,ii,{restSeconds:e.target.value === "" ? undefined : Number(e.target.value)})}/>
+            </label>
           </div>
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Editar ejercicio, instrucciones e imagen</summary>
+            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Notas técnicas e imagen (opcional)</summary>
             <div className="mt-3">
           <div className="flex flex-wrap gap-2 items-start">
             {item.imageUrl && <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-300 bg-slate-100 p-2 dark:border-slate-600"><img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-full w-full object-contain grayscale" /></div>}
@@ -219,7 +237,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </div>
           </details>
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold">Ajustar cargas por semana <span className="font-normal text-muted-foreground">· {plan.durationWeeks} semanas · Opcional</span></summary>
+            <summary className="cursor-pointer text-sm font-semibold">Configuración avanzada por semanas <span className="font-normal text-muted-foreground">· {plan.durationWeeks} semanas · Opcional</span></summary>
           <div className="mt-3 space-y-3">
             <p className="text-xs text-muted-foreground">Editá directamente cada celda para configurar las cargas por semana. Los cambios quedan en el borrador hasta guardar.</p>
             <div className="overflow-x-auto rounded-xl border border-slate-300 bg-background dark:border-slate-700">
@@ -260,12 +278,12 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       </div>)}
       {editable && <button type="button" className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: [...d.blocks, { title: "Bloque principal", type: "main", items: [] }] }))}>+ Agregar bloque</button>}
     </section>)}
-    {plan.status === "published" && <section className="rounded-xl border p-4 space-y-3">
-      <h2 className="font-semibold">Asignar al alumno</h2>
-      <p className="text-sm text-muted-foreground">La asignación conserva una copia independiente de la plantilla.</p>
+    {plan.status === "published" && <section id="asignar-alumno" className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-3">
+      <p className="text-xs font-bold uppercase tracking-wider text-primary">Paso 3 de 3</p><h2 className="text-lg font-bold">Asignar a alumnos</h2>
+      <p className="text-sm text-muted-foreground">Elegí el alumno que va a recibir esta rutina. La asignación no modifica la rutina original.</p>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={personalize} onChange={(e) => { setPersonalize(e.target.checked); setDraft(structuredClone(plan.draft)); }}/> Personalizar ejercicios y cargas para este alumno antes de asignar</label>
       <select aria-label="Alumno" className={field} value={memberId} onChange={(e) => setMemberId(Number(e.target.value))}>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-      <button className={button} disabled={pending || !memberId} onClick={() => run(() => assignTrainingPlan(plan.id, memberId, personalize ? draft : undefined))}>Asignar planificación</button>
+      <button className={button} disabled={pending || !memberId} onClick={() => run(() => assignTrainingPlan(plan.id, memberId, personalize ? draft : undefined))}>Confirmar asignación</button>
     </section>}
   </main>;
 }

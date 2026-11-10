@@ -43,7 +43,7 @@ export async function listTrainingPlans() {
   }));
 }
 
-export async function createTrainingPlan(input: PlanInput): Promise<{ success: boolean; error?: string }> {
+export async function createTrainingPlan(input: PlanInput): Promise<{ success: boolean; error?: string; id?: number }> {
   try {
     const { gymId, trainerId } = await trainerContext();
     const title = input.title?.trim();
@@ -73,7 +73,7 @@ export async function createTrainingPlan(input: PlanInput): Promise<{ success: b
       return { success: false, error: "Faltan categorías iniciales en la base. Ejecutar la migración y su seed primero." };
     }
     const ids = categoryIds.map(Number);
-    await sql`
+    const created = await sql`
       WITH inserted AS (
         INSERT INTO training_plans (gym_id, trainer_id, title, description, duration_weeks)
         VALUES (${gymId}, ${trainerId}, ${title}, ${description}, ${duration})
@@ -82,9 +82,10 @@ export async function createTrainingPlan(input: PlanInput): Promise<{ success: b
       INSERT INTO training_plan_categories (plan_id, category_id)
       SELECT inserted.id, categories.id
       FROM inserted CROSS JOIN unnest(${ids}::bigint[]) AS categories(id)
+      RETURNING plan_id
     `;
     revalidatePath("/trainer/rutinas/planes");
-    return { success: true };
+    return { success: true, id: Number(created[0].plan_id) };
   } catch (error) {
     console.error("Error creando plan", error);
     return { success: false, error: "No se pudo crear el plan. Comprobá que la migración esté aplicada." };
