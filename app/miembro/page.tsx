@@ -80,10 +80,10 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
         FROM subscriptions sub
         WHERE sub.member_id = m.id
           AND sub.status IN ('active', 'scheduled')
-          AND sub.payment_status = 'paid'
           AND sub.start_date <= CURRENT_DATE
           AND sub.end_date > CURRENT_DATE
-        ORDER BY sub.end_date DESC, sub.id DESC
+        ORDER BY CASE WHEN sub.payment_status = 'paid' THEN 0 ELSE 1 END,
+                 sub.start_date DESC, sub.id DESC
         LIMIT 1
       ) s ON TRUE
       LEFT JOIN membership_plans mp ON s.plan_id = mp.id AND mp.gym_id = m.gym_id
@@ -184,7 +184,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
     
     const diffTime = endDate.getTime() - today.getTime();
     daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-    isExpired = endDate < today;
+    isExpired = endDate <= today;
   }
 
   // La suscripción está totalmente activa sólo si no está vencida Y su estado no es suspended/inactive
@@ -215,6 +215,10 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                 <CheckCircle2 className="w-3.5 h-3.5" /> Activa
               </span>
+            ) : memberData?.payment_status === "pending" ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                <AlertTriangle className="w-3.5 h-3.5" /> Pendiente de pago
+              </span>
             ) : isSuspended ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">
                 <AlertTriangle className="w-3.5 h-3.5" /> Suspendida
@@ -233,7 +237,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
             <p className="text-xs text-muted-foreground mt-1">
               {isFullyActive 
                 ? "Tenés acceso completo a las instalaciones" 
-                : "Regularizá tu cuota para volver a entrenar"}
+                : memberData?.payment_status === "pending" ? "Tenés una cuota pendiente. Pagala para habilitar tus entrenamientos." : "Regularizá tu cuota para volver a entrenar"}
             </p>
           </div>
 

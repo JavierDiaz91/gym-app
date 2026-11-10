@@ -83,7 +83,7 @@ export function MembersTable({ members }: { members: Member[] }) {
                   )}
                 </div>
               </TableCell>
-              <TableCell>{member.plan_name ?? "Sin membresía"}</TableCell>
+              <TableCell><div className="space-y-1"><div>{member.plan_name ?? "Sin membresía"}</div>{member.plan_name && member.subscription_payment_status === "pending" && <Badge variant="outline" className="border-amber-500/40 text-amber-500">Pago pendiente</Badge>}</div></TableCell>
               <TableCell>
                 <Badge
                   variant={

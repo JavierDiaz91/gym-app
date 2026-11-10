@@ -14,6 +14,7 @@ export type Member = {
   // joins
   plan_name?: string | null;
   subscription_status?: string | null;
+  subscription_payment_status?: string | null;
   subscription_start?: string | null;
   subscription_end?: string | null;
 };
