@@ -75,7 +75,7 @@ export async function resetPassword(token: string, password: string) {
       WHERE id = ${record.id} AND used_at IS NULL AND expires_at > now()
       RETURNING user_id
     ), updated AS (
-      UPDATE public.users SET password_hash = ${passwordHash}, updated_at = now()
+      UPDATE public.users SET password_hash = ${passwordHash}
       WHERE id IN (SELECT user_id FROM consumed)
       RETURNING id
     )
