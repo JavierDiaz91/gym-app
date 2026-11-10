@@ -14,3 +14,59 @@ CREATE UNIQUE INDEX IF NOT EXISTS member_plan_requests_one_pending
 ON public.member_plan_requests (member_id) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS member_plan_requests_gym_status
 ON public.member_plan_requests (gym_id, status, created_at DESC);
+
+-- Resolución atómica de solicitudes: valida tenant, bloquea fila y evita doble aprobación.
+-- La aprobación crea una membresía pendiente mediante la función existente.
+CREATE OR REPLACE FUNCTION public.resolve_member_plan_request(
+  p_request_id bigint,
+  p_gym_id integer,
+  p_approve boolean
+) RETURNS text
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_request public.member_plan_requests%ROWTYPE;
+  v_member_id integer;
+BEGIN
+  SELECT * INTO v_request
+  FROM public.member_plan_requests
+  WHERE id = p_request_id AND gym_id = p_gym_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN RETURN 'NOT_FOUND'; END IF;
+  IF v_request.status <> 'pending' THEN RETURN 'ALREADY_RESOLVED'; END IF;
+
+  SELECT m.id INTO v_member_id
+  FROM public.members m
+  WHERE m.id = v_request.member_id AND m.gym_id = p_gym_id;
+  IF v_member_id IS NULL THEN RETURN 'INVALID_MEMBER'; END IF;
+
+  IF NOT p_approve THEN
+    UPDATE public.member_plan_requests SET status = 'rejected', resolved_at = now()
+    WHERE id = p_request_id;
+    RETURN 'REJECTED';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.membership_plans
+    WHERE id = v_request.plan_id AND gym_id = p_gym_id AND is_active = true
+  ) THEN RETURN 'PLAN_UNAVAILABLE'; END IF;
+
+  -- Bloquea al alumno para serializar solicitudes aprobadas en paralelo.
+  PERFORM 1 FROM public.members WHERE id = v_member_id FOR UPDATE;
+
+  IF EXISTS (
+    SELECT 1 FROM public.subscriptions s
+    JOIN public.membership_plans p ON p.id = s.plan_id AND p.gym_id = p_gym_id
+    WHERE s.member_id = v_member_id
+      AND s.status IN ('active','scheduled') AND s.end_date > CURRENT_DATE
+  ) THEN RETURN 'ALREADY_SUBSCRIBED'; END IF;
+
+  PERFORM public.renew_gym_membership(p_gym_id, v_member_id, v_request.plan_id, 'pending', 0);
+
+  UPDATE public.member_plan_requests SET status = 'approved', resolved_at = now()
+  WHERE id = p_request_id;
+
+  RETURN 'APPROVED';
+END;
+$$;
