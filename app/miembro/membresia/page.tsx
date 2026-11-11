@@ -77,6 +77,7 @@ export default async function MembershipPage() {
   if (!session || session.role !== "member" || session.gymId == null) redirect("/login");
 
   const userId = session.id;
+  const directCheckoutEnabled = process.env.KIVRA_MEMBER_DIRECT_CHECKOUT_ENABLED === "true";
 
   let subscription: SubscriptionData | null = null;
   let payments: PaymentData[] = [];
@@ -176,7 +177,7 @@ if (subscription?.access_mode === "entry_pack" && Number.isSafeInteger(Number(su
       {!subscription && (
         <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 sm:p-5 space-y-3">
           <h2 className="font-semibold">Empezá a entrenar en tu gimnasio</h2>
-          <p className="text-sm text-muted-foreground">Explorá los planes disponibles y solicitá el que prefieras. Tu gimnasio confirmará la asignación y el pago.</p>
+          <p className="text-sm text-muted-foreground">{directCheckoutEnabled ? "Elegí una membresía de tu gimnasio y pagala online con Mercado Pago. Se habilitará cuando el pago quede confirmado." : "Explorá los planes disponibles y solicitá el que prefieras. Tu gimnasio confirmará la asignación y el pago."}</p>
           <Link href="/miembro/planes" className="inline-flex rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">Ver planes de mi gimnasio</Link>
         </div>
       )}
