@@ -28,14 +28,14 @@ export default async function MemberPlansPage() {
     LIMIT 1
   `;
   const subscriptions = await sql`
-    SELECT s.id, s.plan_id, s.payment_status FROM subscriptions s
+    SELECT s.id, s.plan_id, s.payment_status, s.status FROM subscriptions s
     JOIN membership_plans p ON p.id = s.plan_id AND p.gym_id = ${session.gymId}
     WHERE s.member_id = ${member.id} AND s.status IN ('active','scheduled') AND s.end_date > CURRENT_DATE
-    LIMIT 1
+    ORDER BY CASE WHEN s.payment_status = 'paid' THEN 0 ELSE 1 END, s.end_date DESC
   `;
 
   const currentSubscription = subscriptions[0];
-  const hasPaidOrScheduled = subscriptions.some(s => String(s.payment_status) === "paid" || String(s.payment_status) !== "pending");
+  const hasPaidOrScheduled = subscriptions.some(s => String(s.payment_status) === "paid" || String(s.status) === "scheduled");
 
   return (
     <main className="mx-auto max-w-5xl space-y-5 px-4 py-5 sm:p-6">
@@ -56,7 +56,7 @@ export default async function MemberPlansPage() {
                 <p className="text-xs text-muted-foreground">{plan.access_mode === "entry_pack" ? `${plan.max_entries} ingresos` : plan.access_mode === "fixed_days" ? "Pase por días" : "Membresía"}{plan.duration_days ? ` · ${plan.duration_days} días` : ""}</p>
               </div>
               {directCheckoutEnabled ? (
-                !hasPaidOrScheduled && (!currentSubscription || Number(currentSubscription.plan_id) === Number(plan.id)) && (
+                !hasPaidOrScheduled && (!currentSubscription || (subscriptions.length === 1 && Number(currentSubscription.plan_id) === Number(plan.id))) && (
                   <PayButton memberId={Number(member.id)} planId={Number(plan.id)} price={Number(plan.price)} label="Elegir y pagar con Mercado Pago" />
                 )
               ) : (
