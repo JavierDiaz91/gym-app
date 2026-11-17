@@ -45,7 +45,7 @@ export function MembersTable({ members }: { members: Member[] }) {
             <TableHead>Miembro</TableHead>
             <TableHead>Contacto</TableHead>
             <TableHead>Membresía</TableHead>
-            <TableHead>Estado</TableHead>
+            <TableHead>Estado del miembro</TableHead>
             <TableHead>Vencimiento</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
@@ -86,6 +86,7 @@ export function MembersTable({ members }: { members: Member[] }) {
               <TableCell><div className="space-y-1"><div>{member.plan_name ?? "Sin membresía"}</div>{member.plan_name && member.subscription_payment_status === "pending" && <Badge variant="outline" className="border-amber-500/40 text-amber-500">Pago pendiente</Badge>}</div></TableCell>
               <TableCell>
                 <Badge
+                  title="Estado administrativo del miembro; no indica si su membresía está pagada."
                   variant={
                     member.status === "active"
                       ? "default"
@@ -100,10 +101,11 @@ export function MembersTable({ members }: { members: Member[] }) {
                     ? "Suspendido"
                     : "Inactivo"}
                 </Badge>
+                <p className="mt-1 text-xs text-muted-foreground">Estado administrativo</p>
               </TableCell>
               <TableCell>
                 {member.subscription_end
-                  ? new Date(member.subscription_end).toLocaleDateString("es-AR")
+                  ? new Date(member.subscription_end).toLocaleDateString("es-AR", { timeZone: "UTC" })
                   : "-"}
               </TableCell>
               <TableCell className="text-right">

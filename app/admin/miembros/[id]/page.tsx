@@ -49,6 +49,7 @@ export default async function DetalleMiembroPage({ params }: PageProps) {
                 {member.first_name} {member.last_name}
               </h1>
               <Badge
+                title="Estado administrativo del miembro; independiente del pago de su membresía."
                 variant={
                   member.status === "active"
                     ? "default"
@@ -65,7 +66,7 @@ export default async function DetalleMiembroPage({ params }: PageProps) {
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              ID de Miembro: #{member.id}
+              ID de Miembro: #{member.id} · Estado administrativo
             </p>
           </div>
         </div>
@@ -107,13 +108,13 @@ export default async function DetalleMiembroPage({ params }: PageProps) {
                 {member.plan_name ?? "Sin membresía"}
               </span>
             </div>
-            {member.plan_name && <div className="flex justify-between border-b pb-2"><span className="text-muted-foreground">Pago:</span><Badge variant={member.subscription_payment_status === "paid" ? "default" : "outline"}>{member.subscription_payment_status === "paid" ? "Al día" : member.subscription_payment_status === "pending" ? "Pendiente de pago" : "Sin confirmar"}</Badge></div>}
+            {member.plan_name && <div className="flex justify-between border-b pb-2"><span className="text-muted-foreground">Estado de pago:</span><Badge variant={member.subscription_payment_status === "paid" ? "default" : "outline"}>{member.subscription_payment_status === "paid" ? "Al día" : member.subscription_payment_status === "pending" ? "Pendiente de pago" : "Sin confirmar"}</Badge></div>}
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Inicio:</span>
               <span className="font-medium">
                 {member.subscription_start
                   ? new Date(member.subscription_start).toLocaleDateString(
-                      "es-AR"
+                      "es-AR", { timeZone: "UTC" }
                     )
                   : "-"}
               </span>
@@ -123,7 +124,7 @@ export default async function DetalleMiembroPage({ params }: PageProps) {
               <span className="font-medium">
                 {member.subscription_end
                   ? new Date(member.subscription_end).toLocaleDateString(
-                      "es-AR"
+                      "es-AR", { timeZone: "UTC" }
                     )
                   : "-"}
               </span>
