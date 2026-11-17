@@ -207,36 +207,35 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
         
         {/* 1. Estado del Plan */}
         <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="space-y-3">
+            <span className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Suscripción
             </span>
-            {isFullyActive ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Activa
-              </span>
-            ) : memberData?.payment_status === "pending" ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                <AlertTriangle className="w-3.5 h-3.5" /> Pendiente de pago
-              </span>
-            ) : isSuspended ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">
-                <AlertTriangle className="w-3.5 h-3.5" /> Suspendida
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                <AlertTriangle className="w-3.5 h-3.5" /> Vencida / Sin Plan
-              </span>
-            )}
-          </div>
-
-          <div>
             <h3 className="text-xl font-bold text-foreground">
               {memberData?.plan_name || "Sin Plan Asignado"}
             </h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              {isFullyActive 
-                ? "Tenés acceso completo a las instalaciones" 
+            <div className="flex flex-wrap">
+            {isFullyActive ? (
+              <span className="inline-flex max-w-full items-center gap-1.5 self-start whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Activa
+              </span>
+            ) : memberData?.payment_status === "pending" ? (
+              <span className="inline-flex max-w-full items-center gap-1.5 self-start whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                <AlertTriangle className="w-3.5 h-3.5" /> Pendiente de pago
+              </span>
+            ) : isSuspended ? (
+              <span className="inline-flex max-w-full items-center gap-1.5 self-start whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">
+                <AlertTriangle className="w-3.5 h-3.5" /> Suspendida
+              </span>
+            ) : (
+              <span className="inline-flex max-w-full items-center gap-1.5 self-start whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                <AlertTriangle className="w-3.5 h-3.5" /> Vencida / Sin Plan
+              </span>
+            )}
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {isFullyActive
+                ? "Tenés acceso completo a las instalaciones"
                 : memberData?.payment_status === "pending" ? "Tenés una cuota pendiente. Pagala para habilitar tus entrenamientos." : "Regularizá tu cuota para volver a entrenar"}
             </p>
           </div>
