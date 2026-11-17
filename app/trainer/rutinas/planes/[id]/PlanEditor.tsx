@@ -2,7 +2,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { saveTrainingPlanDraft, publishTrainingPlan, duplicateTrainingPlan, assignTrainingPlan, type PlanDraft, type PlanDay, type PlanBlock, type PlanItem, type Prescription } from "../actions";
+import { saveTrainingPlanDraft, publishTrainingPlan, duplicateTrainingPlan, assignTrainingPlan, type PlanDraft, type PlanDay, type PlanBlock, type PlanItem, type CircuitWeek, type Prescription } from "../actions";
 
 type Plan = { id: number; title: string; durationWeeks: number; status: string; draft: PlanDraft };
 const field = "w-full rounded-lg border bg-background px-3 py-2 text-sm";
@@ -57,6 +57,13 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     updateBlock(di, bi, (b) => ({ ...b, items: b.items.map((x, i) => i === ii ? fn(x) : x) }));
   const updateRx = (di: number, bi: number, ii: number, patch: Partial<Prescription>) =>
     updateItem(di, bi, ii, (x) => ({ ...x, prescriptions: x.prescriptions.map((p, i) => i === week ? { ...p, ...patch } : p) }));
+  const updateCircuit = (di: number, bi: number, patch: Partial<CircuitWeek>) =>
+    updateBlock(di, bi, (block) => {
+      const defaults: CircuitWeek = { rounds: 4, workSeconds: 25, restSeconds: 15, betweenRoundsSeconds: 180, rpe: 9 };
+      const circuitWeeks = Array.from({ length: plan.durationWeeks }, (_, i) =>
+        i === week ? { ...defaults, ...(block.circuitWeeks?.[i] || {}), ...patch } : (block.circuitWeeks?.[i] || defaults));
+      return { ...block, circuitWeeks };
+    });
   const copyPrevious = () => {
     if (week < 1) return;
     if (!window.confirm("¿Copiar los parámetros de la semana " + week + " a la semana " + (week + 1) + "? Se reemplazarán los parámetros actuales de los ejercicios seleccionados.")) return;
@@ -190,6 +197,25 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           </select>
           {editable && <button className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: d.blocks.filter((_, i) => i !== bi) }))}>Eliminar bloque</button>}
         </div>
+        {block.type === "circuit" && <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+          <div><h3 className="font-semibold text-sm">Configuración del circuito · Semana {week + 1}</h3><p className="text-xs text-muted-foreground">Los valores se aplican a todos los ejercicios de este bloque. Cada semana tiene su propia configuración.</p></div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            {([
+              ["rounds", "Vueltas", 1, 100],
+              ["workSeconds", "Trabajo (seg)", 1, 3600],
+              ["restSeconds", "Pausa (seg)", 0, 3600],
+              ["betweenRoundsSeconds", "Entre vueltas (seg)", 0, 7200],
+              ["rpe", "Esfuerzo RPE", 1, 10]
+            ] as const).map(([key, label, min, max]) => {
+              const defaults: CircuitWeek = { rounds: 4, workSeconds: 25, restSeconds: 15, betweenRoundsSeconds: 180, rpe: 9 };
+              return <label key={key} className="text-xs font-medium">{label}
+                <input type="number" min={min} max={max} step={1} disabled={!editable} className={field + " mt-1"} value={block.circuitWeeks?.[week]?.[key] ?? defaults[key]}
+                  onChange={(e) => { const value = Number(e.target.value); if (e.target.value !== "" && Number.isInteger(value) && value >= min && value <= max) updateCircuit(di, bi, { [key]: value }); }}/>
+              </label>;
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">Agregá los ejercicios debajo en el orden de ejecución. Guardá los cambios para conservar la configuración.</p>
+        </div>}
         {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <div key={item.key} className="rounded-xl border-2 border-slate-200 bg-background p-3 space-y-3 shadow-sm dark:border-slate-700">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold text-primary">Ejercicio {ii + 1} · Semana {week + 1}</p>
