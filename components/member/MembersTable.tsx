@@ -105,7 +105,7 @@ export function MembersTable({ members }: { members: Member[] }) {
               </TableCell>
               <TableCell>
                 {member.subscription_end
-                  ? new Date(member.subscription_end).toLocaleDateString("es-AR")
+                  ? new Date(member.subscription_end).toLocaleDateString("es-AR", { timeZone: "UTC" })
                   : "-"}
               </TableCell>
               <TableCell className="text-right">
