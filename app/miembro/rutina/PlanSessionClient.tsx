@@ -88,7 +88,7 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
                       run(() => markPlanExercise(assignmentId, week, day, item.key, next), () => setCompleted(old => next ? [...old.filter(k => k !== item.key), item.key] : old.filter(k => k !== item.key)));
                     }} className="h-5 w-5 accent-emerald-600" />Hecho</label>}
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {block.type !== "circuit" && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {p.sets != null && <div className="rounded-xl border border-border bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Series</p><p className="text-lg font-bold">{p.sets}</p></div>}
                     {p.reps && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Repeticiones</p><p className="text-lg font-bold">{p.reps}</p></div>}
                     {p.durationSeconds != null && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Duración</p><p className="text-lg font-bold">{p.durationSeconds} seg</p></div>}
@@ -96,8 +96,8 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
                     {p.restSeconds != null && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Descanso</p><p className="text-lg font-bold">{p.restSeconds} seg</p></div>}
                     {p.tempo && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Tempo</p><p className="text-lg font-bold">{p.tempo}</p></div>}
                     {p.distanceMeters != null && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Distancia</p><p className="text-lg font-bold">{p.distanceMeters} m</p></div>}
-                  </div>
-                  {status !== "not_started" && Number(p.sets) > 0 && (
+                  </div>}
+                  {block.type !== "circuit" && status !== "not_started" && Number(p.sets) > 0 && (
                     <details className="rounded-xl border p-3">
                       <summary className="cursor-pointer text-sm font-semibold text-primary">Registrar cargas por serie (opcional)</summary>
                       <p className="mt-2 text-xs text-muted-foreground">Podés dejar todos los campos vacíos y marcar el ejercicio como hecho.</p>
