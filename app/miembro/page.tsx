@@ -331,21 +331,21 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
 
         {!isFullyActive ? (
           /* Bloqueo por cuenta suspendida o vencida */
-          <div className="p-6 rounded-xl bg-red-500/5 border border-red-500/20 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-red-500/10 text-red-500 rounded-lg">
-                <Lock className="w-6 h-6" />
+          <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="shrink-0 rounded-lg bg-red-500/10 p-2.5 text-red-500">
+                <Lock className="h-5 w-5" />
               </div>
-              <div>
-                <h4 className="font-bold text-foreground text-sm">Acceso bloqueado a las rutinas</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">
+              <div className="min-w-0 space-y-1 text-left">
+                <h4 className="text-sm font-bold leading-snug text-foreground">Acceso bloqueado a las rutinas</h4>
+                <p className="text-xs leading-relaxed text-muted-foreground">
                   Aboná tu cuota para reactivar tu membresía y visualizar los planes de entrenamiento.
                 </p>
               </div>
             </div>
             <Link
               href="/miembro/membresia"
-              className="px-4 py-2 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors whitespace-nowrap shadow-sm"
+              className="inline-flex w-full shrink-0 items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-red-700 sm:w-auto whitespace-nowrap"
             >
               Pagar Cuota
             </Link>
