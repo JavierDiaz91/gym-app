@@ -97,7 +97,8 @@ export type Prescription = {
   distanceMeters?: number; durationSeconds?: number; pace?: string; notes?: string;
 };
 export type PlanItem = { key: string; title: string; imageUrl?: string; instructions?: string; prescriptions: Prescription[] };
-export type PlanBlock = { title: string; type: "warmup" | "main" | "circuit" | "cooldown" | "custom"; items: PlanItem[] };
+export type CircuitWeek = { rounds: number; workSeconds: number; restSeconds: number; betweenRoundsSeconds: number; rpe?: number };
+export type PlanBlock = { title: string; type: "warmup" | "main" | "circuit" | "cooldown" | "custom"; items: PlanItem[]; circuitWeeks?: CircuitWeek[] };
 export type PlanDay = { title: string; modality: "strength" | "running" | "mixed" | "mobility" | "other"; blocks: PlanBlock[] };
 export type PlanDraft = { days: PlanDay[] };
 
@@ -109,6 +110,15 @@ function validDraft(draft: PlanDraft, weeks: number) {
     Array.isArray(day.blocks) && day.blocks.length <= 20 &&
     day.blocks.every((block) => typeof block.title === "string" && block.title.length <= 150 &&
       ["warmup","main","circuit","cooldown","custom"].includes(block.type) &&
+      (block.circuitWeeks === undefined || (block.type === "circuit" &&
+        Array.isArray(block.circuitWeeks) && block.circuitWeeks.length === weeks &&
+        block.circuitWeeks.every((config) =>
+          config && Number.isInteger(config.rounds) && config.rounds >= 1 && config.rounds <= 100 &&
+          Number.isInteger(config.workSeconds) && config.workSeconds >= 1 && config.workSeconds <= 3600 &&
+          Number.isInteger(config.restSeconds) && config.restSeconds >= 0 && config.restSeconds <= 3600 &&
+          Number.isInteger(config.betweenRoundsSeconds) && config.betweenRoundsSeconds >= 0 && config.betweenRoundsSeconds <= 7200 &&
+          (config.rpe === undefined || (Number.isInteger(config.rpe) && config.rpe >= 1 && config.rpe <= 10))
+        ))) &&
       Array.isArray(block.items) && block.items.length <= 60 &&
       block.items.every((item) =>
         typeof item.key === "string" && item.key.length <= 100 &&
