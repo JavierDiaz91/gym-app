@@ -201,9 +201,9 @@ if (subscription?.access_mode === "entry_pack" && Number.isSafeInteger(Number(su
 
           <div className="flex items-center gap-2">
             {isBlocked ? (
-              <span className="px-3 py-1 bg-red-500/10 text-red-600 border border-red-500/20 rounded-full text-xs font-semibold flex items-center gap-1.5">
+              <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-500">
                 <AlertTriangle className="w-4 h-4" /> 
-                {isSuspended ? "Cuenta suspendida" : "Sin membresía pagada vigente"}
+                {isSuspended ? "Cuenta suspendida" : subscription?.payment_status === "pending" ? "Pendiente de pago" : "Sin membresía pagada vigente"}
               </span>
             ) : (
               <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-full text-xs font-semibold flex items-center gap-1.5">
@@ -215,16 +215,16 @@ if (subscription?.access_mode === "entry_pack" && Number.isSafeInteger(Number(su
 
         {/* Banner de Regularización / Pagar con Mercado Pago */}
         {isBlocked && !isFlexible && subscription?.payment_status === "pending" && !upcoming && (
-          <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-red-500/10 text-red-600 rounded-lg shrink-0">
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="shrink-0 rounded-lg bg-amber-500/10 p-3 text-amber-500">
                 <Lock className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-bold text-foreground text-sm">
+                <h4 className="text-sm font-bold text-foreground">
                   Regularizá tu cuenta para entrenar
                 </h4>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                   Aboná tu cuota mensual para volver a habilitar tu acceso a las rutinas del gimnasio.
                 </p>
               </div>
