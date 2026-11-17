@@ -114,7 +114,7 @@ export default async function DetalleMiembroPage({ params }: PageProps) {
               <span className="font-medium">
                 {member.subscription_start
                   ? new Date(member.subscription_start).toLocaleDateString(
-                      "es-AR"
+                      "es-AR", { timeZone: "UTC" }
                     )
                   : "-"}
               </span>
@@ -124,7 +124,7 @@ export default async function DetalleMiembroPage({ params }: PageProps) {
               <span className="font-medium">
                 {member.subscription_end
                   ? new Date(member.subscription_end).toLocaleDateString(
-                      "es-AR"
+                      "es-AR", { timeZone: "UTC" }
                     )
                   : "-"}
               </span>
