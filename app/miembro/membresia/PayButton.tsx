@@ -58,7 +58,7 @@ export function PayButton({
       onClick={handlePayment}
       disabled={loading || !memberId || !planId || price <= 0}
       size="default"
-      className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+      className="w-full md:w-auto md:shrink-0 whitespace-nowrap bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg gap-2 shadow-xs cursor-pointer disabled:opacity-50"
     >
       {loading ? (
         <>
@@ -69,9 +69,6 @@ export function PayButton({
         <>
           <CreditCard className="w-4 h-4" />
           {label}
-          {price > 0
-            ? ` ($${price.toLocaleString("es-AR")})`
-            : ""}
         </>
       )}
     </Button>
