@@ -221,7 +221,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             <p className="text-xs font-semibold text-primary">Ejercicio {ii + 1} · Semana {week + 1}</p>
             {editable && <button type="button" className="text-xs text-rose-400 hover:underline" onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar ejercicio</button>}
           </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,110px))]">
+          <div className={block.type === "circuit" ? "grid gap-3" : "grid gap-3 lg:grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,110px))]"}>
             <label className="text-xs font-medium text-muted-foreground">Nombre del ejercicio
               <input list={`exercise-catalog-${di}-${bi}-${ii}`} className={field + " mt-1"} disabled={!editable} placeholder="Buscar o escribir ejercicio" value={item.title} onChange={(e) => {
                 const name = e.target.value;
@@ -230,6 +230,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
               }}/>
               <datalist id={`exercise-catalog-${di}-${bi}-${ii}`}>{exercises.map(ex => <option key={ex.id} value={ex.name}/>)}</datalist>
             </label>
+            {block.type !== "circuit" && <>
             <label className="text-xs font-medium text-muted-foreground">Series
               <input aria-label="Series" type="number" min={0} className={field + " mt-1"} disabled={!editable} value={rx.sets ?? ""} onChange={e => updateRx(di,bi,ii,{sets:e.target.value === "" ? undefined : Number(e.target.value)})}/>
             </label>
@@ -242,6 +243,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             <label className="text-xs font-medium text-muted-foreground">Pausa (seg)
               <input aria-label="Pausa en segundos" type="number" min={0} className={field + " mt-1"} disabled={!editable} value={rx.restSeconds ?? ""} onChange={e => updateRx(di,bi,ii,{restSeconds:e.target.value === "" ? undefined : Number(e.target.value)})}/>
             </label>
+            </>}
           </div>
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
             <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Notas técnicas e imagen (opcional)</summary>
