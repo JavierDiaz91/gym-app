@@ -7,7 +7,7 @@ import { startPlanSession, finishPlanSession, markPlanExercise, saveActualSet } 
 type Prescription = { sets?: number; reps?: string; rir?: string; restSeconds?: number; durationSeconds?: number; distanceMeters?: number; tempo?: string; notes?: string };
 type Item = { key: string; title: string; imageUrl?: string; imageVerified?: boolean; instructions?: string; prescriptions: Prescription[] };
 type SetLog = { key: string; setIndex: number; reps: number | null; load: number | null; rir: number | null };
-type Block = { title: string; type?: string; items: Item[] };
+type Block = { title: string; type?: string; items: Item[]; circuitWeeks?: { rounds: number; workSeconds: number; restSeconds: number; betweenRoundsSeconds: number; rpe?: number }[] };
 type Props = { readOnly?: boolean; assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; initialSets: SetLog[]; startedAt?: string | null; finishedAt?: string | null };
 
 export default function PlanSessionClient({ readOnly = false, assignmentId, week, day, title, blocks, status, initialCompleted, initialSets, startedAt, finishedAt }: Props) {
@@ -58,6 +58,22 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
       {blocks.map((block, index) => (
         <section key={index} className="space-y-4">
           <div className="flex items-center gap-3 border-b-2 border-slate-300 pb-3 dark:border-slate-700"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><h3 className="text-lg font-bold">{block.title}</h3></div>
+          {block.type === "circuit" && block.circuitWeeks?.[week - 1] && (() => {
+            const config = block.circuitWeeks[week - 1];
+            return <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-primary">Circuito · Semana {week}</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {[
+                  ["Vueltas", String(config.rounds)],
+                  ["Trabajo", config.workSeconds + " seg"],
+                  ["Descanso", config.restSeconds + " seg"],
+                  ["Entre vueltas", config.betweenRoundsSeconds + " seg"],
+                  ["Esfuerzo", config.rpe ? config.rpe + "/10" : "—"]
+                ].map(([label, value]) => <div key={label} className="rounded-xl bg-background border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="text-lg font-bold">{value}</p></div>)}
+              </div>
+              <p className="text-xs text-muted-foreground">Realizá los ejercicios en el orden indicado y repetí el circuito durante las vueltas configuradas.</p>
+            </div>;
+          })()}
           {block.items.map((item, itemIndex) => {
             const p = item.prescriptions?.[week - 1] || {};
             const checked = completed.includes(item.key);
