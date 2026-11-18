@@ -32,8 +32,8 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
     });
   }
   return (
-    <div className="space-y-7">
-      <section className="rounded-2xl border-2 border-border bg-card p-5 shadow-sm space-y-4">
+    <div className="space-y-5">
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold text-primary uppercase tracking-wide">Semana {week} · Día {day}</p>
@@ -56,23 +56,23 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
       </section>
       {blocks.map((block, index) => (
-        <details key={index} open={index === 0 ? true : undefined} className="group rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-4" >
+        <details key={index} open={index === 0 ? true : undefined} className="group rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-3" >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-2">
-            <span className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span><span className="block text-base font-bold">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? "Circuito" : "Entrenamiento"} · {block.items.length} ejercicios</span></span></span>
+            <span className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span><span className="block text-base font-bold">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? (() => { const cfg = block.circuitWeeks?.[week - 1]; return cfg ? `${cfg.rounds} vueltas · ${cfg.workSeconds}s trabajo · ${cfg.restSeconds}s pausa · ${block.items.length} ejercicios` : `Circuito · ${block.items.length} ejercicios`; })() : `Entrenamiento · ${block.items.length} ejercicios` }</span></span></span>
             <span className="text-xs font-semibold text-primary group-open:hidden">Ver ejercicios +</span><span className="hidden text-xs font-semibold text-primary group-open:inline">Ocultar −</span>
           </summary>
           {block.type === "circuit" && block.circuitWeeks?.[week - 1] && (() => {
             const config = block.circuitWeeks[week - 1];
-            return <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+            return <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2">
               <p className="text-xs font-bold uppercase tracking-wide text-primary">Circuito · Semana {week}</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {[
                   ["Vueltas", String(config.rounds)],
                   ["Trabajo", config.workSeconds + " seg"],
                   ["Descanso", config.restSeconds + " seg"],
                   ["Entre vueltas", config.betweenRoundsSeconds + " seg"],
                   ["Esfuerzo", config.rpe ? config.rpe + "/10" : "—"]
-                ].map(([label, value]) => <div key={label} className="rounded-xl bg-background border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="text-lg font-bold">{value}</p></div>)}
+                ].map(([label, value]) => <div key={label} className="rounded-lg bg-background border p-2"><p className="text-xs text-muted-foreground">{label}</p><p className="text-base font-bold">{value}</p></div>)}
               </div>
               <p className="text-xs text-muted-foreground">Realizá los ejercicios en el orden indicado y repetí el circuito durante las vueltas configuradas.</p>
             </div>;
@@ -81,16 +81,22 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
             const p = item.prescriptions?.[week - 1] || {};
             const checked = completed.includes(item.key);
             return (
-              <article key={item.key || itemIndex} className={`overflow-hidden rounded-2xl border-2 bg-card shadow-md ring-1 ring-border transition-colors ${checked ? "border-emerald-500 dark:border-emerald-400" : "border-border"}`}>
-                {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className="border-b p-3"><details className="group"><summary className="cursor-pointer text-sm font-semibold text-primary">Ver demostración del ejercicio</summary><img src={item.imageUrl} alt={`Demostración verificada de ${item.title}`} loading="lazy" className="mt-3 h-36 w-48 max-w-full rounded-xl border border-slate-300 bg-slate-100 p-2 object-contain grayscale dark:border-slate-600" /></details></div>}
-                <div className="p-4 sm:p-5 space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div><p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p><h4 className="text-lg font-bold text-foreground">{item.title}</h4></div>
-                    {status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-sm font-semibold cursor-pointer"><input type="checkbox" disabled={pending || readOnly || status === "completed"} checked={checked} onChange={e => {
-                      const next = e.target.checked;
-                      run(() => markPlanExercise(assignmentId, week, day, item.key, next), () => setCompleted(old => next ? [...old.filter(k => k !== item.key), item.key] : old.filter(k => k !== item.key)));
-                    }} className="h-5 w-5 accent-emerald-600" />Hecho</label>}
+              <article key={item.key || itemIndex} className={`overflow-hidden rounded-xl border bg-card transition-colors ${checked ? "border-emerald-500 dark:border-emerald-400" : "border-border"}`}>
+                <div className="flex items-center gap-3 p-3 sm:p-4">
+                  {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) ? <img src={item.imageUrl} alt={`Demostración de ${item.title}`} loading="lazy" className="h-16 w-16 shrink-0 rounded-lg border border-border bg-slate-100 object-contain sm:h-20 sm:w-20" /> : <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">Sin imagen</div>}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p>
+                    <h4 className="font-semibold leading-snug">{item.title}</h4>
+                    {block.type !== "circuit" && <p className="mt-1 text-xs text-muted-foreground">{[p.sets ? `${p.sets} series` : null, p.reps ? `${p.reps} reps` : null].filter(Boolean).join(" · ")}</p>}
                   </div>
+                  {status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-xs font-semibold cursor-pointer"><input type="checkbox" disabled={pending || readOnly || status === "completed"} checked={checked} onChange={e => {
+                    const next = e.target.checked;
+                    run(() => markPlanExercise(assignmentId, week, day, item.key, next), () => setCompleted(old => next ? [...old.filter(k => k !== item.key), item.key] : old.filter(k => k !== item.key)));
+                  }} className="h-5 w-5 accent-emerald-600" />Hecho</label>}
+                </div>
+                <details className="group border-t border-border">
+                  <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-primary sm:px-4"><span className="group-open:hidden">Ver indicaciones y detalles +</span><span className="hidden group-open:inline">Ocultar detalles −</span></summary>
+                  <div className="space-y-3 px-3 pb-4 sm:px-4">
                   {block.type !== "circuit" && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {p.sets != null && <div className="rounded-xl border border-border bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Series</p><p className="text-lg font-bold">{p.sets}</p></div>}
                     {p.reps && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Repeticiones</p><p className="text-lg font-bold">{p.reps}</p></div>}
@@ -128,7 +134,8 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
                   {item.instructions && <p className="text-sm leading-relaxed text-muted-foreground"><strong className="text-foreground">Cómo hacerlo:</strong> {item.instructions}</p>}
                   {p.notes && <p className="text-sm text-muted-foreground">{p.notes}</p>}
                   {(!item.imageUrl || item.imageVerified !== true) && <p className="text-xs text-muted-foreground italic">Demostración visual pendiente de verificación por el entrenador.</p>}
-                </div>
+                  </div>
+                </details>
               </article>
             );
           })}
