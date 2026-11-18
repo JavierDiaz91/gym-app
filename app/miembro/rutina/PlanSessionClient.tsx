@@ -56,8 +56,11 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
       </section>
       {blocks.map((block, index) => (
-        <section key={index} className="space-y-4">
-          <div className="flex items-center gap-3 border-b-2 border-slate-300 pb-3 dark:border-slate-700"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><h3 className="text-lg font-bold">{block.title}</h3></div>
+        <details key={index} open={index === 0 ? true : undefined} className="group rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-4" >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-2">
+            <span className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span><span className="block text-base font-bold">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? "Circuito" : "Entrenamiento"} · {block.items.length} ejercicios</span></span></span>
+            <span className="text-xs font-semibold text-primary group-open:hidden">Ver ejercicios +</span><span className="hidden text-xs font-semibold text-primary group-open:inline">Ocultar −</span>
+          </summary>
           {block.type === "circuit" && block.circuitWeeks?.[week - 1] && (() => {
             const config = block.circuitWeeks[week - 1];
             return <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
@@ -129,7 +132,7 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
               </article>
             );
           })}
-        </section>
+        </details>
       ))}
     </div>
   );
