@@ -88,10 +88,10 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     setPreview(null);
     setMessage("Progresión aplicada localmente. Revisá las semanas y presioná Guardar borrador.");
   };
-  function run(fn: () => Promise<{ success: boolean; error?: string; id?: number }>, onSuccess?: (id?: number) => void) {
+  function run(fn: () => Promise<{ success: boolean; error?: string; id?: number }>, onSuccess?: (id?: number) => void, successMessage = "Operación completada") {
     setMessage(""); start(async () => {
       const result = await fn();
-      setMessage(result.success ? "Operación completada" : result.error || "Error");
+      setMessage(result.success ? successMessage : result.error || "Error");
       if (result.success) { onSuccess?.(result.id); router.refresh(); }
     });
   }
@@ -361,7 +361,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       <p className="text-sm text-muted-foreground">Elegí el alumno que va a recibir esta rutina. La asignación no modifica la rutina original.</p>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={personalize} onChange={(e) => { setPersonalize(e.target.checked); setDraft(structuredClone(plan.draft)); }}/> Personalizar ejercicios y cargas para este alumno antes de asignar</label>
       <select aria-label="Alumno" className={field} value={memberId} onChange={(e) => setMemberId(Number(e.target.value))}>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-      <button className={button} disabled={pending || !memberId} onClick={() => run(() => assignTrainingPlan(plan.id, memberId, personalize ? draft : undefined))}>Confirmar asignación</button>
+      <button className={button} disabled={pending || !memberId} onClick={() => run(() => assignTrainingPlan(plan.id, memberId, personalize ? draft : undefined), undefined, `Rutina asignada correctamente a ${members.find(m => m.id === memberId)?.name || "este alumno"}.`)}>Confirmar asignación</button>
     </section>}
   </main>;
 }
