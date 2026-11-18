@@ -75,8 +75,9 @@ export async function createTrainingPlan(input: PlanInput): Promise<{ success: b
     const ids = categoryIds.map(Number);
     const created = await sql`
       WITH inserted AS (
-        INSERT INTO training_plans (gym_id, trainer_id, title, description, duration_weeks)
-        VALUES (${gymId}, ${trainerId}, ${title}, ${description}, ${duration})
+        INSERT INTO training_plans (gym_id, trainer_id, title, description, duration_weeks, draft_jsonb)
+        VALUES (${gymId}, ${trainerId}, ${title}, ${description}, ${duration},
+          '{"days":[{"title":"Día 1","modality":"strength","blocks":[]}]}'::jsonb)
         RETURNING id
       )
       INSERT INTO training_plan_categories (plan_id, category_id)
