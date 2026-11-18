@@ -352,7 +352,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           ["warmup", "Calentamiento", "Entrada en calor"],
           ["cooldown", "Vuelta a la calma", "Vuelta a la calma"]
         ] as const).map(([type, label, title]) =>
-          <button key={type} type="button" className={button + " hover:border-primary"} onClick={() => updateDay(di, d => ({ ...d, blocks: [...d.blocks, { title, type, items: [] }] }))}>+ {label}</button>
+          <button key={type} type="button" className={button + " hover:border-primary"} onClick={() => updateDay(di, d => ({ ...d, blocks: [...d.blocks, { title, type, items: [], ...(type === "circuit" ? { circuitWeeks: Array.from({ length: plan.durationWeeks }, () => ({ rounds: 4, workSeconds: 25, restSeconds: 15, betweenRoundsSeconds: 180, rpe: 9 })) } : {}) }] }))}>+ {label}</button>
         )}
       </div>}
     </section>)}
