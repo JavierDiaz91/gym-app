@@ -33,7 +33,7 @@ function transformWeeks(draft: PlanDraft, fromWeek: number, toWeeks: number[], t
 
 export default function PlanEditor({ plan, members, exercises }: { plan: Plan; members: { id: number; name: string }[]; exercises: { id: number; name: string; imageUrl: string; instructions: string }[] }) {
   const router = useRouter();
-  const [draft, setDraft] = useState<PlanDraft>(plan.draft || { days: [] });
+  const [draft, setDraft] = useState<PlanDraft>(() => plan.status === "draft" && (!plan.draft?.days || plan.draft.days.length === 0) ? { days: [{ title: "Día 1", modality: "strength", blocks: [] }] } : (plan.draft || { days: [] }));
   const [week, setWeek] = useState(0);
   const [selectedDay, setSelectedDay] = useState(0);
   const [memberId, setMemberId] = useState(members[0]?.id || 0);
@@ -174,7 +174,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     {draft.days.length === 0 ? (
       <div role="status" className="rounded-xl border border-dashed border-slate-500/60 bg-slate-900/20 px-5 py-8 text-center dark:bg-slate-900/30">
         <p className="text-base font-semibold">Todavía no agregaste días de entrenamiento</p>
-        <p className="mt-2 text-sm text-muted-foreground">Comenzá creando el primer día de tu planificación. Después vas a poder organizar bloques y ejercicios.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Agregá un día para organizar los ejercicios de esta planificación.</p>
         {editable && <button type="button" className={button + " mt-4 border-primary/60 text-primary dark:text-primary"} onClick={() => { setSelectedDay(0); change({ days: [{ title: "Día 1", modality: "strength", blocks: [] }] }); }}>+ Crear primer día</button>}
       </div>
     ) : <nav aria-label="Seleccionar día de entrenamiento" className="flex flex-wrap gap-2 rounded-xl border border-slate-300 p-3 dark:border-slate-700">
