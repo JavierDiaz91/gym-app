@@ -233,8 +233,8 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
               <span className="block truncate text-sm font-semibold">{ii + 1}. {item.title || "Ejercicio sin nombre"}</span>
               <span className="block text-xs text-muted-foreground">{item.imageUrl ? "Imagen disponible" : "Sin imagen"}{item.instructions ? " · Indicaciones cargadas" : ""}</span>
             </span>
-            <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar +</span>
-            <span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar −</span>
+            <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar ejercicio +</span>
+            <span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Ocultar edición −</span>
           </summary>
           {editable && <div className="absolute right-3 top-5 flex shrink-0 items-center gap-1" aria-label="Ordenar ejercicios">
             <button type="button" aria-label={"Subir " + (item.title || "ejercicio")} title="Subir ejercicio" disabled={ii === 0} className={button + " disabled:cursor-not-allowed disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii - 1], items[ii]] = [items[ii], items[ii - 1]]; return { ...b, items }; })}>↑</button>
@@ -280,7 +280,12 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
               </select>
               <Link href="/trainer/ejercicios" className="inline-block text-xs font-semibold text-primary underline dark:text-primary">+ Crear o administrar mis ejercicios</Link>
               <input aria-label="Ejercicio" placeholder="Ej. Sentadilla o intervalos 400 m" className={field} disabled={!editable} value={item.title} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, title: e.target.value }))}/>
-              <input aria-label="URL de imagen" placeholder="https://... imagen demostrativa" className={field} disabled={!editable} value={item.imageUrl || ""} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, imageUrl: e.target.value }))}/>
+              <details className="rounded-lg border border-slate-300 bg-background p-2 dark:border-slate-700">
+                <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">Opciones avanzadas de imagen</summary>
+                <label className="mt-2 block text-xs text-muted-foreground">Dirección de la imagen (URL)
+                  <input aria-label="URL de imagen" placeholder="https://... imagen demostrativa" className={field + " mt-1"} disabled={!editable} value={item.imageUrl || ""} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, imageUrl: e.target.value }))}/>
+                </label>
+              </details>
               <textarea aria-label="Instrucciones" placeholder="Indicaciones técnicas" className={field} disabled={!editable} value={item.instructions || ""} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, instructions: e.target.value }))}/>
             </div>
             {editable && <button className={button} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar</button>}
