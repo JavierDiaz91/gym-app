@@ -55,6 +55,16 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     updateDay(di, (d) => ({ ...d, blocks: d.blocks.map((b, i) => i === bi ? fn(b) : b) }));
   const updateItem = (di: number, bi: number, ii: number, fn: (item: PlanItem) => PlanItem) =>
     updateBlock(di, bi, (b) => ({ ...b, items: b.items.map((x, i) => i === ii ? fn(x) : x) }));
+  const moveItem = (di: number, fromBlock: number, itemIndex: number, toBlock: number) => {
+    if (fromBlock === toBlock) return;
+    updateDay(di, day => {
+      const blocks = day.blocks.map(block => ({ ...block, items: [...block.items] }));
+      const [item] = blocks[fromBlock].items.splice(itemIndex, 1);
+      if (item) blocks[toBlock].items.push(item);
+      return { ...day, blocks };
+    });
+    setMessage("Ejercicio movido. Guardá los cambios para conservar la nueva ubicación.");
+  };
   const updateRx = (di: number, bi: number, ii: number, patch: Partial<Prescription>) =>
     updateItem(di, bi, ii, (x) => ({ ...x, prescriptions: x.prescriptions.map((p, i) => i === week ? { ...p, ...patch } : p) }));
   const updateCircuit = (di: number, bi: number, patch: Partial<CircuitWeek>) =>
@@ -126,7 +136,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta rutina ya está lista para asignar. Si querés modificarla, duplicala; también podés personalizarla para un alumno sin alterar la original.</p>}
     {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
     <section className="space-y-3 rounded-2xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Seleccionar semana y día">
-      <div className="space-y-1"><h2 className="text-lg font-bold">Tu planificación semanal</h2><p className="text-xs text-muted-foreground">Elegí una semana y un día. Combiná fuerza, calentamiento y circuitos en la misma sesión.</p></div>
+      <div className="space-y-1"><h2 className="text-lg font-bold">Organizá tu rutina</h2><p className="text-sm text-muted-foreground">Elegí un día, agregá bloques y completá los ejercicios. Abrí solo la sección que necesites editar.</p></div>
       <div className="flex flex-wrap gap-2 items-center">
       <span className="text-sm font-semibold">Semana de entrenamiento:</span>
       {Array.from({ length: plan.durationWeeks }, (_, i) => <button key={i} type="button" className={button + (week === i ? " border-primary text-primary" : "")} onClick={() => setWeek(i)}>{i + 1}</button>)}
@@ -170,7 +180,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       </div>}
       </div>
     </details>}
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-bold">Días y ejercicios</h2>{editable && <button type="button" className={button} disabled={draft.days.length >= 7} onClick={() => { setSelectedDay(draft.days.length); change({ days: [...draft.days, { title: "Día " + (draft.days.length + 1), modality: "strength", blocks: [] }] }); }}>+ Agregar día</button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-bold">Días de entrenamiento</h2>{editable && <button type="button" className={button} disabled={draft.days.length >= 7} onClick={() => { setSelectedDay(draft.days.length); change({ days: [...draft.days, { title: "Día " + (draft.days.length + 1), modality: "strength", blocks: [] }] }); }}>+ Agregar día</button>}</div>
     {draft.days.length === 0 ? (
       <div role="status" className="rounded-xl border border-dashed border-slate-500/60 bg-slate-900/20 px-5 py-8 text-center dark:bg-slate-900/30">
         <p className="text-base font-semibold">Todavía no agregaste días de entrenamiento</p>
@@ -186,10 +196,11 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         <input aria-label="Nombre del día" className={field + " max-w-sm font-semibold"} disabled={!editable} value={day.title} onChange={(e) => updateDay(di, (d) => ({ ...d, title: e.target.value }))}/>
         {editable && <button className={button} onClick={() => change({ days: draft.days.filter((_, i) => i !== di) })}>Eliminar día</button>}
       </div>
-      {day.blocks.map((block, bi) => <details key={bi} open={true} className="group rounded-xl border border-slate-300 bg-muted/20 p-3 sm:p-4 dark:border-slate-700">
+      <div className="space-y-1"><h3 className="text-base font-bold">Bloques del entrenamiento</h3><p className="text-xs text-muted-foreground">Cada bloque es independiente. Tocá uno para editarlo; los demás quedan resumidos.</p></div>
+      {day.blocks.map((block, bi) => <details key={bi} className="group rounded-xl border border-slate-300 bg-muted/20 p-3 sm:p-4 dark:border-slate-700">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-1">
-          <span className="min-w-0"><span className="block truncate text-sm font-semibold">{block.title || "Bloque sin nombre"}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? "Circuito temporizado" : "Bloque de entrenamiento"} · {block.items.length} ejercicios</span></span>
-          <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Abrir +</span><span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Contraer −</span>
+          <span className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">{bi + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold">{block.title || "Bloque sin nombre"}</span><span className="block text-xs text-muted-foreground">{({warmup:"Entrada en calor",main:"Fuerza / principal",circuit:"Circuito temporizado",cooldown:"Vuelta a la calma",custom:"Otro bloque"} as Record<string,string>)[block.type] || "Entrenamiento"} · {block.items.length} {block.items.length === 1 ? "ejercicio" : "ejercicios"}{block.items.length === 0 ? " · Pendiente" : ""}</span></span></span>
+          <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar bloque +</span><span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar bloque −</span>
         </summary>
         <div className="mt-3 space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-slate-700">
@@ -197,7 +208,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           <select aria-label="Tipo de bloque" disabled={!editable} className={field + " max-w-44"} value={block.type} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, type: e.target.value as PlanBlock["type"] }))}>
             {["warmup","main","circuit","cooldown","custom"].map((x) => <option key={x} value={x}>{({warmup:"Entrada en calor",main:"Principal",circuit:"Circuito",cooldown:"Vuelta a la calma",custom:"Otro"} as Record<string,string>)[x]}</option>)}
           </select>
-          {editable && <button className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: d.blocks.filter((_, i) => i !== bi) }))}>Eliminar bloque</button>}
+          {editable && <button className={button + " text-rose-400"} onClick={() => { if (window.confirm("¿Eliminar este bloque y todos sus ejercicios?")) updateDay(di, (d) => ({ ...d, blocks: d.blocks.filter((_, i) => i !== bi) })); }}>Eliminar bloque</button>}
         </div>
         {block.type === "circuit" && <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
           <div><h3 className="font-semibold text-sm">Configuración del circuito · Semana {week + 1}</h3><p className="text-xs text-muted-foreground">Los valores se aplican a todos los ejercicios de este bloque. Cada semana tiene su propia configuración.</p></div>
@@ -245,6 +256,11 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             <p className="text-xs font-semibold text-primary">Ejercicio {ii + 1} · Semana {week + 1}</p>
             {editable && <button type="button" className="text-xs text-rose-400 hover:underline" onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar ejercicio</button>}
           </div>
+          {editable && day.blocks.length > 1 && <label className="block text-xs font-medium text-muted-foreground">Mover ejercicio a otro bloque
+            <select aria-label={"Mover " + (item.title || "ejercicio") + " a otro bloque"} className={field + " mt-1"} value={bi} onChange={e => moveItem(di, bi, ii, Number(e.target.value))}>
+              {day.blocks.map((target, targetIndex) => <option key={targetIndex} value={targetIndex}>{targetIndex + 1}. {target.title || "Bloque sin nombre"}{targetIndex === bi ? " (actual)" : ""}</option>)}
+            </select>
+          </label>}
           <div className={block.type === "circuit" ? "grid gap-3" : "grid gap-3 lg:grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,110px))]"}>
             <label className="text-xs font-medium text-muted-foreground">Nombre del ejercicio
               <input list={`exercise-catalog-${di}-${bi}-${ii}`} className={field + " mt-1"} disabled={!editable} placeholder="Buscar o escribir ejercicio" value={item.title} onChange={(e) => {
@@ -345,7 +361,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         </div>
       </details>)}
       {editable && <div className="flex flex-wrap gap-2 rounded-xl border border-dashed border-primary/40 p-3">
-        <span className="w-full text-sm font-semibold">Agregar al {day.title}</span>
+        <span className="w-full text-sm font-semibold">Agregar un bloque nuevo</span><p className="w-full text-xs text-muted-foreground">Elegí el tipo de sección. Abrila para ponerle nombre y agregar ejercicios.</p>
         {([
           ["main", "Fuerza", "Bloque de fuerza"],
           ["circuit", "Circuito", "Circuito temporizado"],
