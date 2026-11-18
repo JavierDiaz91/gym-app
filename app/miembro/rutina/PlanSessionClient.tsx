@@ -94,8 +94,8 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
                     run(() => markPlanExercise(assignmentId, week, day, item.key, next), () => setCompleted(old => next ? [...old.filter(k => k !== item.key), item.key] : old.filter(k => k !== item.key)));
                   }} className="h-5 w-5 accent-emerald-600" />Hecho</label>}
                 </div>
-                <details className="group border-t border-border">
-                  <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-primary sm:px-4"><span className="group-open:hidden">Ver indicaciones y detalles +</span><span className="hidden group-open:inline">Ocultar detalles −</span></summary>
+                <details className="group/exercise border-t border-border">
+                  <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-primary sm:px-4"><span className="group-open/exercise:hidden">Ver indicaciones y detalles +</span><span className="hidden group-open/exercise:inline">Ocultar detalles −</span></summary>
                   <div className="space-y-3 px-3 pb-4 sm:px-4">
                   {block.type !== "circuit" && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {p.sets != null && <div className="rounded-xl border border-border bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Series</p><p className="text-lg font-bold">{p.sets}</p></div>}
