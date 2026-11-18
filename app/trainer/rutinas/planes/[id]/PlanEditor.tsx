@@ -126,9 +126,9 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta rutina ya está lista para asignar. Si querés modificarla, duplicala; también podés personalizarla para un alumno sin alterar la original.</p>}
     {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
     <section className="space-y-3 rounded-2xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Seleccionar semana y día">
-      <div className="space-y-1"><h2 className="text-base font-bold">Paso 2 · Organizá los entrenamientos</h2><p className="text-xs text-muted-foreground">Trabajá sobre un día a la vez. Cada semana conserva sus propias cargas.</p></div>
+      <div className="space-y-1"><h2 className="text-lg font-bold">Tu planificación semanal</h2><p className="text-xs text-muted-foreground">Elegí una semana y un día. Combiná fuerza, calentamiento y circuitos en la misma sesión.</p></div>
       <div className="flex flex-wrap gap-2 items-center">
-      <span className="text-sm font-semibold">Semana:</span>
+      <span className="text-sm font-semibold">Semana de entrenamiento:</span>
       {Array.from({ length: plan.durationWeeks }, (_, i) => <button key={i} type="button" className={button + (week === i ? " border-primary text-primary" : "")} onClick={() => setWeek(i)}>{i + 1}</button>)}
     </div>
     {editable && <details className="rounded-xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Progresión semanal avanzada">
@@ -214,6 +214,14 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
               </label>;
             })}
           </div>
+          {editable && plan.durationWeeks > 1 && <button type="button" className={button + " text-xs"} onClick={() => {
+            if (!window.confirm("¿Copiar los tiempos y vueltas de la semana " + (week + 1) + " a las demás semanas de este circuito? Se reemplazarán sus valores actuales.")) return;
+            updateBlock(di, bi, b => {
+              const defaults: CircuitWeek = { rounds: 4, workSeconds: 25, restSeconds: 15, betweenRoundsSeconds: 180, rpe: 9 };
+              const source = { ...defaults, ...(b.circuitWeeks?.[week] || {}) };
+              return { ...b, circuitWeeks: Array.from({ length: plan.durationWeeks }, () => ({ ...source })) };
+            });
+          }}>Copiar configuración a las demás semanas</button>}
           <p className="text-xs text-muted-foreground">Agregá los ejercicios debajo en el orden de ejecución. Guardá los cambios para conservar la configuración.</p>
         </div>}
         {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <div key={item.key} className="rounded-xl border-2 border-slate-200 bg-background p-3 space-y-3 shadow-sm dark:border-slate-700">
@@ -302,9 +310,29 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           </div>
           </details>
         </div>; })}
-        {editable && <button type="button" className={button + " border-primary/50 text-primary dark:text-primary"} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio / intervalo</button>}
+        {editable && <div className="flex flex-wrap gap-2 items-center">
+          <button type="button" className={button + " border-primary/50 text-primary"} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio</button>
+          {exercises.length > 0 && <select aria-label="Agregar ejercicio desde mi biblioteca" className={field + " max-w-xs"} value="" onChange={(e) => {
+            const ex = exercises.find(x => x.id === Number(e.target.value));
+            if (!ex) return;
+            updateBlock(di, bi, b => ({ ...b, items: [...b.items, { ...blank(plan.durationWeeks), title: ex.name, imageUrl: ex.imageUrl, instructions: ex.instructions }] }));
+          }}>
+            <option value="">+ Desde Mis Ejercicios...</option>
+            {exercises.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+          </select>}
+        </div>}
       </div>)}
-      {editable && <button type="button" className={button} onClick={() => updateDay(di, (d) => ({ ...d, blocks: [...d.blocks, { title: "Bloque principal", type: "main", items: [] }] }))}>+ Agregar bloque</button>}
+      {editable && <div className="flex flex-wrap gap-2 rounded-xl border border-dashed border-primary/40 p-3">
+        <span className="w-full text-sm font-semibold">Agregar al {day.title}</span>
+        {([
+          ["main", "Fuerza", "Bloque de fuerza"],
+          ["circuit", "Circuito", "Circuito temporizado"],
+          ["warmup", "Calentamiento", "Entrada en calor"],
+          ["cooldown", "Vuelta a la calma", "Vuelta a la calma"]
+        ] as const).map(([type, label, title]) =>
+          <button key={type} type="button" className={button + " hover:border-primary"} onClick={() => updateDay(di, d => ({ ...d, blocks: [...d.blocks, { title, type, items: [] }] }))}>+ {label}</button>
+        )}
+      </div>}
     </section>)}
     {plan.status === "published" && <section id="asignar-alumno" className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-3">
       <p className="text-xs font-bold uppercase tracking-wider text-primary">Paso 3 de 3</p><h2 className="text-lg font-bold">Asignar a alumnos</h2>
