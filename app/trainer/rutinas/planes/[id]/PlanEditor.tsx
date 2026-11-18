@@ -227,7 +227,8 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           <p className="text-xs text-muted-foreground">Agregá los ejercicios debajo en el orden de ejecución. Guardá los cambios para conservar la configuración.</p>
         </div>}
         {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <details key={item.key} className="group rounded-xl border border-slate-300 bg-background p-3 shadow-sm dark:border-slate-700">
-          <summary className="flex cursor-pointer list-none items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+          <summary className="flex min-w-0 flex-1 cursor-pointer list-none items-center gap-3">
             {item.imageUrl ? <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 bg-slate-100 object-contain dark:border-slate-700" /> : <span aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">Sin imagen</span>}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{ii + 1}. {item.title || "Ejercicio sin nombre"}</span>
@@ -236,13 +237,14 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar +</span>
             <span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar −</span>
           </summary>
+          {editable && <div className="flex shrink-0 items-center gap-1" aria-label="Ordenar ejercicios">
+            <button type="button" aria-label={"Subir " + (item.title || "ejercicio")} title="Subir ejercicio" disabled={ii === 0} className={button + " disabled:cursor-not-allowed disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii - 1], items[ii]] = [items[ii], items[ii - 1]]; return { ...b, items }; })}>↑</button>
+            <button type="button" aria-label={"Bajar " + (item.title || "ejercicio")} title="Bajar ejercicio" disabled={ii === block.items.length - 1} className={button + " disabled:cursor-not-allowed disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii], items[ii + 1]] = [items[ii + 1], items[ii]]; return { ...b, items }; })}>↓</button>
+          </div>}
+          </div>
           <div className="mt-4 space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold text-primary">Ejercicio {ii + 1} · Semana {week + 1}</p>
-            {editable && <div className="flex items-center gap-2">
-              <button type="button" aria-label={"Subir " + (item.title || "ejercicio")} title="Subir ejercicio" disabled={ii === 0} className={button + " disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii - 1], items[ii]] = [items[ii], items[ii - 1]]; return { ...b, items }; })}>↑</button>
-              <button type="button" aria-label={"Bajar " + (item.title || "ejercicio")} title="Bajar ejercicio" disabled={ii === block.items.length - 1} className={button + " disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii], items[ii + 1]] = [items[ii + 1], items[ii]]; return { ...b, items }; })}>↓</button>
-            </div>}
             {editable && <button type="button" className="text-xs text-rose-400 hover:underline" onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar ejercicio</button>}
           </div>
           <div className={block.type === "circuit" ? "grid gap-3" : "grid gap-3 lg:grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,110px))]"}>
