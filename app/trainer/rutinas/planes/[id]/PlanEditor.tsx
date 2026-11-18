@@ -184,9 +184,6 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     {draft.days.map((day, di) => selectedDay !== di ? null : <section key={di} className="rounded-2xl border border-slate-300 bg-muted/5 p-4 space-y-5 dark:border-slate-700">
       <div className="flex flex-wrap gap-2 items-center">
         <input aria-label="Nombre del día" className={field + " max-w-sm font-semibold"} disabled={!editable} value={day.title} onChange={(e) => updateDay(di, (d) => ({ ...d, title: e.target.value }))}/>
-        <select aria-label="Modalidad" disabled={!editable} className={field + " max-w-40"} value={day.modality} onChange={(e) => updateDay(di, (d) => ({ ...d, modality: e.target.value as PlanDay["modality"] }))}>
-          {["strength","running","mixed","mobility","other"].map((x) => <option key={x} value={x}>{({strength:"Fuerza",running:"Running",mixed:"Mixto",mobility:"Movilidad",other:"Otro"} as Record<string,string>)[x]}</option>)}
-        </select>
         {editable && <button className={button} onClick={() => change({ days: draft.days.filter((_, i) => i !== di) })}>Eliminar día</button>}
       </div>
       {day.blocks.map((block, bi) => <div key={bi} className="rounded-xl border border-slate-300 bg-muted/20 p-3 sm:p-4 space-y-3 dark:border-slate-700">
@@ -224,8 +221,18 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           }}>Copiar configuración a las demás semanas</button>}
           <p className="text-xs text-muted-foreground">Agregá los ejercicios debajo en el orden de ejecución. Guardá los cambios para conservar la configuración.</p>
         </div>}
-        {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <div key={item.key} className="rounded-xl border-2 border-slate-200 bg-background p-3 space-y-3 shadow-sm dark:border-slate-700">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <details key={item.key} className="group rounded-xl border border-slate-300 bg-background p-3 shadow-sm dark:border-slate-700">
+          <summary className="flex cursor-pointer list-none items-center gap-3">
+            {item.imageUrl ? <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 bg-slate-100 object-contain dark:border-slate-700" /> : <span aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">Sin imagen</span>}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">{ii + 1}. {item.title || "Ejercicio sin nombre"}</span>
+              <span className="block text-xs text-muted-foreground">{item.imageUrl ? "Imagen disponible" : "Sin imagen"}{item.instructions ? " · Indicaciones cargadas" : ""}</span>
+            </span>
+            <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar +</span>
+            <span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar −</span>
+          </summary>
+          <div className="mt-4 space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+          <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold text-primary">Ejercicio {ii + 1} · Semana {week + 1}</p>
             {editable && <button type="button" className="text-xs text-rose-400 hover:underline" onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar ejercicio</button>}
           </div>
@@ -272,7 +279,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           </div>
             </div>
           </details>
-          <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
+          {block.type !== "circuit" && <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
             <summary className="cursor-pointer text-sm font-semibold">Configuración avanzada por semanas <span className="font-normal text-muted-foreground">· {plan.durationWeeks} semanas · Opcional</span></summary>
           <div className="mt-3 space-y-3">
             <p className="text-xs text-muted-foreground">Editá directamente cada celda para configurar las cargas por semana. Los cambios quedan en el borrador hasta guardar.</p>
@@ -308,8 +315,9 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
               </div>
             </details>
           </div>
-          </details>
-        </div>; })}
+          </details>}
+          </div>
+        </details>; })}
         {editable && <div className="flex flex-wrap gap-2 items-center">
           <button type="button" className={button + " border-primary/50 text-primary"} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio</button>
           {exercises.length > 0 && <select aria-label="Agregar ejercicio desde mi biblioteca" className={field + " max-w-xs"} value="" onChange={(e) => {
