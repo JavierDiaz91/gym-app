@@ -226,9 +226,8 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           }}>Copiar configuración a las demás semanas</button>}
           <p className="text-xs text-muted-foreground">Agregá los ejercicios debajo en el orden de ejecución. Guardá los cambios para conservar la configuración.</p>
         </div>}
-        {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <details key={item.key} className="group rounded-xl border border-slate-300 bg-background p-3 shadow-sm dark:border-slate-700">
-          <div className="flex flex-wrap items-center gap-2">
-          <summary className="flex min-w-0 flex-1 cursor-pointer list-none items-center gap-3">
+        {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <details key={item.key} className="group relative rounded-xl border border-slate-300 bg-background p-3 shadow-sm dark:border-slate-700">
+          <summary className="flex min-w-0 cursor-pointer list-none items-center gap-3 pr-20">
             {item.imageUrl ? <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 bg-slate-100 object-contain dark:border-slate-700" /> : <span aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">Sin imagen</span>}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{ii + 1}. {item.title || "Ejercicio sin nombre"}</span>
@@ -237,11 +236,10 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar +</span>
             <span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar −</span>
           </summary>
-          {editable && <div className="flex shrink-0 items-center gap-1" aria-label="Ordenar ejercicios">
+          {editable && <div className="absolute right-3 top-5 flex shrink-0 items-center gap-1" aria-label="Ordenar ejercicios">
             <button type="button" aria-label={"Subir " + (item.title || "ejercicio")} title="Subir ejercicio" disabled={ii === 0} className={button + " disabled:cursor-not-allowed disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii - 1], items[ii]] = [items[ii], items[ii - 1]]; return { ...b, items }; })}>↑</button>
             <button type="button" aria-label={"Bajar " + (item.title || "ejercicio")} title="Bajar ejercicio" disabled={ii === block.items.length - 1} className={button + " disabled:cursor-not-allowed disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii], items[ii + 1]] = [items[ii + 1], items[ii]]; return { ...b, items }; })}>↓</button>
           </div>}
-          </div>
           <div className="mt-4 space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold text-primary">Ejercicio {ii + 1} · Semana {week + 1}</p>
@@ -275,7 +273,6 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Notas técnicas e imagen (opcional)</summary>
             <div className="mt-3">
           <div className="flex flex-wrap gap-2 items-start">
-            {item.imageUrl && <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-300 bg-slate-100 p-2 dark:border-slate-600"><img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-full w-full object-contain grayscale" /></div>}
             <div className="flex-1 space-y-2">
               <select aria-label="Seleccionar ejercicio del catálogo" className={field} disabled={!editable} value="" onChange={(e) => { const ex = exercises.find((x) => x.id === Number(e.target.value)); if (!ex) return; updateItem(di, bi, ii, (current) => ({ ...current, title: ex.name, imageUrl: ex.imageUrl, instructions: ex.instructions, prescriptions: current.prescriptions })); setPreview(null); setMessage("Ejercicio seleccionado. Se conservaron las cargas de todas las semanas; guardá el borrador para confirmar el cambio."); }}>
                 <option value="">Elegir de Mis Ejercicios (biblioteca personal)</option>
