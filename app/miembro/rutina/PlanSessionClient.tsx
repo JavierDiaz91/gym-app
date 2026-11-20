@@ -8,10 +8,12 @@ type Prescription = { sets?: number; reps?: string; rir?: string; restSeconds?: 
 type Item = { key: string; title: string; imageUrl?: string; imageVerified?: boolean; instructions?: string; prescriptions: Prescription[] };
 type SetLog = { key: string; setIndex: number; reps: number | null; load: number | null; rir: number | null };
 type Block = { title: string; type?: string; strengthMode?: "individual" | "biserie" | "triserie"; betweenSetsRestMinSeconds?: number; betweenSetsRestMaxSeconds?: number; items: Item[]; circuitWeeks?: { rounds: number; workSeconds: number; restSeconds: number; betweenRoundsSeconds: number; rpe?: number }[] };
-type Props = { readOnly?: boolean; assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; initialSets: SetLog[]; startedAt?: string | null; finishedAt?: string | null };
+type Props = { durationWeeks?: number; planUrl?: string; readOnly?: boolean; assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; initialSets: SetLog[]; startedAt?: string | null; finishedAt?: string | null };
 
-export default function PlanSessionClient({ readOnly = false, assignmentId, week, day, title, blocks, status, initialCompleted, initialSets, startedAt, finishedAt }: Props) {
+export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly = false, assignmentId, week, day, title, blocks, status, initialCompleted, initialSets, startedAt, finishedAt }: Props) {
   const router = useRouter();
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [pending, transition] = useTransition();
   const [error, setError] = useState("");
   const [completed, setCompleted] = useState<string[]>(initialCompleted);
@@ -21,6 +23,11 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
   const restLabel = (seconds: number) => seconds % 60 === 0 ? `${seconds / 60} min` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
   const total = blocks.reduce((n, b) => n + b.items.length, 0);
   const done = blocks.reduce((n, b) => n + b.items.filter(i => completed.includes(i.key)).length, 0);
+  function changeWeek(target: number) {
+    if (!planUrl || target < 1 || target > durationWeeks || target === week) return;
+    if (dirtySeries.length && !window.confirm("Tenés series con cambios sin guardar. ¿Cambiar de semana y descartarlos?")) return;
+    router.push(`${planUrl}&week=${target}&day=${day}`);
+  }
   function run(action: () => Promise<{success:boolean;error?:string}>, after?: () => void) {
     setError("");
     transition(async () => {
@@ -34,6 +41,23 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
   }
   return (
     <div className="space-y-5">
+      {planUrl && durationWeeks > 1 && <nav aria-label="Semanas del entrenamiento" className="rounded-2xl border border-primary/20 bg-card p-3 sm:p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2"><p className="text-xs font-bold uppercase tracking-widest text-primary">Mi entrenamiento</p><span className="text-xs text-muted-foreground">Deslizá para cambiar de semana</span></div>
+        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "thin" }}>
+          {Array.from({ length: durationWeeks }, (_, i) => i + 1).map(n => <button type="button" key={n} aria-current={n === week ? "page" : undefined} onClick={() => changeWeek(n)} className={`min-w-16 flex-1 rounded-xl border px-3 py-3 text-center transition-colors ${n === week ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-muted/40 hover:border-primary/50"}`}><span className="block text-[10px] font-semibold uppercase opacity-80">Semana</span><span className="block text-xl font-black">{n}</span></button>)}
+        </div>
+        <div className="flex items-center justify-between gap-2"><button type="button" onClick={() => changeWeek(week - 1)} disabled={week <= 1} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-30">← Anterior</button><span className="text-sm font-semibold">Semana {week} de {durationWeeks}</span><button type="button" onClick={() => changeWeek(week + 1)} disabled={week >= durationWeeks} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-30">Siguiente →</button></div>
+      </nav>}
+      <div className="rounded-3xl border border-primary/20 bg-muted/10 p-3 sm:p-5 space-y-5"
+        onTouchStart={e => { setTouchStartX(e.touches[0]?.clientX ?? null); setTouchStartY(e.touches[0]?.clientY ?? null); }}
+        onTouchEnd={e => {
+          if (touchStartX === null || touchStartY === null) return;
+          const deltaX = (e.changedTouches[0]?.clientX ?? touchStartX) - touchStartX;
+          const deltaY = (e.changedTouches[0]?.clientY ?? touchStartY) - touchStartY;
+          if (Math.abs(deltaX) > 85 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) changeWeek(week + (deltaX < 0 ? 1 : -1));
+          setTouchStartX(null); setTouchStartY(null);
+        }}>
+        <div className="flex items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-widest text-primary">Semana {week}</p><h2 className="text-lg font-extrabold">Tu rutina de entrenamiento</h2></div><span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{blocks.filter(b => b.items.length).length} bloques</span></div>
       <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -56,7 +80,7 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
         {!readOnly && status === "in_progress" && dirtySeries.length > 0 && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">Tenés {dirtySeries.length} serie(s) con cambios sin guardar. Guardalas antes de finalizar para conservar sus valores.</p>}
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
       </section>
-      {blocks.map((block, index) => (
+      {blocks.filter(block => block.items.length > 0).map((block, index) => (
         <details key={index} open={index === 0 ? true : undefined} className="group rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-3" >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-2">
             <span className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span><span className="block text-base font-bold">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? (() => { const cfg = block.circuitWeeks?.[week - 1]; return cfg ? `${cfg.rounds} vueltas · ${cfg.workSeconds}s trabajo · ${cfg.restSeconds}s pausa · ${block.items.length} ejercicios` : `Circuito · ${block.items.length} ejercicios`; })() : block.type === "main" && (block.strengthMode === "triserie" || block.strengthMode === "biserie") ? `${block.strengthMode === "triserie" ? "Triserie" : "Biserie"} · ${block.items.length} ejercicios en secuencia` : `Entrenamiento · ${block.items.length} ejercicios` }</span></span></span>
@@ -112,13 +136,14 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
             const p = item.prescriptions?.[week - 1] || {};
             const checked = completed.includes(item.key);
             return (
-              <article key={item.key || itemIndex} className={`overflow-hidden rounded-xl border bg-card transition-colors ${checked ? "border-emerald-500 dark:border-emerald-400" : "border-border"}`}>
+              <article key={item.key || itemIndex} className={`overflow-hidden rounded-2xl border bg-card shadow-sm transition-colors ${checked ? "border-emerald-500 dark:border-emerald-400" : "border-border"}`}>
+                {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) ? <div className="flex h-52 w-full items-center justify-center bg-muted/40 sm:h-72"><img src={item.imageUrl} alt={`Demostración de ${item.title}`} loading="lazy" className="h-full w-full object-contain" /></div> : <div className="flex h-28 w-full flex-col items-center justify-center gap-2 bg-muted/40 text-muted-foreground"><span aria-hidden="true" className="text-3xl">▧</span><span className="text-xs font-medium">Imagen pendiente del entrenador</span></div>}
                 <div className="flex items-center gap-3 p-3 sm:p-4">
-                  {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) ? <img src={item.imageUrl} alt={`Demostración de ${item.title}`} loading="lazy" className="h-16 w-16 shrink-0 rounded-lg border border-border bg-slate-100 object-contain sm:h-20 sm:w-20" /> : <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">Sin imagen</div>}
+                  
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p>
                     <h4 className="font-semibold leading-snug">{item.title}</h4>
-                    {block.type !== "circuit" && <p className="mt-1 text-xs text-muted-foreground">{[p.sets ? `${p.sets} series` : null, p.reps ? `${p.reps} reps` : null].filter(Boolean).join(" · ")}</p>}
+                    {block.type !== "circuit" && <div className="mt-2 flex flex-wrap gap-2">{[p.sets ? `${p.sets} series` : null, p.reps ? `${p.reps} reps` : null, p.rir ? `RIR ${p.rir}` : null].filter(Boolean).map(value => <span key={value} className="rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">{value}</span>)}</div>}
                   </div>
                   {status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-xs font-semibold cursor-pointer"><input type="checkbox" disabled={pending || readOnly || status === "completed"} checked={checked} onChange={e => {
                     const next = e.target.checked;
@@ -172,6 +197,7 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
           })}
         </details>
       ))}
+      </div>
     </div>
   );
 }
