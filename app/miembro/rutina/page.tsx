@@ -104,12 +104,12 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
       rir: row.actual_rir == null ? null : Number(row.actual_rir),
     }));
     return (
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
-        <Link href="/miembro" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft className="w-4 h-4" /> Volver al panel</Link>
+      <div className="mx-auto max-w-4xl space-y-3 px-3 py-4 sm:space-y-5 sm:p-6">
+        <Link href="/miembro" className="inline-flex items-center gap-2 text-xs text-primary sm:text-sm"><ArrowLeft className="w-4 h-4" /> Volver al panel</Link>
         <div>
           <p className="text-xs font-semibold text-primary">Plan de entrenamiento · {duration} semanas</p>
-          <h1 className="text-2xl font-bold">{String(assignments[0].title || "Mi plan de entrenamiento")}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Inicio: {startDate} · Duración: {duration} semanas · {currentWeek ? `Semana vigente: ${currentWeek}` : elapsedDays < 0 ? 'Plan programado' : 'Plan vencido'}</p>
+          <h1 className="text-xl font-bold leading-tight sm:text-2xl">{String(assignments[0].title || "Mi plan de entrenamiento")}</h1>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Inicio: {startDate} · {currentWeek ? `Semana vigente: ${currentWeek}` : elapsedDays < 0 ? 'Plan programado' : 'Plan vencido'}</p>
         </div>
         <section className="space-y-2">
           <h2 className="font-semibold">Días de entrenamiento</h2>
@@ -117,13 +117,13 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
             {days.map((d, index) => (
               <Link key={index} href={`${planUrl}&week=${week}&day=${index + 1}`}
                 aria-current={index + 1 === day ? "page" : undefined}
-                className={`px-4 py-2 rounded-lg border text-sm ${index + 1 === day ? "bg-primary text-primary-foreground" : "bg-card"}`}>
+                className={`px-3 py-1.5 rounded-lg border text-xs sm:text-sm ${index + 1 === day ? "bg-primary text-primary-foreground" : "bg-card"}`}>
                 Día {index + 1}: {d.title}
               </Link>
             ))}
           </div>
         </section>
-        {!canEditWeek && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">{elapsedDays < (week - 1) * 7 ? 'Esta semana todavía no comenzó. Podés consultar los ejercicios, pero no registrar actividad.' : 'Esta semana ya venció. Podés consultar los ejercicios y las cargas guardadas, pero no modificarla.'}</p>}
+        {!canEditWeek && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs sm:text-sm">{elapsedDays < (week - 1) * 7 ? 'Esta semana todavía no comenzó. Podés consultar los ejercicios, pero no registrar actividad.' : 'Esta semana ya venció. Podés consultar los ejercicios y las cargas guardadas, pero no modificarla.'}</p>}
         {selectedDay ? (
           <PlanSessionClient
             key={`${planAssignmentId}-${week}-${day}`}
