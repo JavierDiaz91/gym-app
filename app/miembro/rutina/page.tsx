@@ -112,18 +112,6 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
           <p className="mt-2 text-sm text-muted-foreground">Inicio: {startDate} · Duración: {duration} semanas · {currentWeek ? `Semana vigente: ${currentWeek}` : elapsedDays < 0 ? 'Plan programado' : 'Plan vencido'}</p>
         </div>
         <section className="space-y-2">
-          <h2 className="font-semibold">Seleccionar semana</h2>
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: duration }, (_, index) => index + 1).map((n) => (
-              <Link key={n} href={`${planUrl}&week=${n}&day=${day}`}
-                aria-current={n === week ? "page" : undefined}
-                className={`px-4 py-2 rounded-lg border text-sm ${n === week ? "bg-primary text-primary-foreground" : "bg-card"}`}>
-                Semana {n} · {weekState(n)}
-              </Link>
-            ))}
-          </div>
-        </section>
-        <section className="space-y-2">
           <h2 className="font-semibold">Días de entrenamiento</h2>
           <div className="flex flex-wrap gap-2">
             {days.map((d, index) => (
@@ -139,7 +127,7 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
         {selectedDay ? (
           <PlanSessionClient
             key={`${planAssignmentId}-${week}-${day}`}
-            assignmentId={planAssignmentId} week={week} day={day} readOnly={!canEditWeek}
+            assignmentId={planAssignmentId} week={week} day={day} durationWeeks={duration} planUrl={planUrl} readOnly={!canEditWeek}
             title={selectedDay.title} blocks={verifiedBlocks}
             status={String(workoutSession?.status || "not_started")}
             initialCompleted={completedRows.map((r) => String(r.item_snapshot_key))}
