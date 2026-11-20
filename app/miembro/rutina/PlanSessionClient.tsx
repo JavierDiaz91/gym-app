@@ -81,8 +81,8 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
       </section>
       {blocks.filter(block => block.items.length > 0).map((block, index) => (
-        <details key={index} open={index === 0 ? true : undefined} className="group min-w-0 space-y-2 rounded-xl border border-border bg-card p-2.5 sm:space-y-3 sm:rounded-2xl sm:p-4" >
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-2 sm:gap-3">
+        <details key={index} open={index === 0 ? true : undefined} className="group min-w-0 space-y-2 rounded-xl border border-border bg-card p-2 sm:space-y-3 sm:rounded-2xl sm:p-4" >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 sm:gap-3">
             <span className="flex min-w-0 items-center gap-2 sm:gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span className="min-w-0"><span className="block text-sm font-bold leading-snug sm:text-base">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? (() => { const cfg = block.circuitWeeks?.[week - 1]; return cfg ? `${cfg.rounds} vueltas · ${cfg.workSeconds}s trabajo · ${cfg.restSeconds}s pausa · ${block.items.length} ejercicios` : `Circuito · ${block.items.length} ejercicios`; })() : block.type === "main" && (block.strengthMode === "triserie" || block.strengthMode === "biserie") ? `${block.strengthMode === "triserie" ? "Triserie" : "Biserie"} · ${block.items.length} ejercicios en secuencia` : `Entrenamiento · ${block.items.length} ejercicios` }</span></span></span>
             <span className="shrink-0 text-[11px] font-semibold text-primary group-open:hidden sm:text-xs">Ver ejercicios +</span><span className="hidden shrink-0 text-[11px] font-semibold text-primary group-open:inline sm:text-xs">Ocultar −</span>
           </summary>
@@ -91,19 +91,15 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
             const sameRounds = rounds.length === block.items.length && rounds.every(value => value === rounds[0]);
             const minRest = block.betweenSetsRestMinSeconds;
             const maxRest = block.betweenSetsRestMaxSeconds;
-            return <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2 sm:p-4" aria-label="Secuencia de ejercicios">
+            return <div className="rounded-lg bg-primary/5 px-3 py-2.5 space-y-2" aria-label="Secuencia de ejercicios">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="rounded-full bg-primary px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-primary-foreground">{block.strengthMode === "triserie" ? "Triserie" : "Biserie"}</span>
-                <span className="text-sm font-bold">{sameRounds ? `${rounds[0]} ${rounds[0] === 1 ? "vuelta" : "vueltas"}` : `Semana ${week}`}</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-primary">{block.strengthMode === "triserie" ? "Triserie" : "Biserie"} · {sameRounds ? `${rounds[0]} ${rounds[0] === 1 ? "vuelta" : "vueltas"}` : `Semana ${week}`}</span>
+                <span className="text-xs text-muted-foreground">En orden</span>
               </div>
-              <p className="text-xs text-muted-foreground">Realizá los ejercicios en este orden:</p>
-              <ol className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs font-semibold">
-                {block.items.map((item, i) => <li key={item.key || i} className="flex items-center gap-1.5"><span className="text-primary">{i + 1}.</span><span>{item.title}</span>{i < block.items.length - 1 && <span className="ml-1 text-muted-foreground" aria-hidden="true">→</span>}</li>)}
+              <ol className="flex flex-wrap gap-x-2 gap-y-1 text-xs leading-relaxed">
+                {block.items.map((item, i) => <li key={item.key || i} className="inline-flex items-center gap-1"><span className="font-bold text-primary">{i + 1}.</span><span className="font-medium">{item.title}</span>{i < block.items.length - 1 && <span className="ml-1 text-primary/70" aria-hidden="true">→</span>}</li>)}
               </ol>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-background/70 px-3 py-2 text-xs">
-                <span className="font-semibold text-primary">Descanso entre vueltas:</span>
-                <strong>{minRest !== undefined && maxRest !== undefined ? `${restLabel(minRest)} – ${restLabel(maxRest)}` : minRest !== undefined ? restLabel(minRest) : maxRest !== undefined ? restLabel(maxRest) : "Según tu entrenador"}</strong>
-              </div>
+              <p className="border-t border-primary/15 pt-2 text-xs text-muted-foreground">Descanso entre vueltas: <strong className="text-foreground">{minRest !== undefined && maxRest !== undefined ? `${restLabel(minRest)} – ${restLabel(maxRest)}` : minRest !== undefined ? restLabel(minRest) : maxRest !== undefined ? restLabel(maxRest) : "Según tu entrenador"}</strong></p>
             </div>;
           })()}
           {block.type === "circuit" && block.circuitWeeks?.[week - 1] && (() => {
