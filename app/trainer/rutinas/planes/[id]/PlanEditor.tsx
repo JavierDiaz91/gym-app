@@ -9,7 +9,7 @@ const field = "w-full rounded-lg border bg-background px-3 py-2 text-sm";
 const button = "rounded-lg border px-3 py-2 text-sm disabled:opacity-50";
 const blank = (weeks: number): PlanItem => ({
   key: "item-" + crypto.randomUUID(), title: "", imageUrl: "", instructions: "",
-  prescriptions: Array.from({ length: weeks }, () => ({ sets: 3, reps: "10", rir: "2", restSeconds: 60 }))
+  prescriptions: Array.from({ length: weeks }, () => ({ sets: 3, reps: "10", restSeconds: 60 }))
 });
 
 type ProgressScope = "all" | "main";
@@ -74,6 +74,11 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         i === week ? { ...defaults, ...(block.circuitWeeks?.[i] || {}), ...patch } : (block.circuitWeeks?.[i] || defaults));
       return { ...block, circuitWeeks };
     });
+  const copyExerciseWeek = (di: number, bi: number, ii: number) => {
+    if (!window.confirm("¿Copiar esta semana a las demás semanas de este ejercicio? Se reemplazarán sus valores.")) return;
+    updateItem(di, bi, ii, item => ({ ...item, prescriptions: Array.from({ length: plan.durationWeeks }, () => ({ ...(item.prescriptions[week] || {}) })) }));
+    setMessage("Configuración copiada. Guardá los cambios.");
+  };
   const copyPrevious = () => {
     if (week < 1) return;
     if (!window.confirm("¿Copiar los parámetros de la semana " + week + " a la semana " + (week + 1) + "? Se reemplazarán los parámetros actuales de los ejercicios seleccionados.")) return;
@@ -204,10 +209,10 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         </summary>
         <div className="mt-3 space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-slate-700">
-          <input aria-label="Nombre del bloque" className={field + " max-w-sm"} disabled={!editable} value={block.title} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, title: e.target.value }))}/>
-          <select aria-label="Tipo de bloque" disabled={!editable} className={field + " max-w-44"} value={block.type} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, type: e.target.value as PlanBlock["type"] }))}>
+          <label className="text-xs text-muted-foreground">Nombre del bloque<input aria-label="Nombre del bloque" className={field + " max-w-sm"} disabled={!editable} value={block.title} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, title: e.target.value }))}/></label>
+          <label className="text-xs text-muted-foreground">Tipo de entrenamiento<select aria-label="Tipo de bloque" disabled={!editable} className={field + " max-w-44"} value={block.type} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, type: e.target.value as PlanBlock["type"] }))}>
             {["warmup","main","circuit","cooldown","custom"].map((x) => <option key={x} value={x}>{({warmup:"Entrada en calor",main:"Principal",circuit:"Circuito",cooldown:"Vuelta a la calma",custom:"Otro"} as Record<string,string>)[x]}</option>)}
-          </select>
+          </select></label>
           {editable && <button className={button + " text-rose-400"} onClick={() => { if (window.confirm("¿Eliminar este bloque y todos sus ejercicios?")) updateDay(di, (d) => ({ ...d, blocks: d.blocks.filter((_, i) => i !== bi) })); }}>Eliminar bloque</button>}
         </div>
         {block.type === "circuit" && <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
@@ -239,13 +244,13 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         </div>}
         {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <details key={item.key} className="group relative rounded-xl border border-slate-300 bg-background p-3 shadow-sm dark:border-slate-700">
           <summary className="flex min-w-0 cursor-pointer list-none items-center gap-3 pr-20">
-            {item.imageUrl ? <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 bg-slate-100 object-contain dark:border-slate-700" /> : <span aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">Sin imagen</span>}
+            {item.imageUrl ? <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-slate-100 object-contain dark:border-slate-700" /> : <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">Sin imagen</span>}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{ii + 1}. {item.title || "Ejercicio sin nombre"}</span>
               <span className="block text-xs text-muted-foreground">{item.imageUrl ? "Imagen disponible" : "Sin imagen"}{item.instructions ? " · Indicaciones cargadas" : ""}</span>
             </span>
-            <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar ejercicio +</span>
-            <span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Ocultar edición −</span>
+            <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar +</span>
+            <span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar −</span>
           </summary>
           {editable && <div className="absolute right-3 top-5 flex shrink-0 items-center gap-1" aria-label="Ordenar ejercicios">
             <button type="button" aria-label={"Subir " + (item.title || "ejercicio")} title="Subir ejercicio" disabled={ii === 0} className={button + " disabled:cursor-not-allowed disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii - 1], items[ii]] = [items[ii], items[ii - 1]]; return { ...b, items }; })}>↑</button>
@@ -261,8 +266,8 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
               {day.blocks.map((target, targetIndex) => <option key={targetIndex} value={targetIndex}>{targetIndex + 1}. {target.title || "Bloque sin nombre"}{targetIndex === bi ? " (actual)" : ""}</option>)}
             </select>
           </label>}
-          <div className={block.type === "circuit" ? "grid gap-3" : "grid gap-3 lg:grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,110px))]"}>
-            <label className="text-xs font-medium text-muted-foreground">Nombre del ejercicio
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="text-xs font-medium text-muted-foreground sm:col-span-3">Nombre del ejercicio
               <input list={`exercise-catalog-${di}-${bi}-${ii}`} className={field + " mt-1"} disabled={!editable} placeholder="Buscar o escribir ejercicio" value={item.title} onChange={(e) => {
                 const name = e.target.value;
                 const ex = exercises.find(x => x.name.toLocaleLowerCase() === name.toLocaleLowerCase());
@@ -277,25 +282,25 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             <label className="text-xs font-medium text-muted-foreground">Repeticiones
               <input aria-label="Repeticiones" className={field + " mt-1"} disabled={!editable} value={rx.reps ?? ""} onChange={e => updateRx(di,bi,ii,{reps:e.target.value})}/>
             </label>
-            <label className="text-xs font-medium text-muted-foreground">RIR
-              <input aria-label="RIR" className={field + " mt-1"} disabled={!editable} value={rx.rir ?? ""} onChange={e => updateRx(di,bi,ii,{rir:e.target.value})}/>
-            </label>
             <label className="text-xs font-medium text-muted-foreground">Pausa (seg)
               <input aria-label="Pausa en segundos" type="number" min={0} className={field + " mt-1"} disabled={!editable} value={rx.restSeconds ?? ""} onChange={e => updateRx(di,bi,ii,{restSeconds:e.target.value === "" ? undefined : Number(e.target.value)})}/>
             </label>
             </>}
           </div>
+          {block.type !== "circuit" && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3"><span className="text-xs font-medium">Semana {week + 1} de {plan.durationWeeks}</span>{editable && plan.durationWeeks > 1 && <button type="button" className={button + " text-xs"} onClick={() => copyExerciseWeek(di, bi, ii)}>Copiar a otras semanas</button>}</div>}
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Notas técnicas e imagen (opcional)</summary>
+            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Más opciones: RIR, notas e imagen</summary>
             <div className="mt-3">
           <div className="flex flex-wrap gap-2 items-start">
             <div className="flex-1 space-y-2">
+              {block.type !== "circuit" && <label className="block text-xs font-medium text-muted-foreground">RIR (repeticiones en reserva)
+                <input aria-label="RIR" className={field + " mt-1"} disabled={!editable} placeholder="Opcional" value={rx.rir ?? ""} onChange={e => updateRx(di,bi,ii,{rir:e.target.value})}/>
+              </label>}
               <select aria-label="Seleccionar ejercicio del catálogo" className={field} disabled={!editable} value="" onChange={(e) => { const ex = exercises.find((x) => x.id === Number(e.target.value)); if (!ex) return; updateItem(di, bi, ii, (current) => ({ ...current, title: ex.name, imageUrl: ex.imageUrl, instructions: ex.instructions, prescriptions: current.prescriptions })); setPreview(null); setMessage("Ejercicio seleccionado. Se conservaron las cargas de todas las semanas; guardá el borrador para confirmar el cambio."); }}>
                 <option value="">Elegir de Mis Ejercicios (biblioteca personal)</option>
                 {exercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
               </select>
               <Link href="/trainer/ejercicios" className="inline-block text-xs font-semibold text-primary underline dark:text-primary">+ Crear o administrar mis ejercicios</Link>
-              <input aria-label="Ejercicio" placeholder="Ej. Sentadilla o intervalos 400 m" className={field} disabled={!editable} value={item.title} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, title: e.target.value }))}/>
               <details className="rounded-lg border border-slate-300 bg-background p-2 dark:border-slate-700">
                 <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">Opciones avanzadas de imagen</summary>
                 <label className="mt-2 block text-xs text-muted-foreground">Dirección de la imagen (URL)
@@ -304,7 +309,6 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
               </details>
               <textarea aria-label="Instrucciones" placeholder="Indicaciones técnicas" className={field} disabled={!editable} value={item.instructions || ""} onChange={(e) => updateItem(di, bi, ii, (x) => ({ ...x, instructions: e.target.value }))}/>
             </div>
-            {editable && <button className={button} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar</button>}
           </div>
             </div>
           </details>
