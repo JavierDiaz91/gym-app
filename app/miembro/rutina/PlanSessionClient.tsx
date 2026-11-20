@@ -40,15 +40,15 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
     });
   }
   return (
-    <div className="space-y-5">
-      {planUrl && durationWeeks > 1 && <nav aria-label="Semanas del entrenamiento" className="rounded-2xl border border-primary/20 bg-card p-3 sm:p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2"><p className="text-xs font-bold uppercase tracking-widest text-primary">Mi entrenamiento</p><span className="text-xs text-muted-foreground">Deslizá para cambiar de semana</span></div>
-        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "thin" }}>
-          {Array.from({ length: durationWeeks }, (_, i) => i + 1).map(n => <button type="button" key={n} aria-current={n === week ? "page" : undefined} onClick={() => changeWeek(n)} className={`min-w-16 flex-1 rounded-xl border px-3 py-3 text-center transition-colors ${n === week ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-muted/40 hover:border-primary/50"}`}><span className="block text-[10px] font-semibold uppercase opacity-80">Semana</span><span className="block text-xl font-black">{n}</span></button>)}
+    <div className="min-w-0 space-y-3 sm:space-y-5">
+      {planUrl && durationWeeks > 1 && <nav aria-label="Semanas del entrenamiento" className="min-w-0 rounded-2xl border border-primary/20 bg-card p-3 sm:p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><p className="text-xs font-bold uppercase tracking-widest text-primary">Mi entrenamiento</p><span className="text-[11px] text-muted-foreground">Elegí una semana o deslizá</span></div>
+        <div className="grid grid-cols-4 gap-1.5 sm:flex sm:gap-2">
+          {Array.from({ length: durationWeeks }, (_, i) => i + 1).map(n => <button type="button" key={n} aria-current={n === week ? "page" : undefined} onClick={() => changeWeek(n)} className={`min-w-0 rounded-xl border px-1 py-2.5 text-center transition-colors sm:min-w-16 sm:flex-1 sm:px-3 sm:py-3 ${n === week ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-muted/40 hover:border-primary/50"}`}><span className="block text-[10px] font-semibold uppercase opacity-80">Semana</span><span className="block text-xl font-black">{n}</span></button>)}
         </div>
-        <div className="flex items-center justify-between gap-2"><button type="button" onClick={() => changeWeek(week - 1)} disabled={week <= 1} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-30">← Anterior</button><span className="text-sm font-semibold">Semana {week} de {durationWeeks}</span><button type="button" onClick={() => changeWeek(week + 1)} disabled={week >= durationWeeks} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-30">Siguiente →</button></div>
+        <div className="flex items-center justify-between gap-2"><button type="button" onClick={() => changeWeek(week - 1)} disabled={week <= 1} className="rounded-lg border border-border px-2 py-2 text-[11px] font-semibold disabled:opacity-30 sm:px-3 sm:text-xs">← Anterior</button><span className="text-center text-xs font-semibold sm:text-sm">Semana {week} de {durationWeeks}</span><button type="button" onClick={() => changeWeek(week + 1)} disabled={week >= durationWeeks} className="rounded-lg border border-border px-2 py-2 text-[11px] font-semibold disabled:opacity-30 sm:px-3 sm:text-xs">Siguiente →</button></div>
       </nav>}
-      <div className="rounded-3xl border border-primary/20 bg-muted/10 p-3 sm:p-5 space-y-5"
+      <div className="min-w-0 space-y-3 rounded-2xl border border-primary/20 bg-muted/10 p-2.5 sm:space-y-5 sm:rounded-3xl sm:p-5"
         onTouchStart={e => { setTouchStartX(e.touches[0]?.clientX ?? null); setTouchStartY(e.touches[0]?.clientY ?? null); }}
         onTouchEnd={e => {
           if (touchStartX === null || touchStartY === null) return;
@@ -58,7 +58,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
           setTouchStartX(null); setTouchStartY(null);
         }}>
         <div className="flex items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-widest text-primary">Semana {week}</p><h2 className="text-lg font-extrabold">Tu rutina de entrenamiento</h2></div><span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{blocks.filter(b => b.items.length).length} bloques</span></div>
-      <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-4">
+      <section className="rounded-xl border border-border bg-card p-3 shadow-sm space-y-3 sm:rounded-2xl sm:p-5 sm:space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold text-primary uppercase tracking-wide">Semana {week} · Día {day}</p>
@@ -81,7 +81,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
       </section>
       {blocks.filter(block => block.items.length > 0).map((block, index) => (
-        <details key={index} open={index === 0 ? true : undefined} className="group min-w-0 rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-3" >
+        <details key={index} open={index === 0 ? true : undefined} className="group min-w-0 space-y-2 rounded-xl border border-border bg-card p-2.5 sm:space-y-3 sm:rounded-2xl sm:p-4" >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-2 sm:gap-3">
             <span className="flex min-w-0 items-center gap-2 sm:gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span className="min-w-0"><span className="block text-sm font-bold leading-snug sm:text-base">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? (() => { const cfg = block.circuitWeeks?.[week - 1]; return cfg ? `${cfg.rounds} vueltas · ${cfg.workSeconds}s trabajo · ${cfg.restSeconds}s pausa · ${block.items.length} ejercicios` : `Circuito · ${block.items.length} ejercicios`; })() : block.type === "main" && (block.strengthMode === "triserie" || block.strengthMode === "biserie") ? `${block.strengthMode === "triserie" ? "Triserie" : "Biserie"} · ${block.items.length} ejercicios en secuencia` : `Entrenamiento · ${block.items.length} ejercicios` }</span></span></span>
             <span className="shrink-0 text-[11px] font-semibold text-primary group-open:hidden sm:text-xs">Ver ejercicios +</span><span className="hidden shrink-0 text-[11px] font-semibold text-primary group-open:inline sm:text-xs">Ocultar −</span>
@@ -91,7 +91,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
             const sameRounds = rounds.length === block.items.length && rounds.every(value => value === rounds[0]);
             const minRest = block.betweenSetsRestMinSeconds;
             const maxRest = block.betweenSetsRestMaxSeconds;
-            return <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-4" aria-label="Secuencia de ejercicios">
+            return <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-3 sm:rounded-2xl sm:p-4 sm:space-y-4" aria-label="Secuencia de ejercicios">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="rounded-full bg-primary px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-primary-foreground">{block.strengthMode === "triserie" ? "Triserie" : "Biserie"}</span>
                 <span className="text-sm font-bold">{sameRounds ? `${rounds[0]} ${rounds[0] === 1 ? "vuelta" : "vueltas"} · Semana ${week}` : `Semana ${week}`}</span>
@@ -109,7 +109,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
             const config = block.circuitWeeks[week - 1];
             return <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2">
               <p className="text-xs font-bold uppercase tracking-wide text-primary">Circuito · Semana {week}</p>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {[
                   ["Vueltas", String(config.rounds)],
                   ["Trabajo", config.workSeconds + " seg"],
@@ -127,7 +127,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
             return (
               <article key={item.key || itemIndex} className={`overflow-hidden rounded-2xl border bg-card shadow-sm transition-colors ${checked ? "border-emerald-500 dark:border-emerald-400" : "border-border"}`}>
                 {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className="flex h-48 w-full items-center justify-center bg-muted/30 sm:h-64 lg:h-72"><img src={item.imageUrl} alt={`Demostración de ${item.title}`} loading="lazy" className="h-full w-full object-contain" /></div>}
-                <div className="flex flex-wrap items-center gap-3 p-3 sm:flex-nowrap sm:p-4">
+                <div className="flex flex-wrap items-center gap-2 p-3 sm:flex-nowrap sm:gap-3 sm:p-4">
                   
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p>
@@ -142,7 +142,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
                 <details className="group/exercise border-t border-border">
                   <summary className="cursor-pointer list-none px-3 py-3 text-xs font-semibold text-primary sm:px-4"><span className="group-open/exercise:hidden">Ver técnica y registrar series +</span><span className="hidden group-open/exercise:inline">Ocultar detalles −</span></summary>
                   <div className="space-y-3 px-3 pb-4 sm:px-4">
-                  {block.type !== "circuit" && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {block.type !== "circuit" && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {p.sets != null && <div className="rounded-xl border border-border bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Series</p><p className="text-lg font-bold">{p.sets}</p></div>}
                     {p.reps && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Repeticiones</p><p className="text-lg font-bold">{p.reps}</p></div>}
                     {p.durationSeconds != null && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Duración</p><p className="text-lg font-bold">{p.durationSeconds} seg</p></div>}
