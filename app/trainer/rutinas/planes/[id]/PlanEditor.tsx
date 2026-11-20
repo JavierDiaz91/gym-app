@@ -215,6 +215,32 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           </select></label>
           {editable && <button className={button + " text-rose-400"} onClick={() => { if (window.confirm("¿Eliminar este bloque y todos sus ejercicios?")) updateDay(di, (d) => ({ ...d, blocks: d.blocks.filter((_, i) => i !== bi) })); }}>Eliminar bloque</button>}
         </div>
+        {block.type === "main" && <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <div><h3 className="text-sm font-semibold">Cómo se ejecuta este bloque</h3><p className="text-xs text-muted-foreground">Agrupá los ejercicios y definí el descanso al terminar cada vuelta. No modifica las series, repeticiones ni RIR que ya cargaste.</p></div>
+          <label className="block max-w-xs text-xs font-medium">Modalidad del bloque
+            <select className={field + " mt-1"} disabled={!editable} value={block.strengthMode || "individual"} onChange={e => updateBlock(di, bi, b => ({ ...b, strengthMode: e.target.value as NonNullable<PlanBlock["strengthMode"]> }))}>
+              <option value="individual">Ejercicios individuales</option>
+              <option value="biserie">Biserie · 2 ejercicios seguidos</option>
+              <option value="triserie">Triserie · 3 ejercicios seguidos</option>
+            </select>
+          </label>
+          {(block.strengthMode === "biserie" || block.strengthMode === "triserie") && <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-medium">Descanso mínimo entre vueltas (seg)
+                <input type="number" min={0} max={7200} step={1} className={field + " mt-1"} disabled={!editable} value={block.betweenSetsRestMinSeconds ?? ""} placeholder="Ej. 180" onChange={e => updateBlock(di, bi, b => ({ ...b, betweenSetsRestMinSeconds: e.target.value === "" ? undefined : Number(e.target.value) }))}/>
+              </label>
+              <label className="text-xs font-medium">Descanso máximo entre vueltas (seg)
+                <input type="number" min={0} max={7200} step={1} className={field + " mt-1"} disabled={!editable} value={block.betweenSetsRestMaxSeconds ?? ""} placeholder="Ej. 300" onChange={e => updateBlock(di, bi, b => ({ ...b, betweenSetsRestMaxSeconds: e.target.value === "" ? undefined : Number(e.target.value) }))}/>
+              </label>
+            </div>
+            <div className="rounded-lg border border-primary/20 bg-background/70 p-3 text-sm">
+              <p className="font-semibold">{block.strengthMode === "triserie" ? "Triserie" : "Biserie"} · Orden de ejecución</p>
+              <ol className="mt-2 list-inside list-decimal space-y-1">{block.items.map(item => <li key={item.key}>{item.title || "Ejercicio sin nombre"}</li>)}</ol>
+              <p className="mt-2 text-xs font-medium text-primary">Al terminar la secuencia: descansar {block.betweenSetsRestMinSeconds !== undefined ? block.betweenSetsRestMinSeconds + " a " : ""}{block.betweenSetsRestMaxSeconds !== undefined ? block.betweenSetsRestMaxSeconds : "—"} segundos y repetir según las series de la semana.</p>
+              {block.items.length !== (block.strengthMode === "triserie" ? 3 : 2) && <p className="mt-2 text-xs text-amber-500">Revisá la cantidad de ejercicios: esta modalidad requiere {block.strengthMode === "triserie" ? 3 : 2}.</p>}
+            </div>
+          </>}
+        </div>}
         {block.type === "circuit" && <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
           <div><h3 className="font-semibold text-sm">Configuración del circuito · Semana {week + 1}</h3><p className="text-xs text-muted-foreground">Los valores se aplican a todos los ejercicios de este bloque. Cada semana tiene su propia configuración.</p></div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
