@@ -23,6 +23,9 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
   const restLabel = (seconds: number) => seconds % 60 === 0 ? `${seconds / 60} min` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
   const total = blocks.reduce((n, b) => n + b.items.length, 0);
   const done = blocks.reduce((n, b) => n + b.items.filter(i => completed.includes(i.key)).length, 0);
+  const isFinished = status === "completed";
+  const elapsedSeconds = startedAt && finishedAt ? Math.max(0, Math.floor((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 1000)) : null;
+  const elapsedLabel = elapsedSeconds !== null && Number.isFinite(elapsedSeconds) ? `${Math.floor(elapsedSeconds / 3600) ? `${Math.floor(elapsedSeconds / 3600)} h ` : ""}${Math.floor(elapsedSeconds % 3600 / 60)} min ${elapsedSeconds % 60} s` : null;
   function changeWeek(target: number) {
     if (!planUrl || target < 1 || target > durationWeeks || target === week) return;
     if (dirtySeries.length && !window.confirm("Tenés series con cambios sin guardar. ¿Cambiar de semana y descartarlos?")) return;
@@ -75,7 +78,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
           run(() => finishPlanSession(assignmentId, week, day));
         }} className="w-full rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-40">Finalizar actividad</button>}
         {!readOnly && status === "in_progress" && done !== total && <p className="text-xs text-muted-foreground">Marcá todos los ejercicios realizados para habilitar la finalización.</p>}
-        {status === "completed" && <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-700 dark:text-emerald-300">Actividad finalizada. No se puede finalizar por segunda vez.</div>}
+        {isFinished && <div role="status" className="space-y-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 sm:p-4"><div className="flex items-center gap-2"><span aria-hidden="true" className="text-lg text-emerald-500">✓</span><p className="font-bold text-emerald-700 dark:text-emerald-300">¡Entrenamiento completado!</p></div><div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>Semana {week} · Día {day}</span><span>{done} de {total} ejercicios realizados</span>{elapsedLabel && <span>Duración: {elapsedLabel}</span>}</div><p className="text-xs text-muted-foreground">Podés consultar tus ejercicios y cargas guardadas. Esta sesión ya no se puede modificar.</p></div>}
         {startedAt && <p className="text-xs text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
         {!readOnly && status === "in_progress" && dirtySeries.length > 0 && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">Tenés {dirtySeries.length} serie(s) con cambios sin guardar. Guardalas antes de finalizar para conservar sus valores.</p>}
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
@@ -122,7 +125,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
             const p = item.prescriptions?.[week - 1] || {};
             const checked = completed.includes(item.key);
             return (
-              <article key={item.key || itemIndex} className={`min-w-0 overflow-hidden rounded-xl border bg-card transition-colors ${checked ? "border-emerald-500 dark:border-emerald-400" : "border-border"}`}>
+              <article key={item.key || itemIndex} className="min-w-0 overflow-hidden rounded-xl border border-border bg-card transition-colors">
                 {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className="flex h-48 w-full items-center justify-center bg-muted/30 sm:h-64 lg:h-72"><img src={item.imageUrl} alt={`Demostración de ${item.title}`} loading="lazy" className="h-full w-full object-contain" /></div>}
                 <div className="flex flex-wrap items-center gap-2 p-3 sm:flex-nowrap sm:gap-3 sm:p-4">
                   
@@ -131,7 +134,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
                     <h4 className="text-sm font-bold leading-snug sm:text-base">{item.title}</h4>
                     {block.type !== "circuit" && <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">{[p.sets ? `${p.sets} series` : null, p.reps ? `${p.reps} reps` : null, p.rir ? `RIR ${p.rir}` : null].filter(Boolean).map(value => <span key={value} className="rounded-lg bg-primary/10 px-2 py-1 text-xs font-bold text-primary">{value}</span>)}</div>}
                   </div>
-                  {status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-xs font-semibold cursor-pointer"><input type="checkbox" disabled={pending || readOnly || status === "completed"} checked={checked} onChange={e => {
+                  {isFinished && checked ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><span aria-hidden="true">✓</span> Hecho</span> : status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-xs font-semibold cursor-pointer"><input type="checkbox" disabled={pending || readOnly || status === "completed"} checked={checked} onChange={e => {
                     const next = e.target.checked;
                     run(() => markPlanExercise(assignmentId, week, day, item.key, next), () => setCompleted(old => next ? [...old.filter(k => k !== item.key), item.key] : old.filter(k => k !== item.key)));
                   }} className="h-5 w-5 accent-emerald-600" />Hecho</label>}
@@ -147,14 +150,14 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
                   </div>}
                   {block.type !== "circuit" && status !== "not_started" && Number(p.sets) > 0 && (
                     <details className="rounded-xl border p-3">
-                      <summary className="cursor-pointer text-sm font-semibold text-primary">Registrar cargas por serie (opcional)</summary>
-                      <p className="mt-2 text-xs text-muted-foreground">Podés dejar todos los campos vacíos y marcar el ejercicio como hecho.</p>
+                      <summary className="cursor-pointer text-sm font-semibold text-primary">{isFinished ? "Ver cargas registradas" : "Registrar cargas por serie (opcional)"}</summary>
+                      {!isFinished && <p className="mt-2 text-xs text-muted-foreground">Podés dejar todos los campos vacíos y marcar el ejercicio como hecho.</p>}
                       <div className="mt-3 space-y-3">
                         {Array.from({ length: Math.min(30, Number(p.sets)) }, (_, i) => {
                           const index = i + 1;
                           const saved = sets.find((x) => x.key === item.key && x.setIndex === index);
                           return (
-                            <SetEntry key={index} index={index} saved={saved} disabled={pending || readOnly || status === "completed"}
+                            isFinished ? <div key={index} className="rounded-lg bg-muted/40 p-2.5 text-xs"><p className="font-semibold">Serie {index}</p>{saved && (saved.load != null || saved.reps != null || saved.rir != null) ? <p className="mt-1 text-muted-foreground">{[saved.load != null ? `${saved.load} kg` : null, saved.reps != null ? `${saved.reps} reps` : null, saved.rir != null ? `RIR ${saved.rir}` : null].filter(Boolean).join(" · ")}</p> : <p className="mt-1 text-muted-foreground">Sin cargas registradas</p>}</div> : <SetEntry key={index} index={index} saved={saved} disabled={pending || readOnly}
                               onDirtyChange={(dirty) => setDirtySeries((old) => dirty
                                 ? old.includes(seriesId(item.key, index)) ? old : [...old, seriesId(item.key, index)]
                                 : old.filter((id) => id !== seriesId(item.key, index)))}
