@@ -7,7 +7,7 @@ import { startPlanSession, finishPlanSession, markPlanExercise, saveActualSet } 
 type Prescription = { sets?: number; reps?: string; rir?: string; restSeconds?: number; durationSeconds?: number; distanceMeters?: number; tempo?: string; notes?: string };
 type Item = { key: string; title: string; imageUrl?: string; imageVerified?: boolean; instructions?: string; prescriptions: Prescription[] };
 type SetLog = { key: string; setIndex: number; reps: number | null; load: number | null; rir: number | null };
-type Block = { title: string; type?: string; items: Item[]; circuitWeeks?: { rounds: number; workSeconds: number; restSeconds: number; betweenRoundsSeconds: number; rpe?: number }[] };
+type Block = { title: string; type?: string; strengthMode?: "individual" | "biserie" | "triserie"; betweenSetsRestMinSeconds?: number; betweenSetsRestMaxSeconds?: number; items: Item[]; circuitWeeks?: { rounds: number; workSeconds: number; restSeconds: number; betweenRoundsSeconds: number; rpe?: number }[] };
 type Props = { readOnly?: boolean; assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; initialSets: SetLog[]; startedAt?: string | null; finishedAt?: string | null };
 
 export default function PlanSessionClient({ readOnly = false, assignmentId, week, day, title, blocks, status, initialCompleted, initialSets, startedAt, finishedAt }: Props) {
@@ -18,6 +18,7 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
   const [sets, setSets] = useState<SetLog[]>(initialSets);
   const [dirtySeries, setDirtySeries] = useState<string[]>([]);
   const seriesId = (key: string, index: number) => `${key}:${index}`;
+  const restLabel = (seconds: number) => seconds % 60 === 0 ? `${seconds / 60} min` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
   const total = blocks.reduce((n, b) => n + b.items.length, 0);
   const done = blocks.reduce((n, b) => n + b.items.filter(i => completed.includes(i.key)).length, 0);
   function run(action: () => Promise<{success:boolean;error?:string}>, after?: () => void) {
@@ -58,9 +59,39 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
       {blocks.map((block, index) => (
         <details key={index} open={index === 0 ? true : undefined} className="group rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-3" >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-2">
-            <span className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span><span className="block text-base font-bold">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? (() => { const cfg = block.circuitWeeks?.[week - 1]; return cfg ? `${cfg.rounds} vueltas · ${cfg.workSeconds}s trabajo · ${cfg.restSeconds}s pausa · ${block.items.length} ejercicios` : `Circuito · ${block.items.length} ejercicios`; })() : `Entrenamiento · ${block.items.length} ejercicios` }</span></span></span>
+            <span className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span><span className="block text-base font-bold">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? (() => { const cfg = block.circuitWeeks?.[week - 1]; return cfg ? `${cfg.rounds} vueltas · ${cfg.workSeconds}s trabajo · ${cfg.restSeconds}s pausa · ${block.items.length} ejercicios` : `Circuito · ${block.items.length} ejercicios`; })() : block.type === "main" && (block.strengthMode === "triserie" || block.strengthMode === "biserie") ? `${block.strengthMode === "triserie" ? "Triserie" : "Biserie"} · ${block.items.length} ejercicios en secuencia` : `Entrenamiento · ${block.items.length} ejercicios` }</span></span></span>
             <span className="text-xs font-semibold text-primary group-open:hidden">Ver ejercicios +</span><span className="hidden text-xs font-semibold text-primary group-open:inline">Ocultar −</span>
           </summary>
+          {block.type === "main" && (block.strengthMode === "triserie" || block.strengthMode === "biserie") && (() => {
+            const rounds = block.items.map(item => item.prescriptions?.[week - 1]?.sets).filter((value): value is number => typeof value === "number" && value > 0);
+            const sameRounds = rounds.length === block.items.length && rounds.every(value => value === rounds[0]);
+            const minRest = block.betweenSetsRestMinSeconds;
+            const maxRest = block.betweenSetsRestMaxSeconds;
+            return <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-4" aria-label="Secuencia de ejercicios">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="rounded-full bg-primary px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-primary-foreground">{block.strengthMode === "triserie" ? "Triserie" : "Biserie"}</span>
+                <span className="text-sm font-bold">{sameRounds ? `${rounds[0]} ${rounds[0] === 1 ? "vuelta" : "vueltas"} · Semana ${week}` : `Semana ${week}`}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">Hacé estos ejercicios uno después del otro, en este orden:</p>
+              <ol className="space-y-2">
+                {block.items.map((item, position) => {
+                  const rx = item.prescriptions?.[week - 1] || {};
+                  const checked = completed.includes(item.key);
+                  return <li key={item.key} className="flex items-center gap-3 rounded-xl border border-border bg-background p-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-extrabold text-primary">{position + 1}</span>
+                    <div className="min-w-0 flex-1"><p className="font-semibold leading-tight">{item.title}</p><p className="mt-1 text-sm text-muted-foreground">{rx.reps ? `${rx.reps} repeticiones` : "Ver indicaciones"}{rx.rir ? ` · RIR ${rx.rir}` : ""}</p></div>
+                    {checked && <span className="text-xs font-semibold text-emerald-500">Hecho ✓</span>}
+                  </li>;
+                })}
+              </ol>
+              <div className="rounded-xl border border-primary/30 bg-background p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-primary">Descanso al terminar la secuencia</p>
+                <p className="mt-1 text-xl font-extrabold">{minRest !== undefined && maxRest !== undefined ? `${restLabel(minRest)} – ${restLabel(maxRest)}` : minRest !== undefined ? restLabel(minRest) : maxRest !== undefined ? restLabel(maxRest) : "Según indique tu entrenador"}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{sameRounds ? "Repetí la secuencia hasta completar las vueltas indicadas." : "Consultá las series indicadas para cada ejercicio."}</p>
+              </div>
+              <p className="text-xs text-muted-foreground">Debajo podés ver la técnica, marcar cada ejercicio como hecho y registrar tus cargas.</p>
+            </div>;
+          })()}
           {block.type === "circuit" && block.circuitWeeks?.[week - 1] && (() => {
             const config = block.circuitWeeks[week - 1];
             return <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2">
