@@ -300,20 +300,19 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           <p className="text-xs text-muted-foreground">Agregá los ejercicios debajo en el orden de ejecución. Guardá los cambios para conservar la configuración.</p>
         </div>}
         {block.items.length === 0 && <p className="rounded-lg border border-dashed border-primary/30 p-3 text-xs text-muted-foreground">Esta sección está vacía. Agregá el primer ejercicio con el botón de abajo.</p>}
-        {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <details key={item.key} className="group relative rounded-xl border border-slate-300 bg-background p-2.5 shadow-sm dark:border-slate-700">
+        {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <details key={item.key} className="group/exercise relative rounded-xl border border-slate-300 bg-background p-2.5 shadow-sm dark:border-slate-700">
           <summary className="flex min-w-0 cursor-pointer list-none items-center gap-3 pr-20">
             {item.imageUrl ? <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 bg-slate-100 object-contain dark:border-slate-700" /> : <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-[10px] text-muted-foreground">Sin imagen</span>}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{ii + 1}. {item.title || "Ejercicio sin nombre"}</span>
               <span className="block truncate text-xs text-muted-foreground">{block.type === "circuit" ? "Circuito · configuración por tiempo" : [
-                rx.sets !== undefined ? rx.sets + " series" : null,
-                rx.reps ? "× " + rx.reps + " rep." : null,
-                rx.restSeconds !== undefined ? rx.restSeconds + " s descanso" : null,
+                rx.sets !== undefined && rx.reps ? rx.sets + " × " + rx.reps + " repeticiones" : rx.sets !== undefined ? rx.sets + " series" : rx.reps ? rx.reps + " repeticiones" : null,
+                rx.restSeconds !== undefined ? "Descanso " + rx.restSeconds + " s" : null,
                 rx.rir !== undefined && rx.rir !== "" ? "RIR " + rx.rir : null,
               ].filter(Boolean).join(" · ") || "Sin parámetros"}{item.instructions ? " · Con indicaciones" : ""}</span>
             </span>
-            <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar +</span>
-            <span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar −</span>
+            <span className="shrink-0 text-xs font-semibold text-primary group-open/exercise:hidden">Editar +</span>
+            <span className="hidden shrink-0 text-xs font-semibold text-primary group-open/exercise:inline">Cerrar −</span>
           </summary>
           {editable && <div className="absolute right-3 top-5 flex shrink-0 items-center gap-1" aria-label="Ordenar ejercicios">
             <button type="button" aria-label={"Subir " + (item.title || "ejercicio")} title="Subir ejercicio" disabled={ii === 0} className={button + " disabled:cursor-not-allowed disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii - 1], items[ii]] = [items[ii], items[ii - 1]]; return { ...b, items }; })}>↑</button>
