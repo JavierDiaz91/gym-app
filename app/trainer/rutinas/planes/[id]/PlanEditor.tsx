@@ -80,9 +80,22 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       return { ...block, circuitWeeks };
     });
   const copyExerciseWeek = (di: number, bi: number, ii: number) => {
-    if (!window.confirm("¿Copiar esta semana a las demás semanas de este ejercicio? Se reemplazarán sus valores.")) return;
-    updateItem(di, bi, ii, item => ({ ...item, prescriptions: Array.from({ length: plan.durationWeeks }, () => ({ ...(item.prescriptions[week] || {}) })) }));
-    setMessage("Configuración copiada. Guardá los cambios.");
+    const item = draft.days[di]?.blocks[bi]?.items[ii];
+    if (!item) return;
+    const source = item.prescriptions[week] || {};
+    const otherWeeks = Array.from({ length: plan.durationWeeks }, (_, i) => i).filter(i => i !== week);
+    const differs = otherWeeks.some(i => JSON.stringify(item.prescriptions[i] || {}) !== JSON.stringify(source));
+    const prompt = differs
+      ? `¿Copiar los valores de la semana ${week + 1} a las otras ${otherWeeks.length} semanas de este ejercicio? Se reemplazarán las configuraciones diferentes que ya cargaste.`
+      : `¿Copiar los valores de la semana ${week + 1} a las otras ${otherWeeks.length} semanas?`;
+    if (!window.confirm(prompt)) return;
+    updateItem(di, bi, ii, current => ({
+      ...current,
+      prescriptions: Array.from({ length: plan.durationWeeks }, (_, i) =>
+        i === week ? (current.prescriptions[i] || {}) : { ...(current.prescriptions[week] || {}) }
+      ),
+    }));
+    setMessage(`Valores de la semana ${week + 1} copiados a las demás semanas. Guardá los cambios para confirmarlos.`);
   };
   const copyPrevious = () => {
     if (week < 1) return;
@@ -322,7 +335,10 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </label>
             </>}
           </div>
-          {block.type !== "circuit" && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3"><span className="text-xs font-medium">Semana {week + 1} de {plan.durationWeeks}</span>{editable && plan.durationWeeks > 1 && <button type="button" className={button + " text-xs"} onClick={() => copyExerciseWeek(di, bi, ii)}>Copiar estos valores a todas las semanas</button>}</div>}
+          {block.type !== "circuit" && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+            <div><p className="text-xs font-semibold">Configurando semana {week + 1} de {plan.durationWeeks}</p><p className="mt-1 text-xs text-muted-foreground">Estos valores se aplican solo a esta semana, salvo que elijas copiarlos.</p></div>
+            {editable && plan.durationWeeks > 1 && <button type="button" className={button + " border-primary/50 text-xs font-semibold text-primary"} onClick={() => copyExerciseWeek(di, bi, ii)}>Copiar semana {week + 1} a las demás</button>}
+          </div>}
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
             <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Más opciones: notas, imagen y progresión detallada</summary>
             <div className="mt-3">
@@ -346,9 +362,9 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </div>
           </details>
           {block.type !== "circuit" && <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold">Configuración avanzada por semanas <span className="font-normal text-muted-foreground">· {plan.durationWeeks} semanas · Opcional</span></summary>
+            <summary className="cursor-pointer text-sm font-semibold">Personalizar cada semana <span className="font-normal text-muted-foreground">· {plan.durationWeeks} semanas · Opcional</span></summary>
           <div className="mt-3 space-y-3">
-            <p className="text-xs text-muted-foreground">Editá directamente cada celda para configurar las cargas por semana. Los cambios quedan en el borrador hasta guardar.</p>
+            <p className="text-xs text-muted-foreground">Cada columna corresponde a una semana. Podés cambiar series, repeticiones, RIR y descanso sin modificar las otras semanas. Guardá los cambios al terminar.</p>
             <div className="overflow-x-auto rounded-xl border border-slate-300 bg-background dark:border-slate-700">
               <table className="w-full min-w-[600px] border-collapse text-left text-xs sm:text-sm">
                 <thead className="bg-slate-100 dark:bg-slate-800">
