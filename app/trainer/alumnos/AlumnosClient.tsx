@@ -88,10 +88,10 @@ export default function AlumnosClient({
 
   const filteredMembers = membersList.filter((m) => {
     const matchesName = `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase());
-    const hasPlan = (m.training_plans || []).some(p => p.lifecycle === 'current');
+    const hasPlan = (m.training_plans || []).some(p => p.lifecycle === 'current' || p.lifecycle === 'scheduled');
     return matchesName && (planFilter === "all" || (planFilter === "with" ? hasPlan : !hasPlan));
   });
-  const withPlanCount = membersList.filter((m) => (m.training_plans || []).some(p => p.lifecycle === 'current')).length;
+  const withPlanCount = membersList.filter((m) => (m.training_plans || []).some(p => p.lifecycle === 'current' || p.lifecycle === 'scheduled')).length;
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();

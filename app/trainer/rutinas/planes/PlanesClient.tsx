@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createTrainingPlan, type PlanInput } from "./actions";
 
 type Plan = { id: number; title: string; description: string; durationWeeks: number; status: string; version: number };
-const fieldStyle = "mt-2 w-full rounded-xl border border-slate-300 bg-background px-3 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700";
+const fieldStyle = "mt-2 w-full rounded-xl border border-slate-300 bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700";
 const initial: PlanInput = { title:"", description:"", durationWeeks:4, discipline:"", objective:"", level:"", audience:"" };
 export default function PlanesClient({ plans, categories, setupError }: { plans: Plan[]; categories: {dimension:string;slug:string;label:string}[]; setupError?: string }) {
   const router = useRouter();
@@ -35,24 +35,24 @@ export default function PlanesClient({ plans, categories, setupError }: { plans:
       <header className="flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-sky-500/5 to-transparent p-6 md:p-7"><div className="space-y-2"><p className="text-xs font-bold uppercase tracking-widest text-primary">PANEL ENTRENADOR · PLANIFICADOR</p><h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">Planificador deportivo</h1><p className="max-w-xl text-sm leading-relaxed text-muted-foreground">Creá planes por semanas y días. Combiná fuerza, calentamiento y circuitos en una sola planificación.</p><p className="text-xs font-semibold text-primary">{plans.length} {plans.length === 1 ? "rutina disponible" : "rutinas disponibles"}</p></div><button type="button" disabled={!!setupError} onClick={() => setShowForm((v) => !v)} className="rounded-xl bg-primary px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-primary disabled:opacity-50">{showForm ? "Cancelar" : "+ Nueva planificación"}</button></header>
       {setupError && <p role="alert" className="rounded-lg border border-amber-500 p-4 text-sm">{setupError}</p>}
       {!setupError && categories.length===0 && <p className="rounded-lg border p-4">Para crear una rutina, primero necesitás categorías básicas. <Link className="font-bold text-primary underline" href="/trainer/mis-categorias">Configurar categorías</Link> antes de crear una plantilla.</p>}
-      {showForm && !setupError && <form onSubmit={submit} className="space-y-6 rounded-2xl border border-slate-300 bg-muted/10 p-5 shadow-sm dark:border-slate-700 md:p-7">
-        <div className="border-b border-slate-300/60 pb-4 dark:border-slate-700"><p className="mb-1 text-xs font-bold uppercase tracking-widest text-primary">Nueva planificación</p><h2 className="text-xl font-bold">Configurá tu plan</h2><p className="mt-1 text-sm text-muted-foreground">Indicá el nombre y las semanas. Después organizás los días, ejercicios y circuitos.</p></div>
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+      {showForm && !setupError && <form onSubmit={submit} className="space-y-4 rounded-2xl border border-slate-300 bg-muted/10 p-4 shadow-sm dark:border-slate-700 md:p-5">
+        <div className="border-b border-slate-300/60 pb-3 dark:border-slate-700"><p className="mb-1 text-xs font-bold uppercase tracking-widest text-primary">Nueva planificación · Paso 1 de 3</p><h2 className="text-xl font-bold">Configurá tu plan</h2><p className="mt-1 text-sm text-muted-foreground">Indicá el nombre y las semanas. Después organizás los días, ejercicios y circuitos.</p></div>
+        <div className="grid max-w-3xl gap-3 sm:grid-cols-[minmax(0,1fr)_112px]">
           <label className="block text-sm font-semibold">Nombre de la planificación
             <input required maxLength={150} value={form.title} onChange={(e)=>change("title",e.target.value)} className={fieldStyle} placeholder="Ej.: Fuerza para corredores" />
           </label>
-          <label className="block text-sm font-semibold">Duración (semanas)
+          <label className="block text-sm font-semibold">Semanas
             <input type="number" min={1} max={52} required value={form.durationWeeks} onChange={(e)=>change("durationWeeks",Number(e.target.value))} className={fieldStyle}/>
           </label>
         </div>
-        <details className="rounded-xl border border-slate-700/40 p-4">
+        <div className="grid gap-3 sm:grid-cols-2"><details className="min-w-0 rounded-xl border border-slate-700/40 px-3 py-3">
           <summary className="cursor-pointer text-sm font-semibold text-primary">Más opciones (opcional)</summary>
           <label className="mt-3 block text-sm font-semibold">Descripción
             <textarea maxLength={2000} value={form.description} onChange={(e)=>change("description",e.target.value)} className={fieldStyle} rows={3} placeholder="Objetivo, indicaciones generales..." />
           </label>
         </details>
-        <details open={advanced} onToggle={(e)=>setAdvanced(e.currentTarget.open)} className="rounded-xl border border-slate-700/40 p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-primary">Clasificación avanzada (opcional)</summary>
+        <details open={advanced} onToggle={(e)=>setAdvanced(e.currentTarget.open)} className="min-w-0 rounded-xl border border-slate-700/40 px-3 py-3">
+          <summary className="cursor-pointer text-sm font-semibold text-primary">Clasificar rutina (opcional)</summary>
           <p className="mt-2 text-xs text-muted-foreground">Si no elegís categorías, se utilizará la primera disponible en cada grupo.</p>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {(["discipline","objective","level","audience"] as const).map((key) => <label key={key} className="text-sm font-semibold">{({discipline:"Disciplina",objective:"Objetivo",level:"Nivel",audience:"Dirigido a"})[key]}
@@ -60,9 +60,9 @@ export default function PlanesClient({ plans, categories, setupError }: { plans:
             </label>)}
           </div>
           <Link href="/trainer/mis-categorias" className="mt-3 inline-block text-xs font-semibold text-primary underline">Administrar categorías</Link>
-        </details>
+        </details></div>
         {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
-        <button disabled={pending || (["discipline","objective","level","audience"] as const).some(key=>byDimension(key).length===0)} className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-primary disabled:opacity-50">{pending ? "Creando..." : "Crear y continuar"}</button>
+        <div className="flex justify-end"><button disabled={pending || (["discipline","objective","level","audience"] as const).some(key=>byDimension(key).length===0)} className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-primary disabled:opacity-50">{pending ? "Creando..." : "Crear y continuar →"}</button></div>
       </form>}
       <section className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-widest text-primary">Tus entrenamientos</p><h2 className="mt-1 text-xl font-bold">Rutinas creadas</h2></div><span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{plans.length} en total</span></div><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {plans.length === 0 && <p className="col-span-full rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Todavía no creaste planes. Presioná «Nueva planificación» para empezar.</p>}

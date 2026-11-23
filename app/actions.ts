@@ -1161,54 +1161,52 @@ export async function getMemberRoutines(_memberUserId: number) {
 // ==================== TRAINER STATS ====================
 
 export async function getTrainerStats(_userId: number) {
+  const empty = { totalAlumnos: 0, totalRutinas: 0, assignmentRate: 0 };
   try {
     const session = await getSession();
-    if (!session || session.role !== "trainer" || session.gymId == null) {
-      return { totalAlumnos: 0, totalRutinas: 0 };
-    }
+    if (!session || session.role !== "trainer" || session.gymId == null) return empty;
 
     const trainerRes = await sql`
-      SELECT id
-      FROM trainers
-      WHERE user_id = ${session.id}
-        AND gym_id = ${session.gymId}
+      SELECT id FROM trainers
+      WHERE user_id = ${session.id} AND gym_id = ${session.gymId}
       LIMIT 1
     `;
+    if (!trainerRes.length) return empty;
+    const trainerId = Number(trainerRes[0].id);
 
-    if (!trainerRes || trainerRes.length === 0) {
-      return { totalAlumnos: 0, totalRutinas: 0 };
-    }
-
-    const realTrainerId = trainerRes[0].id;
-
-    // 2. Consultar conteo de alumnos y rutinas activas asociadas al entrenador
-    const [alumnosRes, rutinasRes] = await Promise.all([
+    const [students, plans, assigned] = await Promise.all([
       sql`
-        SELECT COUNT(*)::int as count 
-        FROM members 
-        WHERE trainer_id = ${realTrainerId}
+        SELECT COUNT(DISTINCT tm.member_id)::int AS count
+        FROM trainer_members tm
+        JOIN members m ON m.id = tm.member_id AND m.gym_id = ${session.gymId}
+        WHERE tm.trainer_id = ${trainerId}
       `,
       sql`
-        SELECT COUNT(*)::int as count 
-        FROM routines 
-        WHERE trainer_id = ${realTrainerId} 
-          AND (is_archived IS FALSE OR is_archived IS NULL)
+        SELECT COUNT(*)::int AS count FROM training_plans
+        WHERE gym_id = ${session.gymId} AND trainer_id = ${trainerId}
+      `,
+      sql`
+        SELECT COUNT(DISTINCT mtp.member_id)::int AS count
+        FROM member_training_plans mtp
+        JOIN trainer_members tm
+          ON tm.member_id = mtp.member_id AND tm.trainer_id = ${trainerId}
+        WHERE mtp.gym_id = ${session.gymId}
+          AND mtp.trainer_id = ${trainerId}
+          AND mtp.status = 'active'
       `,
     ]);
-
+    const totalAlumnos = Number(students[0]?.count || 0);
+    const totalAsignados = Number(assigned[0]?.count || 0);
     return {
-      totalAlumnos: Number(alumnosRes[0]?.count || 0),
-      totalRutinas: Number(rutinasRes[0]?.count || 0),
+      totalAlumnos,
+      totalRutinas: Number(plans[0]?.count || 0),
+      assignmentRate: totalAlumnos > 0 ? Math.round((totalAsignados / totalAlumnos) * 100) : 0,
     };
   } catch (error) {
-    console.error("❌ Error en getTrainerStats:", error);
-    return {
-      totalAlumnos: 0,
-      totalRutinas: 0,
-    };
+    console.error("Error en getTrainerStats:", error);
+    return empty;
   }
 }
-
 
 export async function logWorkout(routineId: number, details: any) {
   const session = await getSession();
