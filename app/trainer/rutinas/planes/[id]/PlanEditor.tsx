@@ -79,23 +79,32 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         i === week ? { ...defaults, ...(block.circuitWeeks?.[i] || {}), ...patch } : (block.circuitWeeks?.[i] || defaults));
       return { ...block, circuitWeeks };
     });
-  const copyExerciseWeek = (di: number, bi: number, ii: number) => {
-    const item = draft.days[di]?.blocks[bi]?.items[ii];
-    if (!item) return;
-    const source = item.prescriptions[week] || {};
-    const otherWeeks = Array.from({ length: plan.durationWeeks }, (_, i) => i).filter(i => i !== week);
-    const differs = otherWeeks.some(i => JSON.stringify(item.prescriptions[i] || {}) !== JSON.stringify(source));
-    const prompt = differs
-      ? `¿Copiar los valores de la semana ${week + 1} a las otras ${otherWeeks.length} semanas de este ejercicio? Se reemplazarán las configuraciones diferentes que ya cargaste.`
-      : `¿Copiar los valores de la semana ${week + 1} a las otras ${otherWeeks.length} semanas?`;
-    if (!window.confirm(prompt)) return;
-    updateItem(di, bi, ii, current => ({
-      ...current,
-      prescriptions: Array.from({ length: plan.durationWeeks }, (_, i) =>
-        i === week ? (current.prescriptions[i] || {}) : { ...(current.prescriptions[week] || {}) }
+  const copyDayWeek = (di: number) => {
+    const day = draft.days[di];
+    if (!day || plan.durationWeeks < 2) return;
+    const targets = Array.from({ length: plan.durationWeeks }, (_, i) => i).filter(i => i !== week);
+    const items = day.blocks.flatMap(block => block.items);
+    if (!items.length) { setMessage("Primero agregá ejercicios al día para copiar sus valores."); return; }
+    const changed = items.some(item => targets.some(i =>
+      JSON.stringify(item.prescriptions[i] || {}) !== JSON.stringify(item.prescriptions[week] || {})
+    ));
+    const message = changed
+      ? `¿Copiar los valores de todos los ejercicios del día ${di + 1}, semana ${week + 1}, a las demás semanas? Se reemplazarán los valores personalizados de esas semanas.`
+      : `¿Copiar los valores de todos los ejercicios del día ${di + 1}, semana ${week + 1}, a las demás semanas?`;
+    if (!window.confirm(message)) return;
+    updateDay(di, current => ({ ...current, blocks: current.blocks.map(block => ({
+      ...block,
+      items: block.items.map(item => ({
+        ...item,
+        prescriptions: Array.from({ length: plan.durationWeeks }, (_, i) =>
+          i === week ? (item.prescriptions[i] || {}) : { ...(item.prescriptions[week] || {}) }
+        ),
+      })),
+      circuitWeeks: block.circuitWeeks?.map((cw, i) =>
+        i === week ? cw : { ...(block.circuitWeeks?.[week] || cw) }
       ),
-    }));
-    setMessage(`Valores de la semana ${week + 1} copiados a las demás semanas. Guardá los cambios para confirmarlos.`);
+    })) }));
+    setMessage(`Día ${di + 1}: valores de la semana ${week + 1} copiados a las demás. Guardá los cambios.`);
   };
   const copyPrevious = () => {
     if (week < 1) return;
@@ -219,6 +228,10 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         <input aria-label="Nombre del día" className={field + " max-w-sm font-semibold"} disabled={!editable} value={day.title} onChange={(e) => updateDay(di, (d) => ({ ...d, title: e.target.value }))}/>
         {editable && <button className={button} onClick={() => change({ days: draft.days.filter((_, i) => i !== di) })}>Eliminar día</button>}
       </div>
+      {editable && plan.durationWeeks > 1 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+        <div><p className="text-sm font-semibold">Semana {week + 1} de {plan.durationWeeks}</p><p className="text-xs text-muted-foreground">Completá los ejercicios del día y copiá sus series, repeticiones, RIR y descansos a las otras semanas. Después podés personalizar cada ejercicio.</p></div>
+        <button type="button" className={button + " border-primary/60 font-semibold text-primary"} onClick={() => copyDayWeek(di)}>Copiar este día a las demás semanas</button>
+      </div>}
       <div className="space-y-1"><h3 className="text-base font-bold">Secciones del día</h3><p className="text-xs text-muted-foreground">Poné el título que prefieras a cada sección (por ejemplo, Entrada en calor, Principal o Abdominales) y agregá ejercicios dentro.</p></div>
       {day.blocks.map((block, bi) => <details key={bi} open={undefined} className="group rounded-xl border border-slate-300 bg-muted/20 p-3 dark:border-slate-700">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-1">
@@ -335,10 +348,6 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </label>
             </>}
           </div>
-          {block.type !== "circuit" && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
-            <div><p className="text-xs font-semibold">Configurando semana {week + 1} de {plan.durationWeeks}</p><p className="mt-1 text-xs text-muted-foreground">Estos valores se aplican solo a esta semana, salvo que elijas copiarlos.</p></div>
-            {editable && plan.durationWeeks > 1 && <button type="button" className={button + " border-primary/50 text-xs font-semibold text-primary"} onClick={() => copyExerciseWeek(di, bi, ii)}>Copiar semana {week + 1} a las demás</button>}
-          </div>}
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
             <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Más opciones: notas, imagen y progresión detallada</summary>
             <div className="mt-3">
