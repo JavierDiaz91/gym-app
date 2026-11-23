@@ -19,9 +19,17 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
   const [completed, setCompleted] = useState<string[]>(initialCompleted);
   const [sets, setSets] = useState<SetLog[]>(initialSets);
   const [dirtySeries, setDirtySeries] = useState<string[]>([]);
+  const [activeExercise, setActiveExercise] = useState<number | null>(null);
   const seriesId = (key: string, index: number) => `${key}:${index}`;
   const restLabel = (seconds: number) => seconds % 60 === 0 ? `${seconds / 60} min` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
-  const total = blocks.reduce((n, b) => n + b.items.length, 0);
+  const exerciseOrder = blocks.flatMap((block, blockIndex) => block.items.map((item, itemIndex) => ({ blockIndex, itemIndex, item, block })));
+  const total = exerciseOrder.length;
+  const selected = activeExercise === null ? null : exerciseOrder[activeExercise] ?? null;
+  function navigateExercise(next: number | null) {
+    if (dirtySeries.length && !window.confirm("Tenés series con cambios sin guardar. ¿Continuar y descartarlos?")) return;
+    setActiveExercise(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
   const done = blocks.reduce((n, b) => n + b.items.filter(i => completed.includes(i.key)).length, 0);
   const isFinished = status === "completed";
   const elapsedSeconds = startedAt && finishedAt ? Math.max(0, Math.floor((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 1000)) : null;
@@ -44,7 +52,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
   }
   return (
     <div className="min-w-0 space-y-3 sm:space-y-5">
-      {planUrl && durationWeeks > 1 && <nav aria-label="Semanas del entrenamiento" className="min-w-0 rounded-2xl border border-primary/20 bg-card p-3 sm:p-4 space-y-3">
+      {activeExercise === null && planUrl && durationWeeks > 1 && <nav aria-label="Semanas del entrenamiento" className="min-w-0 rounded-2xl border border-primary/20 bg-card p-3 sm:p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><p className="text-xs font-bold uppercase tracking-widest text-primary">Mi entrenamiento</p><span className="text-[11px] text-muted-foreground">Elegí una semana o deslizá</span></div>
         <div className="grid grid-cols-4 gap-1.5 sm:flex sm:gap-2">
           {Array.from({ length: durationWeeks }, (_, i) => i + 1).map(n => <button type="button" key={n} aria-current={n === week ? "page" : undefined} onClick={() => changeWeek(n)} className={`min-w-0 rounded-xl border px-1 py-2.5 text-center transition-colors sm:min-w-16 sm:flex-1 sm:px-3 sm:py-3 ${n === week ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-muted/40 hover:border-primary/50"}`}><span className="block text-[10px] font-semibold uppercase opacity-80">Semana</span><span className="block text-xl font-black">{n}</span></button>)}
@@ -60,7 +68,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
           if (Math.abs(deltaX) > 85 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) changeWeek(week + (deltaX < 0 ? 1 : -1));
           setTouchStartX(null); setTouchStartY(null);
         }}>
-        <div className="flex items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-widest text-primary">Semana {week}</p><h2 className="text-lg font-extrabold">Tu rutina de entrenamiento</h2></div><span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{blocks.filter(b => b.items.length).length} bloques</span></div>
+        <div className="flex items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-widest text-primary">Semana {week}</p><h2 className="text-lg font-extrabold">Tu rutina de entrenamiento</h2></div><span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{blocks.filter(b => b.items.length).length} secciones</span></div>
       <section className="rounded-xl border border-border bg-card p-3 shadow-sm space-y-3 sm:rounded-2xl sm:p-5 sm:space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -83,8 +91,20 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
         {!readOnly && status === "in_progress" && dirtySeries.length > 0 && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">Tenés {dirtySeries.length} serie(s) con cambios sin guardar. Guardalas antes de finalizar para conservar sus valores.</p>}
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
       </section>
+      {selected && <nav aria-label="Navegación de ejercicios" className="sticky top-16 z-20 rounded-xl border border-primary/30 bg-card/95 p-3 shadow-lg backdrop-blur sm:top-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <button type="button" onClick={() => navigateExercise(null)} className="text-xs font-semibold text-primary">← Volver a la rutina</button>
+          <span className="text-xs font-bold text-muted-foreground">Ejercicio {activeExercise! + 1} de {total}</span>
+        </div>
+        <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary" style={{ width: `${(activeExercise! + 1) / Math.max(total, 1) * 100}%` }} /></div>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" disabled={activeExercise === 0} onClick={() => navigateExercise(activeExercise! - 1)} className="rounded-lg border border-border px-3 py-3 text-sm font-semibold disabled:opacity-30">← Anterior</button>
+          <button type="button" onClick={() => navigateExercise(activeExercise! + 1 < total ? activeExercise! + 1 : null)} className="rounded-lg bg-primary px-3 py-3 text-sm font-bold text-primary-foreground">{activeExercise! + 1 < total ? "Siguiente ejercicio →" : "Volver al resumen ✓"}</button>
+        </div>
+      </nav>}
+      {!selected && total > 0 && <button type="button" onClick={() => navigateExercise(0)} className="w-full rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground">Ver ejercicios uno por uno →</button>}
       {blocks.filter(block => block.items.length > 0).map((block, index) => (
-        <details key={index} open={index === 0 ? true : undefined} className="group min-w-0 space-y-2 rounded-xl border border-border bg-card p-2 sm:space-y-3 sm:rounded-2xl sm:p-4" >
+        <details key={`${index}-${selected ? "focus" : "list"}`} open={selected ? selected.blockIndex === index : index === 0 ? true : undefined} className={`group min-w-0 space-y-2 rounded-xl border border-border bg-card p-2 sm:space-y-3 sm:rounded-2xl sm:p-4 ${selected && selected.blockIndex !== index ? "hidden" : ""}`} >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 sm:gap-3">
             <span className="flex min-w-0 items-center gap-2 sm:gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span className="min-w-0"><span className="block text-sm font-bold leading-snug sm:text-base">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? (() => { const cfg = block.circuitWeeks?.[week - 1]; return cfg ? `${cfg.rounds} vueltas · ${cfg.workSeconds}s trabajo · ${cfg.restSeconds}s pausa · ${block.items.length} ejercicios` : `Circuito · ${block.items.length} ejercicios`; })() : block.type === "main" && (block.strengthMode === "triserie" || block.strengthMode === "biserie") ? `${block.strengthMode === "triserie" ? "Triserie" : "Biserie"} · ${block.items.length} ejercicios en secuencia` : `Entrenamiento · ${block.items.length} ejercicios` }</span></span></span>
             <span className="shrink-0 text-[11px] font-semibold text-primary group-open:hidden sm:text-xs">Ver ejercicios +</span><span className="hidden shrink-0 text-[11px] font-semibold text-primary group-open:inline sm:text-xs">Ocultar −</span>
@@ -122,24 +142,25 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
             </div>;
           })()}
           {block.items.map((item, itemIndex) => {
+            if (selected && (selected.blockIndex !== index || selected.itemIndex !== itemIndex)) return null;
             const p = item.prescriptions?.[week - 1] || {};
             const checked = completed.includes(item.key);
             return (
               <article key={item.key || itemIndex} className="min-w-0 overflow-hidden rounded-xl border border-border bg-card transition-colors">
-                {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className="flex h-48 w-full items-center justify-center bg-muted/30 sm:h-64 lg:h-72"><img src={item.imageUrl} alt={`Demostración de ${item.title}`} loading="lazy" className="h-full w-full object-contain" /></div>}
+                {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className={`flex w-full items-center justify-center bg-muted/30 ${selected ? "h-56 sm:h-72" : "h-48 sm:h-64 lg:h-72"}`}><img src={item.imageUrl} alt={`Demostración de ${item.title}`} loading="lazy" className="h-full w-full object-contain" /></div>}
                 <div className="flex flex-wrap items-center gap-2 p-3 sm:flex-nowrap sm:gap-3 sm:p-4">
                   
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p>
                     <h4 className="text-sm font-bold leading-snug sm:text-base">{item.title}</h4>
-                    {block.type !== "circuit" && <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">{[p.sets ? `${p.sets} series` : null, p.reps ? `${p.reps} reps` : null, p.rir ? `RIR ${p.rir}` : null].filter(Boolean).map(value => <span key={value} className="rounded-lg bg-primary/10 px-2 py-1 text-xs font-bold text-primary">{value}</span>)}</div>}
+                    {block.type !== "circuit" && <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">{[p.sets ? `${p.sets} series` : null, p.reps ? `${p.reps} reps` : null, p.restSeconds != null ? `Descanso ${p.restSeconds} s` : null, p.rir ? `RIR ${p.rir}` : null].filter(Boolean).map(value => <span key={value} className="rounded-lg bg-primary/10 px-2 py-1 text-xs font-bold text-primary">{value}</span>)}</div>}
                   </div>
                   {isFinished && checked ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><span aria-hidden="true">✓</span> Hecho</span> : status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-xs font-semibold cursor-pointer"><input type="checkbox" disabled={pending || readOnly || status === "completed"} checked={checked} onChange={e => {
                     const next = e.target.checked;
                     run(() => markPlanExercise(assignmentId, week, day, item.key, next), () => setCompleted(old => next ? [...old.filter(k => k !== item.key), item.key] : old.filter(k => k !== item.key)));
                   }} className="h-5 w-5 accent-emerald-600" />Hecho</label>}
                 </div>
-                <details className="group/exercise border-t border-border">
+                <details open={selected ? true : undefined} key={selected ? `focus-${item.key}` : `list-${item.key}`} className="group/exercise border-t border-border">
                   <summary className="cursor-pointer list-none px-3 py-3 text-xs font-semibold text-primary sm:px-4"><span className="group-open/exercise:hidden">Indicaciones y registro +</span><span className="hidden group-open/exercise:inline">Ocultar detalles −</span></summary>
                   <div className="space-y-3 px-3 pb-4 sm:px-4">
                   {block.type !== "circuit" && [p.durationSeconds, p.restSeconds, p.tempo, p.distanceMeters].some(v => v !== undefined && v !== null && v !== "") && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
