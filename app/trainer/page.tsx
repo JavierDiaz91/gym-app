@@ -20,7 +20,7 @@ export default async function TrainerDashboardPage() {
     return null;
   }
 
-  const { totalAlumnos, totalRutinas } = await getTrainerStats(session.id);
+  const { totalAlumnos, totalRutinas, assignmentRate } = await getTrainerStats(session.id);
   // Restrict every student and training record to this trainer and tenant.
   const linkedStudents = session.gymId == null ? [] : await sql`
     SELECT DISTINCT m.id, m.first_name, m.last_name
@@ -76,12 +76,12 @@ export default async function TrainerDashboardPage() {
     {
       title: "Rutinas Creadas",
       value: totalRutinas.toString(),
-      description: "Plantillas de entrenamiento listas",
+      description: "Planificaciones creadas",
       icon: Dumbbell,
     },
     {
       title: "Ritmo de Asignación",
-      value: "100%",
+      value: `${assignmentRate}%`,
       description: "Atletas con plan activo",
       icon: TrendingUp,
     },
