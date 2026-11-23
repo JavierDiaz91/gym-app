@@ -229,8 +229,8 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         {editable && <button className={button} onClick={() => change({ days: draft.days.filter((_, i) => i !== di) })}>Eliminar día</button>}
       </div>
       {editable && plan.durationWeeks > 1 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
-        <div><p className="text-sm font-semibold">Semana {week + 1} de {plan.durationWeeks}</p><p className="text-xs text-muted-foreground">Completá los ejercicios del día y copiá sus series, repeticiones, RIR y descansos a las otras semanas. Después podés personalizar cada ejercicio.</p></div>
-        <button type="button" className={button + " border-primary/60 font-semibold text-primary"} onClick={() => copyDayWeek(di)}>Copiar este día a las demás semanas</button>
+        <div><p className="text-sm font-semibold">Semana {week + 1} de {plan.durationWeeks}</p><p className="text-xs text-muted-foreground">Configurá los ejercicios una vez y aplicá sus valores a las demás semanas. No se duplican ejercicios; después podés ajustar cada semana.</p></div>
+        <button type="button" className={button + " border-primary/60 font-semibold text-primary"} onClick={() => copyDayWeek(di)}>Aplicar configuración a las demás semanas</button>
       </div>}
       <div className="space-y-1"><h3 className="text-base font-bold">Secciones del día</h3><p className="text-xs text-muted-foreground">Poné el título que prefieras a cada sección (por ejemplo, Entrada en calor, Principal o Abdominales) y agregá ejercicios dentro.</p></div>
       {day.blocks.map((block, bi) => <details key={bi} open={undefined} className="group rounded-xl border border-slate-300 bg-muted/20 p-3 dark:border-slate-700">
@@ -300,12 +300,17 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           <p className="text-xs text-muted-foreground">Agregá los ejercicios debajo en el orden de ejecución. Guardá los cambios para conservar la configuración.</p>
         </div>}
         {block.items.length === 0 && <p className="rounded-lg border border-dashed border-primary/30 p-3 text-xs text-muted-foreground">Esta sección está vacía. Agregá el primer ejercicio con el botón de abajo.</p>}
-        {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <details key={item.key} className="group relative rounded-xl border border-slate-300 bg-background p-3 shadow-sm dark:border-slate-700">
+        {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <details key={item.key} className="group relative rounded-xl border border-slate-300 bg-background p-2.5 shadow-sm dark:border-slate-700">
           <summary className="flex min-w-0 cursor-pointer list-none items-center gap-3 pr-20">
-            {item.imageUrl ? <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-slate-100 object-contain dark:border-slate-700" /> : <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">Sin imagen</span>}
+            {item.imageUrl ? <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 bg-slate-100 object-contain dark:border-slate-700" /> : <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-[10px] text-muted-foreground">Sin imagen</span>}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{ii + 1}. {item.title || "Ejercicio sin nombre"}</span>
-              <span className="block text-xs text-muted-foreground">{item.imageUrl ? "Imagen disponible" : "Sin imagen"}{item.instructions ? " · Indicaciones cargadas" : ""}</span>
+              <span className="block truncate text-xs text-muted-foreground">{block.type === "circuit" ? "Circuito · configuración por tiempo" : [
+                rx.sets !== undefined ? rx.sets + " series" : null,
+                rx.reps ? "× " + rx.reps + " rep." : null,
+                rx.restSeconds !== undefined ? rx.restSeconds + " s descanso" : null,
+                rx.rir !== undefined && rx.rir !== "" ? "RIR " + rx.rir : null,
+              ].filter(Boolean).join(" · ") || "Sin parámetros"}{item.instructions ? " · Con indicaciones" : ""}</span>
             </span>
             <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar +</span>
             <span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar −</span>
@@ -314,7 +319,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             <button type="button" aria-label={"Subir " + (item.title || "ejercicio")} title="Subir ejercicio" disabled={ii === 0} className={button + " disabled:cursor-not-allowed disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii - 1], items[ii]] = [items[ii], items[ii - 1]]; return { ...b, items }; })}>↑</button>
             <button type="button" aria-label={"Bajar " + (item.title || "ejercicio")} title="Bajar ejercicio" disabled={ii === block.items.length - 1} className={button + " disabled:cursor-not-allowed disabled:opacity-30"} onClick={() => updateBlock(di, bi, b => { const items = [...b.items]; [items[ii], items[ii + 1]] = [items[ii + 1], items[ii]]; return { ...b, items }; })}>↓</button>
           </div>}
-          <div className="mt-4 space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+          <div className="mt-3 space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold text-primary">Ejercicio {ii + 1} · Semana {week + 1}</p>
             {editable && <button type="button" className="text-xs text-rose-400 hover:underline" onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: b.items.filter((_, i) => i !== ii) }))}>Quitar ejercicio</button>}
@@ -349,7 +354,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </>}
           </div>
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Más opciones: notas, imagen y progresión detallada</summary>
+            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Indicaciones e imagen (opcional)</summary>
             <div className="mt-3">
           <div className="flex flex-wrap gap-2 items-start">
             <div className="flex-1 space-y-2">
@@ -371,7 +376,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             </div>
           </details>
           {block.type !== "circuit" && <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold">Personalizar cada semana <span className="font-normal text-muted-foreground">· {plan.durationWeeks} semanas · Opcional</span></summary>
+            <summary className="cursor-pointer text-sm font-semibold">Ajustar series, repeticiones y RIR por semana <span className="font-normal text-muted-foreground">· Opcional</span></summary>
           <div className="mt-3 space-y-3">
             <p className="text-xs text-muted-foreground">Cada columna corresponde a una semana. Podés cambiar series, repeticiones, RIR y descanso sin modificar las otras semanas. Guardá los cambios al terminar.</p>
             <div className="overflow-x-auto rounded-xl border border-slate-300 bg-background dark:border-slate-700">
