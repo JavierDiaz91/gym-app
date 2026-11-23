@@ -7,6 +7,11 @@ import { saveTrainingPlanDraft, publishTrainingPlan, duplicateTrainingPlan, assi
 type Plan = { id: number; title: string; durationWeeks: number; status: string; draft: PlanDraft };
 const field = "w-full rounded-lg border bg-background px-3 py-2 text-sm";
 const button = "rounded-lg border px-3 py-2 text-sm disabled:opacity-50";
+const suggestedSections = (): PlanBlock[] => [
+  { title: "Entrada en calor", type: "warmup", items: [] },
+  { title: "Entrenamiento principal", type: "main", items: [] },
+  { title: "Trabajo final", type: "custom", items: [] },
+];
 const blank = (weeks: number): PlanItem => ({
   key: "item-" + crypto.randomUUID(), title: "", imageUrl: "", instructions: "",
   prescriptions: Array.from({ length: weeks }, () => ({ sets: 3, reps: "10", restSeconds: 60 }))
@@ -33,7 +38,7 @@ function transformWeeks(draft: PlanDraft, fromWeek: number, toWeeks: number[], t
 
 export default function PlanEditor({ plan, members, exercises }: { plan: Plan; members: { id: number; name: string }[]; exercises: { id: number; name: string; imageUrl: string; instructions: string }[] }) {
   const router = useRouter();
-  const [draft, setDraft] = useState<PlanDraft>(() => plan.status === "draft" && (!plan.draft?.days || plan.draft.days.length === 0) ? { days: [{ title: "Día 1", modality: "strength", blocks: [] }] } : (plan.draft || { days: [] }));
+  const [draft, setDraft] = useState<PlanDraft>(() => plan.status === "draft" && (!plan.draft?.days || plan.draft.days.length === 0) ? { days: [{ title: "Día 1", modality: "strength", blocks: suggestedSections() }] } : (plan.draft || { days: [] }));
   const [week, setWeek] = useState(0);
   const [selectedDay, setSelectedDay] = useState(0);
   const [memberId, setMemberId] = useState(members[0]?.id || 0);
@@ -190,32 +195,32 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       <div role="status" className="rounded-xl border border-dashed border-slate-500/60 bg-slate-900/20 px-5 py-8 text-center dark:bg-slate-900/30">
         <p className="text-base font-semibold">Todavía no agregaste días de entrenamiento</p>
         <p className="mt-2 text-sm text-muted-foreground">Agregá un día para organizar los ejercicios de esta planificación.</p>
-        {editable && <button type="button" className={button + " mt-4 border-primary/60 text-primary dark:text-primary"} onClick={() => { setSelectedDay(0); change({ days: [{ title: "Día 1", modality: "strength", blocks: [] }] }); }}>+ Crear primer día</button>}
+        {editable && <button type="button" className={button + " mt-4 border-primary/60 text-primary dark:text-primary"} onClick={() => { setSelectedDay(0); change({ days: [{ title: "Día 1", modality: "strength", blocks: suggestedSections() }] }); }}>+ Crear primer día</button>}
       </div>
     ) : <nav aria-label="Seleccionar día de entrenamiento" className="flex flex-wrap gap-2 rounded-xl border border-slate-300 p-3 dark:border-slate-700">
       {draft.days.map((day, di) => <button type="button" key={di} onClick={() => setSelectedDay(di)} aria-current={selectedDay === di ? "step" : undefined} className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${selectedDay === di ? "border-primary bg-primary/10 text-primary dark:text-primary" : "border-slate-300 hover:bg-muted dark:border-slate-600"}`}>{day.title.trim() === `Día ${di + 1}` ? day.title : `Día ${di + 1} · ${day.title}`}</button>)}
     </nav>}
     </section>
-    {draft.days.map((day, di) => selectedDay !== di ? null : <section key={di} className="rounded-2xl border border-slate-300 bg-muted/5 p-4 space-y-5 dark:border-slate-700">
+    {draft.days.map((day, di) => selectedDay !== di ? null : <section key={di} className="rounded-2xl border border-slate-300 bg-muted/5 p-4 space-y-3 dark:border-slate-700">
       <div className="flex flex-wrap gap-2 items-center">
         <input aria-label="Nombre del día" className={field + " max-w-sm font-semibold"} disabled={!editable} value={day.title} onChange={(e) => updateDay(di, (d) => ({ ...d, title: e.target.value }))}/>
         {editable && <button className={button} onClick={() => change({ days: draft.days.filter((_, i) => i !== di) })}>Eliminar día</button>}
       </div>
       <div className="space-y-1"><h3 className="text-base font-bold">Secciones del día</h3><p className="text-xs text-muted-foreground">Poné el título que prefieras a cada sección (por ejemplo, Entrada en calor, Principal o Abdominales) y agregá ejercicios dentro.</p></div>
-      {day.blocks.map((block, bi) => <details key={bi} className="group rounded-xl border border-slate-300 bg-muted/20 p-3 sm:p-4 dark:border-slate-700">
+      {day.blocks.map((block, bi) => <details key={bi} open={undefined} className="group rounded-xl border border-slate-300 bg-muted/20 p-3 dark:border-slate-700">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-1">
-          <span className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">{bi + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold">{block.title || "Bloque sin nombre"}</span><span className="block text-xs text-muted-foreground">{({warmup:"Entrada en calor",main:"Fuerza / principal",circuit:"Circuito temporizado",cooldown:"Vuelta a la calma",custom:"Otro bloque"} as Record<string,string>)[block.type] || "Entrenamiento"} · {block.items.length} {block.items.length === 1 ? "ejercicio" : "ejercicios"}{block.items.length === 0 ? " · Pendiente" : ""}</span></span></span>
-          <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar sección +</span><span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar sección −</span>
+          <span className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">{bi + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold">{block.title || "Sección sin nombre"}</span><span className="block text-xs text-muted-foreground">{"Ejercicios del día"} · {block.items.length} {block.items.length === 1 ? "ejercicio" : "ejercicios"}{block.items.length === 0 ? " · Pendiente" : ""}</span></span></span>
+          <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Abrir y agregar ejercicios +</span><span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar sección −</span>
         </summary>
         <div className="mt-3 space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-slate-700">
-          <label className="text-xs text-muted-foreground">Título de la sección<input aria-label="Título de la sección" className={field + " max-w-sm"} disabled={!editable} value={block.title} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, title: e.target.value }))}/></label>
-          <label className="text-xs text-muted-foreground">Tipo de entrenamiento<select aria-label="Tipo de bloque" disabled={!editable} className={field + " max-w-44"} value={block.type} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, type: e.target.value as PlanBlock["type"] }))}>
+        <div className="flex flex-wrap items-end gap-2 border-b border-slate-200 pb-3 dark:border-slate-700">
+          <label className="text-xs text-muted-foreground">Título de la sección<input aria-label="Título de la sección" className={field + " mt-1 max-w-sm"} disabled={!editable} value={block.title} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, title: e.target.value }))}/></label>
+          <details className="rounded-lg border border-slate-700/40 p-2"><summary className="cursor-pointer text-xs text-muted-foreground">Opciones de sección (tipo y ejecución)</summary><label className="mt-2 block text-xs text-muted-foreground">Tipo de entrenamiento<select aria-label="Tipo de bloque" disabled={!editable} className={field + " max-w-44"} value={block.type} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, type: e.target.value as PlanBlock["type"] }))}>
             {["warmup","main","circuit","cooldown","custom"].map((x) => <option key={x} value={x}>{({warmup:"Entrada en calor",main:"Principal",circuit:"Circuito",cooldown:"Vuelta a la calma",custom:"Otro"} as Record<string,string>)[x]}</option>)}
-          </select></label>
-          {editable && <button className={button + " text-rose-400"} onClick={() => { if (window.confirm("¿Eliminar este bloque y todos sus ejercicios?")) updateDay(di, (d) => ({ ...d, blocks: d.blocks.filter((_, i) => i !== bi) })); }}>Eliminar bloque</button>}
+          </select></label></details>
+          {editable && <button className={button + " text-rose-400"} onClick={() => { if (window.confirm("¿Eliminar este bloque y todos sus ejercicios?")) updateDay(di, (d) => ({ ...d, blocks: d.blocks.filter((_, i) => i !== bi) })); }}>Eliminar sección</button>}
         </div>
-        {block.type === "main" && <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+        {block.type === "main" && <details className="rounded-xl border border-primary/30 bg-primary/5 p-3"><summary className="cursor-pointer text-sm font-medium">Opciones avanzadas: biseries y triseries</summary><div className="mt-3 space-y-3">
           <div><h3 className="text-sm font-semibold">Cómo se ejecuta este bloque</h3><p className="text-xs text-muted-foreground">Agrupá los ejercicios y definí el descanso al terminar cada vuelta. No modifica las series, repeticiones ni RIR que ya cargaste.</p></div>
           <label className="block max-w-xs text-xs font-medium">Modalidad del bloque
             <select className={field + " mt-1"} disabled={!editable} value={block.strengthMode || "individual"} onChange={e => updateBlock(di, bi, b => ({ ...b, strengthMode: e.target.value as NonNullable<PlanBlock["strengthMode"]> }))}>
@@ -240,7 +245,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
               {block.items.length !== (block.strengthMode === "triserie" ? 3 : 2) && <p className="mt-2 text-xs text-amber-500">Revisá la cantidad de ejercicios: esta modalidad requiere {block.strengthMode === "triserie" ? 3 : 2}.</p>}
             </div>
           </>}
-        </div>}
+        </div></details>}
         {block.type === "circuit" && <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
           <div><h3 className="font-semibold text-sm">Configuración del circuito · Semana {week + 1}</h3><p className="text-xs text-muted-foreground">Los valores se aplican a todos los ejercicios de este bloque. Cada semana tiene su propia configuración.</p></div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -268,6 +273,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           }}>Copiar configuración a las demás semanas</button>}
           <p className="text-xs text-muted-foreground">Agregá los ejercicios debajo en el orden de ejecución. Guardá los cambios para conservar la configuración.</p>
         </div>}
+        {block.items.length === 0 && <p className="rounded-lg border border-dashed border-primary/30 p-3 text-xs text-muted-foreground">Esta sección está vacía. Agregá el primer ejercicio con el botón de abajo.</p>}
         {block.items.map((item, ii) => { const rx = item.prescriptions[week] || {}; return <details key={item.key} className="group relative rounded-xl border border-slate-300 bg-background p-3 shadow-sm dark:border-slate-700">
           <summary className="flex min-w-0 cursor-pointer list-none items-center gap-3 pr-20">
             {item.imageUrl ? <img src={item.imageUrl} alt={"Demostración de " + item.title} className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-slate-100 object-contain dark:border-slate-700" /> : <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">Sin imagen</span>}
@@ -292,8 +298,8 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
               {day.blocks.map((target, targetIndex) => <option key={targetIndex} value={targetIndex}>{targetIndex + 1}. {target.title || "Bloque sin nombre"}{targetIndex === bi ? " (actual)" : ""}</option>)}
             </select>
           </label>}
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="text-xs font-medium text-muted-foreground sm:col-span-3">Nombre del ejercicio
+          <div className="grid gap-2 sm:grid-cols-4">
+            <label className="text-xs font-medium text-muted-foreground sm:col-span-4">Nombre del ejercicio
               <input list={`exercise-catalog-${di}-${bi}-${ii}`} className={field + " mt-1"} disabled={!editable} placeholder="Buscar o escribir ejercicio" value={item.title} onChange={(e) => {
                 const name = e.target.value;
                 const ex = exercises.find(x => x.name.toLocaleLowerCase() === name.toLocaleLowerCase());
@@ -379,7 +385,7 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
           </div>
         </details>; })}
         {editable && <div className="flex flex-wrap gap-2 items-center">
-          <button type="button" className={button + " border-primary/50 text-primary"} onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio</button>
+          <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-black disabled:opacity-50" onClick={() => updateBlock(di, bi, (b) => ({ ...b, items: [...b.items, blank(plan.durationWeeks)] }))}>+ Agregar ejercicio</button>
           {exercises.length > 0 && <select aria-label="Agregar ejercicio desde mi biblioteca" className={field + " max-w-xs"} value="" onChange={(e) => {
             const ex = exercises.find(x => x.id === Number(e.target.value));
             if (!ex) return;
@@ -391,16 +397,9 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         </div>}
         </div>
       </details>)}
-      {editable && <div className="flex flex-wrap gap-2 rounded-xl border border-dashed border-primary/40 p-3">
-        <span className="w-full text-sm font-semibold">Agregar sección</span><p className="w-full text-xs text-muted-foreground">Elegí una opción inicial y cambiale el título como quieras. Después agregá ejercicios dentro.</p>
-        {([
-          ["main", "Entrenamiento principal", "Entrenamiento principal"],
-          ["circuit", "Circuito final", "Circuito final"],
-          ["warmup", "Entrada en calor", "Entrada en calor"],
-          ["cooldown", "Vuelta a la calma", "Vuelta a la calma"]
-        ] as const).map(([type, label, title]) =>
-          <button key={type} type="button" className={button + " hover:border-primary"} onClick={() => updateDay(di, d => ({ ...d, blocks: [...d.blocks, { title, type, items: [], ...(type === "circuit" ? { circuitWeeks: Array.from({ length: plan.durationWeeks }, () => ({ rounds: 4, workSeconds: 25, restSeconds: 15, betweenRoundsSeconds: 180, rpe: 9 })) } : {}) }] }))}>+ {label}</button>
-        )}
+      {editable && <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-primary/40 p-3">
+        <button type="button" className="rounded-lg border border-primary/60 px-3 py-2 text-sm font-semibold text-primary" onClick={() => updateDay(di, d => ({ ...d, blocks: [...d.blocks, { title: "Nueva sección", type: "custom", items: [] }] }))}>+ Agregar otra sección</button>
+        <span className="text-xs text-muted-foreground">Podés cambiarle el nombre y agregar ejercicios. Las secciones sugeridas son opcionales.</span>
       </div>}
     </section>)}
     {plan.status === "published" && <section id="asignar-alumno" className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-3">
