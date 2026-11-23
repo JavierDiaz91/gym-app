@@ -40,9 +40,9 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
   const [personalize, setPersonalize] = useState(false);
   const [message, setMessage] = useState("");
   const [scope, setScope] = useState<ProgressScope>("main");
-  const [repIncrement, setRepIncrement] = useState(2);
-  const [rirIncrement, setRirIncrement] = useState(-1);
-  const [deload, setDeload] = useState(true);
+  const [repIncrement, setRepIncrement] = useState(0);
+  const [rirIncrement, setRirIncrement] = useState(0);
+  const [deload, setDeload] = useState(false);
   const [preview, setPreview] = useState<PlanDraft | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(plan.draft || { days: [] }));
   const hasUnsavedChanges = plan.status === "draft" && JSON.stringify(draft) !== savedSnapshot;
@@ -141,13 +141,13 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
     {plan.status === "published" && <p className="rounded-lg border p-3 text-sm text-muted-foreground">Esta rutina ya está lista para asignar. Si querés modificarla, duplicala; también podés personalizarla para un alumno sin alterar la original.</p>}
     {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
     <section className="space-y-3 rounded-2xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Seleccionar semana y día">
-      <div className="space-y-1"><h2 className="text-lg font-bold">Organizá tu rutina</h2><p className="text-sm text-muted-foreground">Elegí un día, agregá bloques y completá los ejercicios. Abrí solo la sección que necesites editar.</p></div>
+      <div className="space-y-1"><h2 className="text-lg font-bold">Organizá tu rutina</h2><p className="text-sm text-muted-foreground">Elegí un día, poné nombre a cada sección y agregá sus ejercicios. Podés copiar los valores a las demás semanas.</p></div>
       <div className="flex flex-wrap gap-2 items-center">
       <span className="text-sm font-semibold">Semana de entrenamiento:</span>
       {Array.from({ length: plan.durationWeeks }, (_, i) => <button key={i} type="button" className={button + (week === i ? " border-primary text-primary" : "")} onClick={() => setWeek(i)}>{i + 1}</button>)}
     </div>
     {editable && <details className="rounded-xl border border-slate-300 bg-muted/10 p-4 dark:border-slate-700" aria-label="Progresión semanal avanzada">
-      <summary className="cursor-pointer list-item text-sm font-semibold">Opciones avanzadas de progresión <span className="ml-2 font-normal text-muted-foreground">· Opcional, configurar cuando la semana 1 esté lista</span></summary>
+      <summary className="cursor-pointer list-item text-sm font-semibold">Progresión entre semanas (opcional) <span className="ml-2 font-normal text-muted-foreground">· Sin aumentos automáticos por defecto</span></summary>
       <div className="mt-4 space-y-3">
       <h2 className="font-semibold">Automatización semanal</h2>
       <p className="text-sm text-muted-foreground">Las semanas mantienen parámetros independientes. Los cambios se guardan al presionar Guardar borrador.</p>
@@ -159,10 +159,10 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
       </label>
       <button type="button" className={button} disabled={week === 0 || pending} onClick={copyPrevious}>Copiar semana anterior a semana {week + 1}</button>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="text-sm">Repeticiones adicionales por semana
+        <label className="text-sm">Aumentar repeticiones por semana (0 = mantener)
           <input type="number" className={field} step={1} min={-20} max={20} value={repIncrement} onChange={e => { setRepIncrement(bounded(Number(e.target.value) || 0, -20, 20)); setPreview(null); }} />
         </label>
-        <label className="text-sm">Cambio de RIR por semana (negativo = mayor esfuerzo)
+        <label className="text-sm">Cambio de RIR por semana (0 = mantener)
           <input type="number" className={field} step={1} min={-5} max={5} value={rirIncrement} onChange={e => { setRirIncrement(bounded(Number(e.target.value) || 0, -5, 5)); setPreview(null); }} />
         </label>
       </div>
@@ -201,15 +201,15 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         <input aria-label="Nombre del día" className={field + " max-w-sm font-semibold"} disabled={!editable} value={day.title} onChange={(e) => updateDay(di, (d) => ({ ...d, title: e.target.value }))}/>
         {editable && <button className={button} onClick={() => change({ days: draft.days.filter((_, i) => i !== di) })}>Eliminar día</button>}
       </div>
-      <div className="space-y-1"><h3 className="text-base font-bold">Bloques del entrenamiento</h3><p className="text-xs text-muted-foreground">Cada bloque es independiente. Tocá uno para editarlo; los demás quedan resumidos.</p></div>
+      <div className="space-y-1"><h3 className="text-base font-bold">Secciones del día</h3><p className="text-xs text-muted-foreground">Poné el título que prefieras a cada sección (por ejemplo, Entrada en calor, Principal o Abdominales) y agregá ejercicios dentro.</p></div>
       {day.blocks.map((block, bi) => <details key={bi} className="group rounded-xl border border-slate-300 bg-muted/20 p-3 sm:p-4 dark:border-slate-700">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-1">
           <span className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">{bi + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold">{block.title || "Bloque sin nombre"}</span><span className="block text-xs text-muted-foreground">{({warmup:"Entrada en calor",main:"Fuerza / principal",circuit:"Circuito temporizado",cooldown:"Vuelta a la calma",custom:"Otro bloque"} as Record<string,string>)[block.type] || "Entrenamiento"} · {block.items.length} {block.items.length === 1 ? "ejercicio" : "ejercicios"}{block.items.length === 0 ? " · Pendiente" : ""}</span></span></span>
-          <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar bloque +</span><span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar bloque −</span>
+          <span className="shrink-0 text-xs font-semibold text-primary group-open:hidden">Editar sección +</span><span className="hidden shrink-0 text-xs font-semibold text-primary group-open:inline">Cerrar sección −</span>
         </summary>
         <div className="mt-3 space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-slate-700">
-          <label className="text-xs text-muted-foreground">Nombre del bloque<input aria-label="Nombre del bloque" className={field + " max-w-sm"} disabled={!editable} value={block.title} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, title: e.target.value }))}/></label>
+          <label className="text-xs text-muted-foreground">Título de la sección<input aria-label="Título de la sección" className={field + " max-w-sm"} disabled={!editable} value={block.title} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, title: e.target.value }))}/></label>
           <label className="text-xs text-muted-foreground">Tipo de entrenamiento<select aria-label="Tipo de bloque" disabled={!editable} className={field + " max-w-44"} value={block.type} onChange={(e) => updateBlock(di, bi, (b) => ({ ...b, type: e.target.value as PlanBlock["type"] }))}>
             {["warmup","main","circuit","cooldown","custom"].map((x) => <option key={x} value={x}>{({warmup:"Entrada en calor",main:"Principal",circuit:"Circuito",cooldown:"Vuelta a la calma",custom:"Otro"} as Record<string,string>)[x]}</option>)}
           </select></label>
@@ -308,20 +308,21 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
             <label className="text-xs font-medium text-muted-foreground">Repeticiones
               <input aria-label="Repeticiones" className={field + " mt-1"} disabled={!editable} value={rx.reps ?? ""} onChange={e => updateRx(di,bi,ii,{reps:e.target.value})}/>
             </label>
-            <label className="text-xs font-medium text-muted-foreground">Pausa (seg)
+            <label className="text-xs font-medium text-muted-foreground">Descanso (seg)
               <input aria-label="Pausa en segundos" type="number" min={0} className={field + " mt-1"} disabled={!editable} value={rx.restSeconds ?? ""} onChange={e => updateRx(di,bi,ii,{restSeconds:e.target.value === "" ? undefined : Number(e.target.value)})}/>
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">RIR (opcional)
+              <input aria-label="RIR" className={field + " mt-1"} disabled={!editable} placeholder="Ej.: 2" value={rx.rir ?? ""} onChange={e => updateRx(di,bi,ii,{rir:e.target.value})}/>
             </label>
             </>}
           </div>
-          {block.type !== "circuit" && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3"><span className="text-xs font-medium">Semana {week + 1} de {plan.durationWeeks}</span>{editable && plan.durationWeeks > 1 && <button type="button" className={button + " text-xs"} onClick={() => copyExerciseWeek(di, bi, ii)}>Copiar a otras semanas</button>}</div>}
+          {block.type !== "circuit" && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3"><span className="text-xs font-medium">Semana {week + 1} de {plan.durationWeeks}</span>{editable && plan.durationWeeks > 1 && <button type="button" className={button + " text-xs"} onClick={() => copyExerciseWeek(di, bi, ii)}>Copiar estos valores a todas las semanas</button>}</div>}
           <details className="rounded-lg border border-slate-300 bg-muted/10 p-3 dark:border-slate-700">
-            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Más opciones: RIR, notas e imagen</summary>
+            <summary className="cursor-pointer text-sm font-semibold text-cyan-700 dark:text-primary">Más opciones: notas, imagen y progresión detallada</summary>
             <div className="mt-3">
           <div className="flex flex-wrap gap-2 items-start">
             <div className="flex-1 space-y-2">
-              {block.type !== "circuit" && <label className="block text-xs font-medium text-muted-foreground">RIR (repeticiones en reserva)
-                <input aria-label="RIR" className={field + " mt-1"} disabled={!editable} placeholder="Opcional" value={rx.rir ?? ""} onChange={e => updateRx(di,bi,ii,{rir:e.target.value})}/>
-              </label>}
+
               <select aria-label="Seleccionar ejercicio del catálogo" className={field} disabled={!editable} value="" onChange={(e) => { const ex = exercises.find((x) => x.id === Number(e.target.value)); if (!ex) return; updateItem(di, bi, ii, (current) => ({ ...current, title: ex.name, imageUrl: ex.imageUrl, instructions: ex.instructions, prescriptions: current.prescriptions })); setPreview(null); setMessage("Ejercicio seleccionado. Se conservaron las cargas de todas las semanas; guardá el borrador para confirmar el cambio."); }}>
                 <option value="">Elegir de Mis Ejercicios (biblioteca personal)</option>
                 {exercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
@@ -391,11 +392,11 @@ export default function PlanEditor({ plan, members, exercises }: { plan: Plan; m
         </div>
       </details>)}
       {editable && <div className="flex flex-wrap gap-2 rounded-xl border border-dashed border-primary/40 p-3">
-        <span className="w-full text-sm font-semibold">Agregar un bloque nuevo</span><p className="w-full text-xs text-muted-foreground">Elegí el tipo de sección. Abrila para ponerle nombre y agregar ejercicios.</p>
+        <span className="w-full text-sm font-semibold">Agregar sección</span><p className="w-full text-xs text-muted-foreground">Elegí una opción inicial y cambiale el título como quieras. Después agregá ejercicios dentro.</p>
         {([
-          ["main", "Fuerza", "Bloque de fuerza"],
-          ["circuit", "Circuito", "Circuito temporizado"],
-          ["warmup", "Calentamiento", "Entrada en calor"],
+          ["main", "Entrenamiento principal", "Entrenamiento principal"],
+          ["circuit", "Circuito final", "Circuito final"],
+          ["warmup", "Entrada en calor", "Entrada en calor"],
           ["cooldown", "Vuelta a la calma", "Vuelta a la calma"]
         ] as const).map(([type, label, title]) =>
           <button key={type} type="button" className={button + " hover:border-primary"} onClick={() => updateDay(di, d => ({ ...d, blocks: [...d.blocks, { title, type, items: [], ...(type === "circuit" ? { circuitWeeks: Array.from({ length: plan.durationWeeks }, () => ({ rounds: 4, workSeconds: 25, restSeconds: 15, betweenRoundsSeconds: 180, rpe: 9 })) } : {}) }] }))}>+ {label}</button>
