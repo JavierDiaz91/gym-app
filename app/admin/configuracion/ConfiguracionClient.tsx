@@ -392,7 +392,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
             </CardHeader>
 
             <CardContent className="space-y-6">
-              <div className="flex flex-col md:flex-row items-center gap-8 bg-[#0d0f12] p-6 rounded-2xl border border-gray-800">
+              <div className="flex flex-col md:flex-row items-center gap-4 sm:gap-8 bg-[#0d0f12] p-3 sm:p-6 rounded-2xl border border-gray-800">
                 <div className="bg-white p-4 rounded-2xl shadow-xl flex flex-col items-center justify-center flex-shrink-0" id="qr-printable">
                   {registerUrl ? (
                     <QRCodeSVG
@@ -542,7 +542,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
 
                 {/* Cierres Especiales / Feriados */}
                 <div className="space-y-4 pt-4 border-t border-gray-800">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Feriados y Cierres Especiales</h3>
                       <p className="text-xs text-gray-500">Se mostrarÃ¡n avisos automÃ¡ticos en la app de los alumnos.</p>
@@ -564,7 +564,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                   ) : (
                     <div className="space-y-2">
                       {feriados.map((f) => (
-                        <div key={f.id} className="flex items-center gap-3 bg-[#0d0f12] p-3 rounded-xl border border-gray-800">
+                        <div key={f.id} className="flex flex-wrap items-center gap-3 bg-[#0d0f12] p-3 rounded-xl border border-gray-800">
                           <Input
                             type="date"
                             value={f.fecha}
@@ -614,7 +614,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSaveNotificaciones} className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <Label className="text-white">Nuevos registros</Label>
                     <p className="text-sm text-gray-400">Recibir notificaciÃ³n cuando se registre un nuevo miembro</p>
@@ -624,7 +624,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                     onCheckedChange={(checked) => setNotifForm({ ...notifForm, nuevosRegistros: checked })}
                   />
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <Label className="text-white">MembresÃ­as por vencer</Label>
                     <p className="text-sm text-gray-400">Alertas de membresÃ­as prÃ³ximas a expirar</p>
@@ -634,7 +634,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                     onCheckedChange={(checked) => setNotifForm({ ...notifForm, membresiasVencer: checked })}
                   />
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <Label className="text-white">Pagos recibidos</Label>
                     <p className="text-sm text-gray-400">NotificaciÃ³n de cada pago procesado</p>
@@ -644,7 +644,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                     onCheckedChange={(checked) => setNotifForm({ ...notifForm, pagosRecibidos: checked })}
                   />
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <Label className="text-white">Reservas de clases</Label>
                     <p className="text-sm text-gray-400">Alertas cuando se llene una clase</p>
