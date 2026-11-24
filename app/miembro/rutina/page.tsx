@@ -104,42 +104,31 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
       rir: row.actual_rir == null ? null : Number(row.actual_rir),
     }));
     return (
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
-        <Link href="/miembro" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft className="w-4 h-4" /> Volver al panel</Link>
-        <div>
-          <p className="text-xs font-semibold text-primary">Plan de entrenamiento · {duration} semanas</p>
-          <h1 className="text-2xl font-bold">{String(assignments[0].title || "Mi plan de entrenamiento")}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Inicio: {startDate} · Duración: {duration} semanas · {currentWeek ? `Semana vigente: ${currentWeek}` : elapsedDays < 0 ? 'Plan programado' : 'Plan vencido'}</p>
-        </div>
-        <section className="space-y-2">
-          <h2 className="font-semibold">Seleccionar semana</h2>
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: duration }, (_, index) => index + 1).map((n) => (
-              <Link key={n} href={`${planUrl}&week=${n}&day=${day}`}
-                aria-current={n === week ? "page" : undefined}
-                className={`px-4 py-2 rounded-lg border text-sm ${n === week ? "bg-primary text-primary-foreground" : "bg-card"}`}>
-                Semana {n} · {weekState(n)}
-              </Link>
-            ))}
+      <div className="mx-auto max-w-4xl space-y-3 px-3 py-4 sm:space-y-5 sm:p-6">
+        <header className="space-y-2 rounded-2xl border border-border bg-card p-3.5 sm:p-5">
+          <Link href="/miembro" className="inline-flex items-center gap-1.5 text-xs font-medium text-primary"><ArrowLeft className="h-4 w-4" /> Mi panel</Link>
+          <h1 className="break-words text-lg font-bold leading-snug sm:text-2xl">{String(assignments[0].title || "Mi plan de entrenamiento")}</h1>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>{duration} semanas</span>
+            <span aria-hidden="true">·</span>
+            <span>{currentWeek ? `Semana ${currentWeek} activa` : elapsedDays < 0 ? "Programado" : "Finalizado"}</span>
+            <span aria-hidden="true">·</span>
+            <span>Desde {startDate.split("-").reverse().join("/")}</span>
           </div>
-        </section>
-        <section className="space-y-2">
-          <h2 className="font-semibold">Días de entrenamiento</h2>
-          <div className="flex flex-wrap gap-2">
-            {days.map((d, index) => (
-              <Link key={index} href={`${planUrl}&week=${week}&day=${index + 1}`}
-                aria-current={index + 1 === day ? "page" : undefined}
-                className={`px-4 py-2 rounded-lg border text-sm ${index + 1 === day ? "bg-primary text-primary-foreground" : "bg-card"}`}>
-                Día {index + 1}: {d.title}
-              </Link>
-            ))}
-          </div>
-        </section>
-        {!canEditWeek && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">{elapsedDays < (week - 1) * 7 ? 'Esta semana todavía no comenzó. Podés consultar los ejercicios, pero no registrar actividad.' : 'Esta semana ya venció. Podés consultar los ejercicios y las cargas guardadas, pero no modificarla.'}</p>}
+          {days.length > 1 && <nav aria-label="Elegir día de entrenamiento" className="flex flex-wrap gap-2 pt-1">
+            {days.map((d, index) => <Link key={index} href={`${planUrl}&week=${week}&day=${index + 1}`} aria-current={index + 1 === day ? "page" : undefined}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${index + 1 === day ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>
+              {d.title?.trim() && d.title.trim().toLowerCase() !== `día ${index + 1}` ? d.title : `Día ${index + 1}`}
+            </Link>)}
+          </nav>}
+        </header>
+        {!canEditWeek && <p role="status" className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+          {elapsedDays < (week - 1) * 7 ? "Podés consultar este entrenamiento. El registro se habilita cuando comience la semana." : "Esta semana ya terminó. Podés consultar los ejercicios y las cargas registradas."}
+        </p>}
         {selectedDay ? (
           <PlanSessionClient
             key={`${planAssignmentId}-${week}-${day}`}
-            assignmentId={planAssignmentId} week={week} day={day} readOnly={!canEditWeek}
+            assignmentId={planAssignmentId} week={week} day={day} durationWeeks={duration} planUrl={planUrl} readOnly={!canEditWeek}
             title={selectedDay.title} blocks={verifiedBlocks}
             status={String(workoutSession?.status || "not_started")}
             initialCompleted={completedRows.map((r) => String(r.item_snapshot_key))}

@@ -75,8 +75,9 @@ export async function createTrainingPlan(input: PlanInput): Promise<{ success: b
     const ids = categoryIds.map(Number);
     const created = await sql`
       WITH inserted AS (
-        INSERT INTO training_plans (gym_id, trainer_id, title, description, duration_weeks)
-        VALUES (${gymId}, ${trainerId}, ${title}, ${description}, ${duration})
+        INSERT INTO training_plans (gym_id, trainer_id, title, description, duration_weeks, draft_jsonb)
+        VALUES (${gymId}, ${trainerId}, ${title}, ${description}, ${duration},
+          '{"days":[{"title":"Día 1","modality":"strength","blocks":[]}]}'::jsonb)
         RETURNING id
       )
       INSERT INTO training_plan_categories (plan_id, category_id)
@@ -97,7 +98,8 @@ export type Prescription = {
   distanceMeters?: number; durationSeconds?: number; pace?: string; notes?: string;
 };
 export type PlanItem = { key: string; title: string; imageUrl?: string; instructions?: string; prescriptions: Prescription[] };
-export type PlanBlock = { title: string; type: "warmup" | "main" | "circuit" | "cooldown" | "custom"; items: PlanItem[] };
+export type CircuitWeek = { rounds: number; workSeconds: number; restSeconds: number; betweenRoundsSeconds: number; rpe?: number };
+export type PlanBlock = { title: string; type: "warmup" | "main" | "circuit" | "cooldown" | "custom"; items: PlanItem[]; circuitWeeks?: CircuitWeek[]; strengthMode?: "individual" | "biserie" | "triserie"; betweenSetsRestMinSeconds?: number; betweenSetsRestMaxSeconds?: number };
 export type PlanDay = { title: string; modality: "strength" | "running" | "mixed" | "mobility" | "other"; blocks: PlanBlock[] };
 export type PlanDraft = { days: PlanDay[] };
 
@@ -109,6 +111,19 @@ function validDraft(draft: PlanDraft, weeks: number) {
     Array.isArray(day.blocks) && day.blocks.length <= 20 &&
     day.blocks.every((block) => typeof block.title === "string" && block.title.length <= 150 &&
       ["warmup","main","circuit","cooldown","custom"].includes(block.type) &&
+      (block.circuitWeeks === undefined || (block.type === "circuit" &&
+        Array.isArray(block.circuitWeeks) && block.circuitWeeks.length === weeks &&
+        block.circuitWeeks.every((config) =>
+          config && Number.isInteger(config.rounds) && config.rounds >= 1 && config.rounds <= 100 &&
+          Number.isInteger(config.workSeconds) && config.workSeconds >= 1 && config.workSeconds <= 3600 &&
+          Number.isInteger(config.restSeconds) && config.restSeconds >= 0 && config.restSeconds <= 3600 &&
+          Number.isInteger(config.betweenRoundsSeconds) && config.betweenRoundsSeconds >= 0 && config.betweenRoundsSeconds <= 7200 &&
+          (config.rpe === undefined || (Number.isInteger(config.rpe) && config.rpe >= 1 && config.rpe <= 10))
+        ))) &&
+      (block.strengthMode === undefined || (block.type === "main" && ["individual","biserie","triserie"].includes(block.strengthMode))) &&
+      (block.betweenSetsRestMinSeconds === undefined || (block.type === "main" && Number.isInteger(block.betweenSetsRestMinSeconds) && block.betweenSetsRestMinSeconds >= 0 && block.betweenSetsRestMinSeconds <= 7200)) &&
+      (block.betweenSetsRestMaxSeconds === undefined || (block.type === "main" && Number.isInteger(block.betweenSetsRestMaxSeconds) && block.betweenSetsRestMaxSeconds >= 0 && block.betweenSetsRestMaxSeconds <= 7200)) &&
+      (block.betweenSetsRestMinSeconds === undefined || block.betweenSetsRestMaxSeconds === undefined || block.betweenSetsRestMaxSeconds >= block.betweenSetsRestMinSeconds) &&
       Array.isArray(block.items) && block.items.length <= 60 &&
       block.items.every((item) =>
         typeof item.key === "string" && item.key.length <= 100 &&

@@ -7,19 +7,38 @@ import { startPlanSession, finishPlanSession, markPlanExercise, saveActualSet } 
 type Prescription = { sets?: number; reps?: string; rir?: string; restSeconds?: number; durationSeconds?: number; distanceMeters?: number; tempo?: string; notes?: string };
 type Item = { key: string; title: string; imageUrl?: string; imageVerified?: boolean; instructions?: string; prescriptions: Prescription[] };
 type SetLog = { key: string; setIndex: number; reps: number | null; load: number | null; rir: number | null };
-type Block = { title: string; type?: string; items: Item[] };
-type Props = { readOnly?: boolean; assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; initialSets: SetLog[]; startedAt?: string | null; finishedAt?: string | null };
+type Block = { title: string; type?: string; strengthMode?: "individual" | "biserie" | "triserie"; betweenSetsRestMinSeconds?: number; betweenSetsRestMaxSeconds?: number; items: Item[]; circuitWeeks?: { rounds: number; workSeconds: number; restSeconds: number; betweenRoundsSeconds: number; rpe?: number }[] };
+type Props = { durationWeeks?: number; planUrl?: string; readOnly?: boolean; assignmentId: number; week: number; day: number; title: string; blocks: Block[]; status: string; initialCompleted: string[]; initialSets: SetLog[]; startedAt?: string | null; finishedAt?: string | null };
 
-export default function PlanSessionClient({ readOnly = false, assignmentId, week, day, title, blocks, status, initialCompleted, initialSets, startedAt, finishedAt }: Props) {
+export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly = false, assignmentId, week, day, title, blocks, status, initialCompleted, initialSets, startedAt, finishedAt }: Props) {
   const router = useRouter();
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [pending, transition] = useTransition();
   const [error, setError] = useState("");
   const [completed, setCompleted] = useState<string[]>(initialCompleted);
   const [sets, setSets] = useState<SetLog[]>(initialSets);
   const [dirtySeries, setDirtySeries] = useState<string[]>([]);
+  const [activeExercise, setActiveExercise] = useState<number | null>(null);
   const seriesId = (key: string, index: number) => `${key}:${index}`;
-  const total = blocks.reduce((n, b) => n + b.items.length, 0);
+  const restLabel = (seconds: number) => seconds % 60 === 0 ? `${seconds / 60} min` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
+  const exerciseOrder = blocks.flatMap((block, blockIndex) => block.items.map((item, itemIndex) => ({ blockIndex, itemIndex, item, block })));
+  const total = exerciseOrder.length;
+  const selected = activeExercise === null ? null : exerciseOrder[activeExercise] ?? null;
+  function navigateExercise(next: number | null) {
+    if (dirtySeries.length && !window.confirm("Tenés series con cambios sin guardar. ¿Continuar y descartarlos?")) return;
+    setActiveExercise(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
   const done = blocks.reduce((n, b) => n + b.items.filter(i => completed.includes(i.key)).length, 0);
+  const isFinished = status === "completed";
+  const elapsedSeconds = startedAt && finishedAt ? Math.max(0, Math.floor((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 1000)) : null;
+  const elapsedLabel = elapsedSeconds !== null && Number.isFinite(elapsedSeconds) ? `${Math.floor(elapsedSeconds / 3600) ? `${Math.floor(elapsedSeconds / 3600)} h ` : ""}${Math.floor(elapsedSeconds % 3600 / 60)} min ${elapsedSeconds % 60} s` : null;
+  function changeWeek(target: number) {
+    if (!planUrl || target < 1 || target > durationWeeks || target === week) return;
+    if (dirtySeries.length && !window.confirm("Tenés series con cambios sin guardar. ¿Cambiar de semana y descartarlos?")) return;
+    router.push(`${planUrl}&week=${target}&day=${day}`);
+  }
   function run(action: () => Promise<{success:boolean;error?:string}>, after?: () => void) {
     setError("");
     transition(async () => {
@@ -32,65 +51,154 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
     });
   }
   return (
-    <div className="space-y-7">
-      <section className="rounded-2xl border-2 border-border bg-card p-5 shadow-sm space-y-4">
+    <div className="min-w-0 space-y-3 sm:space-y-5">
+      {activeExercise === null && planUrl && durationWeeks > 1 && <nav aria-label="Semanas del entrenamiento" className="min-w-0 rounded-2xl border border-primary/20 bg-card p-3 sm:p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><p className="text-xs font-bold uppercase tracking-widest text-primary">Mi entrenamiento</p><span className="text-[11px] text-muted-foreground">Elegí una semana o deslizá</span></div>
+        <div className="grid grid-cols-4 gap-1.5 sm:flex sm:gap-2">
+          {Array.from({ length: durationWeeks }, (_, i) => i + 1).map(n => <button type="button" key={n} aria-current={n === week ? "page" : undefined} onClick={() => changeWeek(n)} className={`min-w-0 rounded-xl border px-1 py-2.5 text-center transition-colors sm:min-w-16 sm:flex-1 sm:px-3 sm:py-3 ${n === week ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-muted/40 hover:border-primary/50"}`}><span className="block text-[10px] font-semibold uppercase opacity-80">Semana</span><span className="block text-xl font-black">{n}</span></button>)}
+        </div>
+        <div className="flex items-center justify-between gap-2"><button type="button" onClick={() => changeWeek(week - 1)} disabled={week <= 1} className="rounded-lg border border-border px-2 py-2 text-[11px] font-semibold disabled:opacity-30 sm:px-3 sm:text-xs">← Anterior</button><span className="text-center text-xs font-semibold sm:text-sm">Semana {week} de {durationWeeks}</span><button type="button" onClick={() => changeWeek(week + 1)} disabled={week >= durationWeeks} className="rounded-lg border border-border px-2 py-2 text-[11px] font-semibold disabled:opacity-30 sm:px-3 sm:text-xs">Siguiente →</button></div>
+      </nav>}
+      <div className="min-w-0 space-y-3 rounded-2xl border border-primary/20 bg-muted/10 p-2.5 sm:space-y-5 sm:rounded-3xl sm:p-5"
+        onTouchStart={e => { setTouchStartX(e.touches[0]?.clientX ?? null); setTouchStartY(e.touches[0]?.clientY ?? null); }}
+        onTouchEnd={e => {
+          if (touchStartX === null || touchStartY === null) return;
+          const deltaX = (e.changedTouches[0]?.clientX ?? touchStartX) - touchStartX;
+          const deltaY = (e.changedTouches[0]?.clientY ?? touchStartY) - touchStartY;
+          if (Math.abs(deltaX) > 85 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) changeWeek(week + (deltaX < 0 ? 1 : -1));
+          setTouchStartX(null); setTouchStartY(null);
+        }}>
+        {!selected && <div className="flex items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-widest text-primary">Semana {week} · Día {day}</p><h2 className="text-lg font-extrabold">Tu entrenamiento</h2></div><span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">{total} ejercicios</span></div>}
+      {!selected && <section className="rounded-xl border border-border bg-card p-3 shadow-sm space-y-3 sm:rounded-2xl sm:p-5 sm:space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold text-primary uppercase tracking-wide">Semana {week} · Día {day}</p>
             <h2 className="text-xl font-bold">{title}</h2>
-            <p className="text-sm text-muted-foreground">{status === "completed" ? "Sesión finalizada" : readOnly ? "Consulta de semana fuera de vigencia" : status === "in_progress" ? "Sesión en curso" : "Lista para empezar"}</p>
+            {!isFinished && <p className="text-sm text-muted-foreground">{readOnly ? "Consulta de semana fuera de vigencia" : status === "in_progress" ? "Sesión en curso" : "Lista para empezar"}</p>}
           </div>
           <div className="rounded-xl bg-muted px-4 py-2 text-sm font-semibold">{done} de {total} ejercicios</div>
         </div>
         <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary transition-all" style={{ width: total ? `${done / total * 100}%` : "0%" }} /></div>
         {!readOnly && status === "not_started" && <button disabled={pending} onClick={() => run(() => startPlanSession(assignmentId, week, day))} className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground disabled:opacity-50">Iniciar actividad</button>}
-        {!readOnly && status === "in_progress" && <button disabled={pending || done !== total || total === 0} onClick={() => {
+        {!readOnly && status === "in_progress" && <button disabled={pending || total === 0} onClick={() => {
           if (dirtySeries.length && !window.confirm(`Tenés ${dirtySeries.length} serie(s) con cambios sin guardar. Si finalizás ahora, esos cambios se perderán. ¿Finalizar igualmente?`)) return;
-          if (!window.confirm("¿Finalizar esta actividad? No podrás volver a editarla.")) return;
+          if (!window.confirm(done === total ? "¿Finalizar esta actividad? No podrás volver a editarla." : `Realizaste ${done} de ${total} ejercicios. ¿Finalizar la actividad como parcial? No podrás volver a editarla.`)) return;
           run(() => finishPlanSession(assignmentId, week, day));
         }} className="w-full rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-40">Finalizar actividad</button>}
-        {!readOnly && status === "in_progress" && done !== total && <p className="text-xs text-muted-foreground">Marcá todos los ejercicios realizados para habilitar la finalización.</p>}
-        {status === "completed" && <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-700 dark:text-emerald-300">Actividad finalizada. No se puede finalizar por segunda vez.</div>}
-        {startedAt && <p className="text-xs text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
+        {!readOnly && status === "in_progress" && done !== total && <p className="text-xs text-muted-foreground">Podés finalizar la sesión aunque queden ejercicios pendientes; se conservará el progreso registrado.</p>}
+        {isFinished && <div role="status" className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-3">
+          <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{done === total ? "✓ Entrenamiento completado" : "✓ Sesión finalizada parcialmente"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{done} de {total} ejercicios realizados{elapsedLabel ? ` · ${elapsedLabel}` : ""}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Sesión de solo lectura. Podés revisar tus ejercicios y cargas.</p>
+          {startedAt && <p className="mt-1 text-[11px] text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
+        </div>}
+        {!isFinished && startedAt && <p className="text-xs text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
         {!readOnly && status === "in_progress" && dirtySeries.length > 0 && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">Tenés {dirtySeries.length} serie(s) con cambios sin guardar. Guardalas antes de finalizar para conservar sus valores.</p>}
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
-      </section>
-      {blocks.map((block, index) => (
-        <section key={index} className="space-y-4">
-          <div className="flex items-center gap-3 border-b-2 border-slate-300 pb-3 dark:border-slate-700"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><h3 className="text-lg font-bold">{block.title}</h3></div>
+      </section>}
+      {selected && <nav aria-label="Navegación de ejercicios" className="rounded-xl border border-primary/30 bg-card p-3 shadow-sm">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <button type="button" onClick={() => navigateExercise(null)} className="text-xs font-semibold text-primary">← Volver a la rutina</button>
+          <span className="text-xs font-bold text-muted-foreground">Ejercicio {activeExercise! + 1} de {total}</span>
+        </div>
+        <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary" style={{ width: `${(activeExercise! + 1) / Math.max(total, 1) * 100}%` }} /></div>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" disabled={activeExercise === 0} onClick={() => navigateExercise(activeExercise! - 1)} className="rounded-lg border border-border px-3 py-3 text-sm font-semibold disabled:opacity-30">← Anterior</button>
+          <button type="button" onClick={() => navigateExercise(activeExercise! + 1 < total ? activeExercise! + 1 : null)} className="rounded-lg bg-primary px-3 py-3 text-sm font-bold text-primary-foreground">{activeExercise! + 1 < total ? "Siguiente ejercicio →" : "Volver al resumen ✓"}</button>
+        </div>
+      </nav>}
+      {!selected && total > 0 && <>
+        <button type="button" onClick={() => navigateExercise(0)} className="w-full rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground">{isFinished ? "Revisar ejercicios realizados →" : "Comenzar a ver ejercicios →"}</button>
+        <div className="space-y-2" aria-label="Secciones del entrenamiento">
+          <p className="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Secciones del día</p>
+          {blocks.map((block, blockIndex) => {
+            if (!block.items.length) return null;
+            const first = exerciseOrder.findIndex(x => x.blockIndex === blockIndex);
+            const completedInBlock = block.items.filter(item => completed.includes(item.key)).length;
+            return <button key={blockIndex} type="button" onClick={() => navigateExercise(first)} className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-primary/50">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">{blockIndex + 1}</span>
+              <span className="min-w-0 flex-1"><span className="block text-sm font-bold">{block.title}</span><span className="block text-xs text-muted-foreground">{block.items.length} ejercicios · {completedInBlock} completados</span></span>
+              <span className="shrink-0 text-sm font-bold text-primary" aria-hidden="true">→</span>
+            </button>;
+          })}
+        </div>
+      </>}
+      {selected && blocks.filter(block => block.items.length > 0).map((block, index) => (
+        <details key={`${index}-${selected ? "focus" : "list"}`} open={selected ? selected.blockIndex === index : index === 0 ? true : undefined} className={`group min-w-0 space-y-2 rounded-xl border border-border bg-card p-2 sm:space-y-3 sm:rounded-2xl sm:p-4 ${selected && selected.blockIndex !== index ? "hidden" : ""}`} >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 sm:gap-3">
+            <span className="flex min-w-0 items-center gap-2 sm:gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span className="min-w-0"><span className="block text-sm font-bold leading-snug sm:text-base">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? (() => { const cfg = block.circuitWeeks?.[week - 1]; return cfg ? `${cfg.rounds} vueltas · ${cfg.workSeconds}s trabajo · ${cfg.restSeconds}s pausa · ${block.items.length} ejercicios` : `Circuito · ${block.items.length} ejercicios`; })() : block.type === "main" && (block.strengthMode === "triserie" || block.strengthMode === "biserie") ? `${block.strengthMode === "triserie" ? "Triserie" : "Biserie"} · ${block.items.length} ejercicios en secuencia` : `Entrenamiento · ${block.items.length} ejercicios` }</span></span></span>
+            <span className="shrink-0 text-[11px] font-semibold text-primary group-open:hidden sm:text-xs">Ver ejercicios +</span><span className="hidden shrink-0 text-[11px] font-semibold text-primary group-open:inline sm:text-xs">Ocultar −</span>
+          </summary>
+          {block.type === "main" && (block.strengthMode === "triserie" || block.strengthMode === "biserie") && (() => {
+            const rounds = block.items.map(item => item.prescriptions?.[week - 1]?.sets).filter((value): value is number => typeof value === "number" && value > 0);
+            const sameRounds = rounds.length === block.items.length && rounds.every(value => value === rounds[0]);
+            const minRest = block.betweenSetsRestMinSeconds;
+            const maxRest = block.betweenSetsRestMaxSeconds;
+            return <div className="rounded-lg bg-primary/5 px-3 py-2.5 space-y-2" aria-label="Secuencia de ejercicios">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold uppercase tracking-wide text-primary">{block.strengthMode === "triserie" ? "Triserie" : "Biserie"} · {sameRounds ? `${rounds[0]} ${rounds[0] === 1 ? "vuelta" : "vueltas"}` : `Semana ${week}`}</span>
+                <span className="text-xs text-muted-foreground">En orden</span>
+              </div>
+              <ol className="flex flex-wrap gap-x-2 gap-y-1 text-xs leading-relaxed">
+                {block.items.map((item, i) => <li key={item.key || i} className="inline-flex items-center gap-1"><span className="font-bold text-primary">{i + 1}.</span><span className="font-medium">{item.title}</span>{i < block.items.length - 1 && <span className="ml-1 text-primary/70" aria-hidden="true">→</span>}</li>)}
+              </ol>
+              <p className="border-t border-primary/15 pt-2 text-xs text-muted-foreground">Descanso entre vueltas: <strong className="text-foreground">{minRest !== undefined && maxRest !== undefined ? `${restLabel(minRest)} – ${restLabel(maxRest)}` : minRest !== undefined ? restLabel(minRest) : maxRest !== undefined ? restLabel(maxRest) : "Según tu entrenador"}</strong></p>
+            </div>;
+          })()}
+          {block.type === "circuit" && block.circuitWeeks?.[week - 1] && (() => {
+            const config = block.circuitWeeks[week - 1];
+            return <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-primary">Circuito · Semana {week}</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {[
+                  ["Vueltas", String(config.rounds)],
+                  ["Trabajo", config.workSeconds + " seg"],
+                  ["Descanso", config.restSeconds + " seg"],
+                  ["Entre vueltas", config.betweenRoundsSeconds + " seg"],
+                  ["Esfuerzo", config.rpe ? config.rpe + "/10" : "—"]
+                ].map(([label, value]) => <div key={label} className="rounded-lg bg-background border p-2"><p className="text-xs text-muted-foreground">{label}</p><p className="text-base font-bold">{value}</p></div>)}
+              </div>
+              <p className="text-xs text-muted-foreground">Realizá los ejercicios en el orden indicado y repetí el circuito durante las vueltas configuradas.</p>
+            </div>;
+          })()}
           {block.items.map((item, itemIndex) => {
+            if (selected && (selected.blockIndex !== index || selected.itemIndex !== itemIndex)) return null;
             const p = item.prescriptions?.[week - 1] || {};
             const checked = completed.includes(item.key);
             return (
-              <article key={item.key || itemIndex} className={`overflow-hidden rounded-2xl border-2 bg-card shadow-md ring-1 ring-border transition-colors ${checked ? "border-emerald-500 dark:border-emerald-400" : "border-border"}`}>
-                {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className="border-b p-3"><details className="group"><summary className="cursor-pointer text-sm font-semibold text-primary">Ver demostración del ejercicio</summary><img src={item.imageUrl} alt={`Demostración verificada de ${item.title}`} loading="lazy" className="mt-3 h-36 w-48 max-w-full rounded-xl border border-slate-300 bg-slate-100 p-2 object-contain grayscale dark:border-slate-600" /></details></div>}
-                <div className="p-4 sm:p-5 space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div><p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p><h4 className="text-lg font-bold text-foreground">{item.title}</h4></div>
-                    {status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-sm font-semibold cursor-pointer"><input type="checkbox" disabled={pending || readOnly || status === "completed"} checked={checked} onChange={e => {
-                      const next = e.target.checked;
-                      run(() => markPlanExercise(assignmentId, week, day, item.key, next), () => setCompleted(old => next ? [...old.filter(k => k !== item.key), item.key] : old.filter(k => k !== item.key)));
-                    }} className="h-5 w-5 accent-emerald-600" />Hecho</label>}
+              <article key={item.key || itemIndex} className="min-w-0 overflow-hidden rounded-xl border border-border bg-card transition-colors">
+                {item.imageVerified === true && item.imageUrl && /^https:\/\//.test(item.imageUrl) && <div className={`flex w-full items-center justify-center bg-muted/30 ${selected ? "h-56 sm:h-72" : "h-48 sm:h-64 lg:h-72"}`}><img src={item.imageUrl} alt={`Demostración de ${item.title}`} loading="lazy" className="h-full w-full object-contain" /></div>}
+                <div className="flex flex-wrap items-center gap-2 p-3 sm:flex-nowrap sm:gap-3 sm:p-4">
+                  
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-muted-foreground">Ejercicio {itemIndex + 1}</p>
+                    <h4 className="text-sm font-bold leading-snug sm:text-base">{item.title}</h4>
+                    {block.type !== "circuit" && <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">{[p.sets ? `${p.sets} series` : null, p.reps ? `${p.reps} reps` : null, p.restSeconds != null ? `Descanso ${p.restSeconds} s` : null, p.rir ? `RIR ${p.rir}` : null].filter(Boolean).map(value => <span key={value} className="rounded-lg bg-primary/10 px-2 py-1 text-xs font-bold text-primary">{value}</span>)}</div>}
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {p.sets != null && <div className="rounded-xl border border-border bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Series</p><p className="text-lg font-bold">{p.sets}</p></div>}
-                    {p.reps && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Repeticiones</p><p className="text-lg font-bold">{p.reps}</p></div>}
+                  {isFinished && checked ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><span aria-hidden="true">✓</span> Hecho</span> : status !== "not_started" && <label className="flex shrink-0 items-center gap-2 text-xs font-semibold cursor-pointer"><input type="checkbox" disabled={pending || readOnly || status === "completed"} checked={checked} onChange={e => {
+                    const next = e.target.checked;
+                    run(() => markPlanExercise(assignmentId, week, day, item.key, next), () => setCompleted(old => next ? [...old.filter(k => k !== item.key), item.key] : old.filter(k => k !== item.key)));
+                  }} className="h-5 w-5 accent-emerald-600" />Hecho</label>}
+                </div>
+                <details open={selected ? true : undefined} key={selected ? `focus-${item.key}` : `list-${item.key}`} className="group/exercise border-t border-border">
+                  <summary className="cursor-pointer list-none px-3 py-3 text-xs font-semibold text-primary sm:px-4"><span className="group-open/exercise:hidden">Indicaciones y registro +</span><span className="hidden group-open/exercise:inline">Ocultar detalles −</span></summary>
+                  <div className="space-y-3 px-3 pb-4 sm:px-4">
+                  {block.type !== "circuit" && [p.durationSeconds, p.restSeconds, p.tempo, p.distanceMeters].some(v => v !== undefined && v !== null && v !== "") && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {p.durationSeconds != null && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Duración</p><p className="text-lg font-bold">{p.durationSeconds} seg</p></div>}
-                    {p.rir && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">RIR</p><p className="text-lg font-bold">{p.rir}</p></div>}
                     {p.restSeconds != null && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Descanso</p><p className="text-lg font-bold">{p.restSeconds} seg</p></div>}
                     {p.tempo && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Tempo</p><p className="text-lg font-bold">{p.tempo}</p></div>}
                     {p.distanceMeters != null && <div className="rounded-xl bg-muted/70 p-3"><p className="text-xs text-muted-foreground">Distancia</p><p className="text-lg font-bold">{p.distanceMeters} m</p></div>}
-                  </div>
-                  {status !== "not_started" && Number(p.sets) > 0 && (
+                  </div>}
+                  {block.type !== "circuit" && status !== "not_started" && Number(p.sets) > 0 && (
                     <details className="rounded-xl border p-3">
-                      <summary className="cursor-pointer text-sm font-semibold text-primary">Registrar cargas por serie (opcional)</summary>
-                      <p className="mt-2 text-xs text-muted-foreground">Podés dejar todos los campos vacíos y marcar el ejercicio como hecho.</p>
+                      <summary className="cursor-pointer text-sm font-semibold text-primary">{isFinished ? "Ver cargas registradas" : "Registrar cargas por serie (opcional)"}</summary>
+                      {!isFinished && <p className="mt-2 text-xs text-muted-foreground">Podés dejar todos los campos vacíos y marcar el ejercicio como hecho.</p>}
                       <div className="mt-3 space-y-3">
                         {Array.from({ length: Math.min(30, Number(p.sets)) }, (_, i) => {
                           const index = i + 1;
                           const saved = sets.find((x) => x.key === item.key && x.setIndex === index);
                           return (
-                            <SetEntry key={index} index={index} saved={saved} disabled={pending || readOnly || status === "completed"}
+                            isFinished ? <div key={index} className="rounded-lg bg-muted/40 p-2.5 text-xs"><p className="font-semibold">Serie {index}</p>{saved && (saved.load != null || saved.reps != null || saved.rir != null) ? <p className="mt-1 text-muted-foreground">{[saved.load != null ? `${saved.load} kg` : null, saved.reps != null ? `${saved.reps} reps` : null, saved.rir != null ? `RIR ${saved.rir}` : null].filter(Boolean).join(" · ")}</p> : <p className="mt-1 text-muted-foreground">Sin cargas registradas</p>}</div> : <SetEntry key={index} index={index} saved={saved} disabled={pending || readOnly}
                               onDirtyChange={(dirty) => setDirtySeries((old) => dirty
                                 ? old.includes(seriesId(item.key, index)) ? old : [...old, seriesId(item.key, index)]
                                 : old.filter((id) => id !== seriesId(item.key, index)))}
@@ -108,13 +216,14 @@ export default function PlanSessionClient({ readOnly = false, assignmentId, week
                   )}
                   {item.instructions && <p className="text-sm leading-relaxed text-muted-foreground"><strong className="text-foreground">Cómo hacerlo:</strong> {item.instructions}</p>}
                   {p.notes && <p className="text-sm text-muted-foreground">{p.notes}</p>}
-                  {(!item.imageUrl || item.imageVerified !== true) && <p className="text-xs text-muted-foreground italic">Demostración visual pendiente de verificación por el entrenador.</p>}
-                </div>
+                  </div>
+                </details>
               </article>
             );
           })}
-        </section>
+        </details>
       ))}
+      </div>
     </div>
   );
 }
