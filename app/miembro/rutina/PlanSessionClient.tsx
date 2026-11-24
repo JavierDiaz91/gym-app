@@ -80,14 +80,14 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
         </div>
         <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary transition-all" style={{ width: total ? `${done / total * 100}%` : "0%" }} /></div>
         {!readOnly && status === "not_started" && <button disabled={pending} onClick={() => run(() => startPlanSession(assignmentId, week, day))} className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground disabled:opacity-50">Iniciar actividad</button>}
-        {!readOnly && status === "in_progress" && <button disabled={pending || done !== total || total === 0} onClick={() => {
+        {!readOnly && status === "in_progress" && <button disabled={pending || total === 0} onClick={() => {
           if (dirtySeries.length && !window.confirm(`Tenés ${dirtySeries.length} serie(s) con cambios sin guardar. Si finalizás ahora, esos cambios se perderán. ¿Finalizar igualmente?`)) return;
-          if (!window.confirm("¿Finalizar esta actividad? No podrás volver a editarla.")) return;
+          if (!window.confirm(done === total ? "¿Finalizar esta actividad? No podrás volver a editarla." : `Realizaste ${done} de ${total} ejercicios. ¿Finalizar la actividad como parcial? No podrás volver a editarla.`)) return;
           run(() => finishPlanSession(assignmentId, week, day));
         }} className="w-full rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-40">Finalizar actividad</button>}
-        {!readOnly && status === "in_progress" && done !== total && <p className="text-xs text-muted-foreground">Marcá todos los ejercicios realizados para habilitar la finalización.</p>}
+        {!readOnly && status === "in_progress" && done !== total && <p className="text-xs text-muted-foreground">Podés finalizar la sesión aunque queden ejercicios pendientes; se conservará el progreso registrado.</p>}
         {isFinished && <div role="status" className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-3">
-          <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">✓ Entrenamiento completado</p>
+          <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{done === total ? "✓ Entrenamiento completado" : "✓ Sesión finalizada parcialmente"}</p>
           <p className="mt-1 text-xs text-muted-foreground">{done} de {total} ejercicios realizados{elapsedLabel ? ` · ${elapsedLabel}` : ""}</p>
           <p className="mt-1 text-xs text-muted-foreground">Sesión de solo lectura. Podés revisar tus ejercicios y cargas.</p>
           {startedAt && <p className="mt-1 text-[11px] text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
