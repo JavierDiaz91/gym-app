@@ -125,7 +125,7 @@ export default async function ReportesPage() {
       </div>
 
       {/* Tarjetas de Resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground">Total Miembros</p>
