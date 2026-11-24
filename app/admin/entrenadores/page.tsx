@@ -10,7 +10,7 @@ export default async function EntrenadoresPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 
             className="text-3xl font-bold"
@@ -25,7 +25,7 @@ export default async function EntrenadoresPage() {
         <CreateTrainerModal buttonText="Nuevo Entrenador" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
         {trainers.length > 0 ? (
           trainers.map((trainer: {
             id: number;

@@ -96,7 +96,7 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Historial de Pagos</h1>
           <p className="text-muted-foreground">Gestión de cobros y emisión de recibos</p>

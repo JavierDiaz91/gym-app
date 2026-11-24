@@ -62,8 +62,8 @@ export default function AsistenciasPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="flex gap-4">
-            <div className="relative flex-1">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="text"
@@ -106,7 +106,7 @@ export default function AsistenciasPage() {
                 {result.message}
               </h2>
               <p className="text-xl font-semibold text-foreground">{result.member.name}</p>
-              <div className="text-sm text-muted-foreground pt-2 flex justify-between max-w-sm">
+              <div className="text-sm text-muted-foreground pt-2 flex flex-wrap gap-2 justify-between max-w-sm">
                 <span>
                   <strong>Plan:</strong> {result.member.plan}
                 </span>

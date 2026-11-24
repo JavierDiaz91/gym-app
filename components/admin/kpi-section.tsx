@@ -48,28 +48,28 @@ export function KpiSection({ stats }: { stats: KpiStats }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {kpis.map((kpi, index) => {
         const Icon = kpi.icon;
         return (
           <div
             key={index}
-            className={`relative overflow-hidden rounded-xl border bg-card p-5 text-card-foreground shadow-xs transition-all duration-300 ${kpi.hoverBorder}`}
+            className={`relative min-w-0 overflow-hidden rounded-xl border bg-card p-4 sm:p-5 text-card-foreground shadow-xs transition-all duration-300 ${kpi.hoverBorder}`}
           >
             {/* Tira superior de acento de color */}
             <div className={`absolute top-0 left-0 right-0 h-1 ${kpi.topBar}`} />
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {kpi.title}
               </span>
-              <div className={`p-2.5 rounded-lg ${kpi.badgeColor}`}>
+              <div className={`shrink-0 p-2.5 rounded-lg ${kpi.badgeColor}`}>
                 <Icon className="w-5 h-5" />
               </div>
             </div>
 
             <div className="mt-3">
-              <div className="text-3xl font-extrabold tracking-tight text-foreground">
+              <div className="break-words text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
                 {kpi.value}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
