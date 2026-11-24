@@ -32,6 +32,14 @@ type Result = { success: boolean; error?: string };
 export async function startPlanSession(assignmentId: number, week: number, day: number): Promise<Result> {
   try {
     const { memberId } = await memberContext(assignmentId, week, day);
+    const open = await sql`
+      SELECT ws.id FROM workout_sessions ws
+      JOIN member_training_plans mtp ON mtp.id = ws.member_training_plan_id
+      WHERE ws.member_id = ${memberId} AND mtp.status = 'active'
+        AND ws.status = 'in_progress'
+      LIMIT 1
+    `;
+    if (open.length) return { success: false, error: "Ya tenés una actividad en curso. Volvé a esa sesión y finalizala antes de comenzar otra." };
     const rows = await sql`
       INSERT INTO workout_sessions (member_training_plan_id, member_id, week_number, day_index, status)
       VALUES (${assignmentId}, ${memberId}, ${week}, ${day}, 'in_progress')
@@ -106,15 +114,6 @@ export async function finishPlanSession(assignmentId: number, week: number, day:
     const { memberId, days } = await memberContext(assignmentId, week, day);
     const requiredKeys: string[] = days[day - 1].blocks.flatMap((b: { items: { key: string }[] }) => b.items.map(i => i.key));
     if (!requiredKeys.length || new Set(requiredKeys).size !== requiredKeys.length) return { success: false, error: "Los ejercicios del plan no tienen identificadores únicos." };
-    const logged = await sql`
-      SELECT wsl.item_snapshot_key FROM workout_set_logs wsl
-      JOIN workout_sessions ws ON ws.id = wsl.workout_session_id
-      WHERE ws.member_training_plan_id = ${assignmentId} AND ws.member_id = ${memberId}
-        AND ws.week_number = ${week} AND ws.day_index = ${day}
-        AND ws.status = 'in_progress' AND wsl.set_index = 1 AND wsl.notes = 'completed'
-    `;
-    const completedKeys = new Set(logged.map(r => String(r.item_snapshot_key)));
-    if (!requiredKeys.every(key => completedKeys.has(key))) return { success: false, error: "Marcá todos los ejercicios antes de finalizar." };
     const rows = await sql`
       UPDATE workout_sessions SET status = 'completed', finished_at = NOW()
       WHERE member_training_plan_id = ${assignmentId} AND member_id = ${memberId}
