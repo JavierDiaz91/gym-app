@@ -32,19 +32,19 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="relative flex min-h-screen bg-background text-foreground antialiased selection:bg-primary/20">
+    <div className="relative flex min-h-screen min-w-0 flex-col lg:flex-row bg-background text-foreground antialiased selection:bg-primary/20">
       {/* Luz Ambiental sutil en la esquina superior derecha */}
       <div 
         aria-hidden="true" 
-        className="pointer-events-none fixed top-0 right-0 -z-0 h-[400px] w-[400px] bg-primary/10 blur-[140px] rounded-full"
+        className="pointer-events-none fixed top-0 right-0 -z-0 h-[400px] w-[min(400px,100vw)] bg-primary/10 blur-[140px] rounded-full"
       />
 
       {/* Sidebar Navigation */}
       <AdminSidebar userRole={session.role} userEmail={session.email} gymName={gymName} />
 
       {/* Contenido Principal */}
-      <main className="relative z-10 flex-1 p-6 md:p-8 overflow-y-auto">
-        <div className="mx-auto max-w-7xl space-y-6">
+      <main className="relative z-10 w-full min-w-0 flex-1 p-3 sm:p-6 md:p-8">
+        <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6">
           {children}
         </div>
       </main>
