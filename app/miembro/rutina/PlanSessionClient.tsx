@@ -68,8 +68,8 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
           if (Math.abs(deltaX) > 85 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) changeWeek(week + (deltaX < 0 ? 1 : -1));
           setTouchStartX(null); setTouchStartY(null);
         }}>
-        <div className="flex items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-widest text-primary">Semana {week}</p><h2 className="text-lg font-extrabold">Tu rutina de entrenamiento</h2></div><span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{blocks.filter(b => b.items.length).length} secciones</span></div>
-      <section className="rounded-xl border border-border bg-card p-3 shadow-sm space-y-3 sm:rounded-2xl sm:p-5 sm:space-y-4">
+        {!selected && <div className="flex items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-widest text-primary">Semana {week} · Día {day}</p><h2 className="text-lg font-extrabold">Tu entrenamiento</h2></div><span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">{total} ejercicios</span></div>}
+      {!selected && <section className="rounded-xl border border-border bg-card p-3 shadow-sm space-y-3 sm:rounded-2xl sm:p-5 sm:space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold text-primary uppercase tracking-wide">Semana {week} · Día {day}</p>
@@ -90,8 +90,8 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
         {startedAt && <p className="text-xs text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
         {!readOnly && status === "in_progress" && dirtySeries.length > 0 && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">Tenés {dirtySeries.length} serie(s) con cambios sin guardar. Guardalas antes de finalizar para conservar sus valores.</p>}
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
-      </section>
-      {selected && <nav aria-label="Navegación de ejercicios" className="sticky top-16 z-20 rounded-xl border border-primary/30 bg-card/95 p-3 shadow-lg backdrop-blur sm:top-3">
+      </section>}
+      {selected && <nav aria-label="Navegación de ejercicios" className="rounded-xl border border-primary/30 bg-card p-3 shadow-sm">
         <div className="mb-2 flex items-center justify-between gap-2">
           <button type="button" onClick={() => navigateExercise(null)} className="text-xs font-semibold text-primary">← Volver a la rutina</button>
           <span className="text-xs font-bold text-muted-foreground">Ejercicio {activeExercise! + 1} de {total}</span>
@@ -102,8 +102,23 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
           <button type="button" onClick={() => navigateExercise(activeExercise! + 1 < total ? activeExercise! + 1 : null)} className="rounded-lg bg-primary px-3 py-3 text-sm font-bold text-primary-foreground">{activeExercise! + 1 < total ? "Siguiente ejercicio →" : "Volver al resumen ✓"}</button>
         </div>
       </nav>}
-      {!selected && total > 0 && <button type="button" onClick={() => navigateExercise(0)} className="w-full rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground">Ver ejercicios uno por uno →</button>}
-      {blocks.filter(block => block.items.length > 0).map((block, index) => (
+      {!selected && total > 0 && <>
+        <button type="button" onClick={() => navigateExercise(0)} className="w-full rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground">Comenzar a ver ejercicios →</button>
+        <div className="space-y-2" aria-label="Secciones del entrenamiento">
+          <p className="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Secciones del día</p>
+          {blocks.map((block, blockIndex) => {
+            if (!block.items.length) return null;
+            const first = exerciseOrder.findIndex(x => x.blockIndex === blockIndex);
+            const completedInBlock = block.items.filter(item => completed.includes(item.key)).length;
+            return <button key={blockIndex} type="button" onClick={() => navigateExercise(first)} className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-primary/50">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">{blockIndex + 1}</span>
+              <span className="min-w-0 flex-1"><span className="block text-sm font-bold">{block.title}</span><span className="block text-xs text-muted-foreground">{block.items.length} ejercicios · {completedInBlock} completados</span></span>
+              <span className="shrink-0 text-sm font-bold text-primary" aria-hidden="true">→</span>
+            </button>;
+          })}
+        </div>
+      </>}
+      {selected && blocks.filter(block => block.items.length > 0).map((block, index) => (
         <details key={`${index}-${selected ? "focus" : "list"}`} open={selected ? selected.blockIndex === index : index === 0 ? true : undefined} className={`group min-w-0 space-y-2 rounded-xl border border-border bg-card p-2 sm:space-y-3 sm:rounded-2xl sm:p-4 ${selected && selected.blockIndex !== index ? "hidden" : ""}`} >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 sm:gap-3">
             <span className="flex min-w-0 items-center gap-2 sm:gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{index + 1}</span><span className="min-w-0"><span className="block text-sm font-bold leading-snug sm:text-base">{block.title}</span><span className="block text-xs text-muted-foreground">{block.type === "circuit" ? (() => { const cfg = block.circuitWeeks?.[week - 1]; return cfg ? `${cfg.rounds} vueltas · ${cfg.workSeconds}s trabajo · ${cfg.restSeconds}s pausa · ${block.items.length} ejercicios` : `Circuito · ${block.items.length} ejercicios`; })() : block.type === "main" && (block.strengthMode === "triserie" || block.strengthMode === "biserie") ? `${block.strengthMode === "triserie" ? "Triserie" : "Biserie"} · ${block.items.length} ejercicios en secuencia` : `Entrenamiento · ${block.items.length} ejercicios` }</span></span></span>
