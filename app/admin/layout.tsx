@@ -1,7 +1,7 @@
 // app/admin/layout.tsx
 import React from "react";
 import { AdminSidebar } from "@/components/admin/sidebar";
-import { getSession, getGymStatusAction } from "@/app/actions";
+import { getSession } from "@/app/actions";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 
@@ -22,11 +22,11 @@ export default async function AdminLayout({
   // 2. Si es un Admin del Gimnasio, verificamos el estado real en la Base de Datos
   if (session.role === "admin") {
     if (session.gymId == null) redirect("/login");
-    const gym = await getGymStatusAction(session.gymId);
-    const gymRows = await sql`SELECT name FROM gyms WHERE id = ${session.gymId} LIMIT 1`;
-    gymName = typeof gymRows[0]?.name === "string" ? gymRows[0].name.trim() : undefined; 
+    const [gym] = await sql`SELECT name, status FROM gyms WHERE id = ${session.gymId} LIMIT 1`;
+    if (!gym) redirect("/login");
+    gymName = typeof gym.name === "string" ? gym.name.trim() : undefined;
 
-    if (gym && gym.status === "suspended") {
+    if (gym.status === "suspended") {
       redirect("/cuenta-suspendida");
     }
   }
