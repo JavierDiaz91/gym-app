@@ -74,7 +74,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
           <div>
             <p className="text-xs font-semibold text-primary uppercase tracking-wide">Semana {week} · Día {day}</p>
             <h2 className="text-xl font-bold">{title}</h2>
-            <p className="text-sm text-muted-foreground">{status === "completed" ? "Sesión finalizada" : readOnly ? "Consulta de semana fuera de vigencia" : status === "in_progress" ? "Sesión en curso" : "Lista para empezar"}</p>
+            {!isFinished && <p className="text-sm text-muted-foreground">{readOnly ? "Consulta de semana fuera de vigencia" : status === "in_progress" ? "Sesión en curso" : "Lista para empezar"}</p>}
           </div>
           <div className="rounded-xl bg-muted px-4 py-2 text-sm font-semibold">{done} de {total} ejercicios</div>
         </div>
@@ -86,8 +86,13 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
           run(() => finishPlanSession(assignmentId, week, day));
         }} className="w-full rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-40">Finalizar actividad</button>}
         {!readOnly && status === "in_progress" && done !== total && <p className="text-xs text-muted-foreground">Marcá todos los ejercicios realizados para habilitar la finalización.</p>}
-        {isFinished && <div role="status" className="space-y-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 sm:p-4"><div className="flex items-center gap-2"><span aria-hidden="true" className="text-lg text-emerald-500">✓</span><p className="font-bold text-emerald-700 dark:text-emerald-300">¡Entrenamiento completado!</p></div><div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>Semana {week} · Día {day}</span><span>{done} de {total} ejercicios realizados</span>{elapsedLabel && <span>Duración: {elapsedLabel}</span>}</div><p className="text-xs text-muted-foreground">Podés consultar tus ejercicios y cargas guardadas. Esta sesión ya no se puede modificar.</p></div>}
-        {startedAt && <p className="text-xs text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
+        {isFinished && <div role="status" className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-3">
+          <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">✓ Entrenamiento completado</p>
+          <p className="mt-1 text-xs text-muted-foreground">{done} de {total} ejercicios realizados{elapsedLabel ? ` · ${elapsedLabel}` : ""}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Sesión de solo lectura. Podés revisar tus ejercicios y cargas.</p>
+          {startedAt && <p className="mt-1 text-[11px] text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
+        </div>}
+        {!isFinished && startedAt && <p className="text-xs text-muted-foreground">Inicio: {new Date(startedAt).toLocaleString("es-AR")}{finishedAt ? ` · Fin: ${new Date(finishedAt).toLocaleString("es-AR")}` : ""}</p>}
         {!readOnly && status === "in_progress" && dirtySeries.length > 0 && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">Tenés {dirtySeries.length} serie(s) con cambios sin guardar. Guardalas antes de finalizar para conservar sus valores.</p>}
         {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
       </section>}
@@ -103,7 +108,7 @@ export default function PlanSessionClient({ durationWeeks = 1, planUrl, readOnly
         </div>
       </nav>}
       {!selected && total > 0 && <>
-        <button type="button" onClick={() => navigateExercise(0)} className="w-full rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground">Comenzar a ver ejercicios →</button>
+        <button type="button" onClick={() => navigateExercise(0)} className="w-full rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground">{isFinished ? "Revisar ejercicios realizados →" : "Comenzar a ver ejercicios →"}</button>
         <div className="space-y-2" aria-label="Secciones del entrenamiento">
           <p className="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Secciones del día</p>
           {blocks.map((block, blockIndex) => {
