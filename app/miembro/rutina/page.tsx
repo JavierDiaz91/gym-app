@@ -105,25 +105,26 @@ export default async function MiembroRutinaPage({ searchParams }: PageProps) {
     }));
     return (
       <div className="mx-auto max-w-4xl space-y-3 px-3 py-4 sm:space-y-5 sm:p-6">
-        <Link href="/miembro" className="inline-flex items-center gap-2 text-xs text-primary sm:text-sm"><ArrowLeft className="w-4 h-4" /> Volver al panel</Link>
-        <div>
-          <p className="text-xs font-semibold text-primary">Plan de entrenamiento · {duration} semanas</p>
-          <h1 className="text-xl font-bold leading-tight sm:text-2xl">{String(assignments[0].title || "Mi plan de entrenamiento")}</h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Inicio: {startDate} · {currentWeek ? `Semana vigente: ${currentWeek}` : elapsedDays < 0 ? 'Plan programado' : 'Plan vencido'}</p>
-        </div>
-        <section className="space-y-2">
-          <h2 className="font-semibold">Días de entrenamiento</h2>
-          <div className="flex flex-wrap gap-2">
-            {days.map((d, index) => (
-              <Link key={index} href={`${planUrl}&week=${week}&day=${index + 1}`}
-                aria-current={index + 1 === day ? "page" : undefined}
-                className={`px-3 py-1.5 rounded-lg border text-xs sm:text-sm ${index + 1 === day ? "bg-primary text-primary-foreground" : "bg-card"}`}>
-                Día {index + 1}: {d.title}
-              </Link>
-            ))}
+        <header className="space-y-2 rounded-2xl border border-border bg-card p-3.5 sm:p-5">
+          <Link href="/miembro" className="inline-flex items-center gap-1.5 text-xs font-medium text-primary"><ArrowLeft className="h-4 w-4" /> Mi panel</Link>
+          <h1 className="break-words text-lg font-bold leading-snug sm:text-2xl">{String(assignments[0].title || "Mi plan de entrenamiento")}</h1>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>{duration} semanas</span>
+            <span aria-hidden="true">·</span>
+            <span>{currentWeek ? `Semana ${currentWeek} activa` : elapsedDays < 0 ? "Programado" : "Finalizado"}</span>
+            <span aria-hidden="true">·</span>
+            <span>Desde {startDate.split("-").reverse().join("/")}</span>
           </div>
-        </section>
-        {!canEditWeek && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs sm:text-sm">{elapsedDays < (week - 1) * 7 ? 'Esta semana todavía no comenzó. Podés consultar los ejercicios, pero no registrar actividad.' : 'Esta semana ya venció. Podés consultar los ejercicios y las cargas guardadas, pero no modificarla.'}</p>}
+          {days.length > 1 && <nav aria-label="Elegir día de entrenamiento" className="flex flex-wrap gap-2 pt-1">
+            {days.map((d, index) => <Link key={index} href={`${planUrl}&week=${week}&day=${index + 1}`} aria-current={index + 1 === day ? "page" : undefined}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${index + 1 === day ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>
+              {d.title?.trim() && d.title.trim().toLowerCase() !== `día ${index + 1}` ? d.title : `Día ${index + 1}`}
+            </Link>)}
+          </nav>}
+        </header>
+        {!canEditWeek && <p role="status" className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+          {elapsedDays < (week - 1) * 7 ? "Podés consultar este entrenamiento. El registro se habilita cuando comience la semana." : "Esta semana ya terminó. Podés consultar los ejercicios y las cargas registradas."}
+        </p>}
         {selectedDay ? (
           <PlanSessionClient
             key={`${planAssignmentId}-${week}-${day}`}
