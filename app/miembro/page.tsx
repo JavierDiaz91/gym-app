@@ -1,3 +1,4 @@
+import { FirstMembership } from "@/components/member/first-membership";
 import { getSession } from "@/app/actions";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
@@ -51,6 +52,21 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
   if (!session || session.role !== "member" || session.gymId == null) redirect("/login");
 
   const userId = session.id;
+
+  // Only members with no subscription or payment history qualify for onboarding.
+  const firstMembership = await sql`
+    SELECT m.first_name, g.name AS gym_name
+    FROM members m JOIN gyms g ON g.id = m.gym_id
+    WHERE m.user_id = ${session.id} AND m.gym_id = ${session.gymId}
+      AND m.status = 'active'
+      AND NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.member_id = m.id)
+      AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.member_id = m.id)
+    LIMIT 1
+  `.catch((error) => { console.error("First membership lookup failed", error); return []; });
+  if (firstMembership[0]) {
+    return <FirstMembership name={String(firstMembership[0].first_name)} gymName={String(firstMembership[0].gym_name)} dashboard directCheckout={process.env.KIVRA_MEMBER_DIRECT_CHECKOUT_ENABLED === "true"} />;
+  }
+
 
   // El estado de pagos se sincroniza exclusivamente por webhook de Mercado Pago.
   await searchParams;
