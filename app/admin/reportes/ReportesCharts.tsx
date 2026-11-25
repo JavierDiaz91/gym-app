@@ -28,7 +28,7 @@ interface ReportesChartsProps {
 }
 
 const COLORS = [
-  "#3b82f6", // Azul
+  "#06b6b9", // Azul
   "#10b981", // Verde
   "#f59e0b", // Ámbar
   "#8b5cf6", // Púrpura
@@ -42,15 +42,15 @@ export function ReportesCharts({
   metrics,
 }: ReportesChartsProps) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Asistencia Diaria */}
-      <Card>
+    <div className="grid min-w-0 grid-cols-1 xl:grid-cols-2 gap-4">
+      {/* Asistencias del período */}
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Asistencia Diaria</CardTitle>
-          <CardDescription>Visitas registradas en los últimos 14 días</CardDescription>
+          <CardDescription>Visitas registradas en las fechas seleccionadas</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
+          <div className="h-[280px] min-w-0">
             {attendanceData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={attendanceData}>
@@ -66,31 +66,31 @@ export function ReportesCharts({
                     }}
                   />
                   <Line 
-                    type="monotone" 
+                    type="linear" 
                     dataKey="visitas" 
-                    stroke="#3b82f6" 
+                    stroke="#06b6b9" 
                     strokeWidth={2}
-                    dot={{ fill: "#3b82f6", r: 4 }}
+                    dot={attendanceData.length <= 31 ? { fill: "#06b6b9", r: 3 } : false}
                   />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                No hay ingresos registrados en los últimos 14 días
+                No hay asistencias en el período
               </div>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Ingresos Mensuales */}
-      <Card>
+      {/* Ingresos del período */}
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Ingresos Mensuales</CardTitle>
-          <CardDescription>Ingresos acumulados en los últimos 6 meses</CardDescription>
+          <CardDescription>Cobros completados en las fechas seleccionadas</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
+          <div className="h-[280px] min-w-0">
             {revenueData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={revenueData}>
@@ -104,9 +104,9 @@ export function ReportesCharts({
                       borderRadius: "8px",
                       color: "hsl(var(--foreground))"
                     }}
-                    formatter={(value: number) => [`$${value.toLocaleString()}`, "Ingresos"]}
+                    formatter={(value: number) => [`$${value.toLocaleString("es-AR")}`, "Ingresos"]}
                   />
-                  <Bar dataKey="ingresos" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="ingresos" fill="#06b6b9" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -119,13 +119,13 @@ export function ReportesCharts({
       </Card>
 
       {/* Distribución de Membresías */}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Distribución de Membresías</CardTitle>
-          <CardDescription>Suscripciones activas por tipo de plan</CardDescription>
+          <CardDescription>Membresías y pases cobrados por plan</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
+          <div className="h-[280px] min-w-0">
             {membershipDist.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -157,7 +157,7 @@ export function ReportesCharts({
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                No hay membresías activas registradas
+                No hay ventas en el período
               </div>
             )}
           </div>
@@ -165,14 +165,14 @@ export function ReportesCharts({
       </Card>
 
       {/* Métricas Clave Dinámicas */}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Métricas Clave</CardTitle>
           <CardDescription>Indicadores calculados con datos reales de la BD</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between py-2 border-b">
-            <span className="text-muted-foreground text-sm">Promedio visitas / miembro (30 días)</span>
+            <span className="text-muted-foreground text-sm">Promedio de visitas por asistente</span>
             <span className="font-semibold">{metrics.avgVisitsPerMember}</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b">
@@ -184,7 +184,7 @@ export function ReportesCharts({
             <span className="font-semibold">{membershipDist[0]?.name || "Sin datos"}</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b">
-            <span className="text-muted-foreground text-sm">Ingreso promedio por suscripción</span>
+            <span className="text-muted-foreground text-sm">Ingreso promedio por membresía o pase vendido</span>
             <span className="font-semibold">{metrics.avgRevenuePerMember}</span>
           </div>
           <div className="flex items-center justify-between py-2">
