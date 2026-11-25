@@ -1,10 +1,12 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { Sun, Moon, Laptop, Palette } from "lucide-react";
 
 export default function ThemeToggleBar() {
+  const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -16,7 +18,7 @@ export default function ThemeToggleBar() {
   if (!mounted) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-2">
+    <div className={`fixed bottom-5 right-5 z-50 flex-col items-end gap-2 ${pathname === "/admin" || pathname.startsWith("/admin/") ? "hidden lg:flex" : "flex"}`}>
       {/* Menú desplegable flotante */}
       {isOpen && (
         <div className="bg-[#102233] border border-[#234355] p-1.5 rounded-2xl shadow-2xl flex flex-col gap-1 backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-200">

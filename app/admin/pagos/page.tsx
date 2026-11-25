@@ -98,7 +98,7 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
 
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Historial de Pagos</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Historial de Pagos</h1>
           <p className="text-muted-foreground">Gestión de cobros y emisión de recibos</p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -110,10 +110,10 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="px-3 sm:px-6">
           <CardTitle>Últimos Cobros Registrados</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           <div className="hidden lg:block"><Table>
             <TableHeader>
               <TableRow>
@@ -160,7 +160,7 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
                 </TableRow>
               )}
             </TableBody>
-          </Table></div><div className="grid gap-3 lg:hidden">{payments.length ? payments.map((payment: any) => <article key={payment.id} className="space-y-2 rounded-xl border p-3"><div className="flex flex-wrap justify-between gap-2"><strong>{payment.last_name}, {payment.first_name}</strong><strong>${Number(payment.amount).toLocaleString("es-AR")}</strong></div><p className="text-xs text-muted-foreground">{new Date(payment.payment_date).toLocaleString("es-AR")}</p><p className="text-sm">{payment.plan_name || "N/A"}</p><div className="flex flex-wrap items-center justify-between gap-2">{getMethodBadge(payment.payment_method)}<PrintReceiptButton payment={payment} /></div></article>) : <p>No hay pagos registrados aún.</p>}</div>
+          </Table></div><div className="grid gap-2 lg:hidden">{payments.length ? payments.map((payment: any) => <article key={payment.id} className="min-w-0 space-y-1.5 rounded-xl border p-3"><div className="flex flex-wrap justify-between gap-2"><strong>{payment.last_name}, {payment.first_name}</strong><strong>${Number(payment.amount).toLocaleString("es-AR")}</strong></div><p className="text-xs text-muted-foreground">{new Date(payment.payment_date).toLocaleString("es-AR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}</p><p className="text-sm">{payment.plan_name || "N/A"}</p><div className="flex flex-wrap items-center justify-between gap-2">{getMethodBadge(payment.payment_method)}<PrintReceiptButton payment={payment} showLabel /></div></article>) : <p>No hay pagos registrados aún.</p>}</div>
         </CardContent>
       </Card>
     </div>

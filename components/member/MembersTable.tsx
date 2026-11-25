@@ -117,7 +117,19 @@ export function MembersTable({ members }: { members: Member[] }) {
           ))}
         </TableBody>
       </Table></div>
-<div className="grid gap-3 lg:hidden">{filteredMembers.map(member => <article key={member.id} className="min-w-0 space-y-2 rounded-xl border p-3"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{member.first_name} {member.last_name}</strong><Badge variant="outline">{member.status === "active" ? "Activo" : member.status === "suspended" ? "Suspendido" : "Inactivo"}</Badge></div><p className="break-all text-sm text-muted-foreground">{member.email}</p>{member.phone && <p className="text-sm">{member.phone}</p>}<p className="text-sm">{member.plan_name ?? "Sin membresía"}</p>{member.subscription_payment_status === "pending" && <p className="text-sm text-amber-500">Pago pendiente</p>}<p className="text-sm">Vencimiento: {member.subscription_end ? new Date(member.subscription_end).toLocaleDateString("es-AR", {timeZone:"UTC"}) : "—"}</p><Button variant="outline" className="w-full" asChild><Link href={`/admin/miembros/${member.id}`}>Ver detalle</Link></Button></article>)}</div>
+<div className="grid gap-2 lg:hidden">
+        {filteredMembers.map(member => <article key={member.id} className="min-w-0 space-y-2 rounded-xl border p-3">
+          <div className="flex items-start gap-2">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{member.first_name[0]}{member.last_name?.[0] ?? ""}</div>
+            <div className="min-w-0 flex-1"><p className="break-words font-semibold">{member.first_name} {member.last_name}</p><p className="text-xs text-muted-foreground">{member.plan_name ?? "Sin membresía"}</p></div>
+            <Badge variant="outline" title="Estado administrativo" className={member.status === "active" ? "text-emerald-500" : "text-muted-foreground"}>{member.status === "active" ? "Activo" : member.status === "suspended" ? "Suspendido" : "Inactivo"}</Badge>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"><span className="flex min-w-0 items-center gap-1"><Mail className="size-3 shrink-0"/><span className="break-all">{member.email}</span></span>{member.phone && <span className="flex items-center gap-1"><Phone className="size-3"/>{member.phone}</span>}</div>
+          <div className="flex flex-wrap items-center gap-2 text-xs"><span>Vence: {member.subscription_end ? new Date(member.subscription_end).toLocaleDateString("es-AR", {timeZone:"UTC"}) : "—"}</span>{member.subscription_payment_status === "pending" && <Badge variant="outline" className="text-amber-500">Pago pendiente</Badge>}</div>
+          <div className="flex justify-end border-t pt-1"><Button variant="ghost" size="sm" className="text-primary" asChild><Link href={`/admin/miembros/${member.id}`}>Ver detalle →</Link></Button></div>
+        </article>)}
+        {filteredMembers.length === 0 && <p className="text-sm text-muted-foreground">No se encontraron miembros.</p>}
+      </div>
     </div>
   );
 }

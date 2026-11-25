@@ -29,14 +29,14 @@ export default async function MiSuscripcionPage() {
 
   return <div className="space-y-6">
     <div><p className="text-xs font-semibold uppercase tracking-widest text-primary">Kivra SaaS</p>
-      <h1 className="mt-2 text-3xl font-bold">Mi suscripción Kivra</h1>
+      <h1 className="mt-2 text-2xl sm:text-3xl font-bold">Mi suscripción Kivra</h1>
       <p className="mt-1 text-muted-foreground">Plan, avisos de pago y recibos de {gym?.name || "tu gimnasio"}.</p></div>
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
-      {subscription ? <div className="grid gap-4 sm:grid-cols-3">
+      {subscription ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div><p className="text-sm text-muted-foreground">Plan contratado</p><p className="text-xl font-bold">{subscription.plan_name}</p></div>
         <div><p className="text-sm text-muted-foreground">Precio mensual</p><p className="text-xl font-bold">{subscription.price == null ? "A definir" : money(subscription.price)}</p></div>
         <div><p className="text-sm text-muted-foreground">Próximo vencimiento</p><p className="text-xl font-bold">{date(subscription.next_billing_date)}</p></div>
-        <div className="sm:col-span-3 text-sm text-muted-foreground">Estado: {subscription.status} · Período: {date(subscription.current_period_start)} al {date(subscription.current_period_end)}</div>
+        <div className="col-span-2 sm:col-span-3 text-sm text-muted-foreground">Estado: {subscription.status} · Período: {date(subscription.current_period_start)} al {date(subscription.current_period_end)}</div>
       </div> : <p className="text-muted-foreground">Todavía no hay una suscripción SaaS asignada a este gimnasio.</p>}
     </section>
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
@@ -53,7 +53,7 @@ export default async function MiSuscripcionPage() {
           <td className="py-3 text-right"><div className="flex flex-col items-end gap-2">{process.env.KIVRA_SAAS_TEST_CHECKOUT_ENABLED === "true" && (i.status === "pending" || i.status === "overdue") && <SaaSCheckoutButton invoiceId={Number(i.id)} />}{i.status === "cancelled" ? "—" :
             <Link className="font-semibold text-primary hover:underline" href={`/admin/mi-suscripcion/comprobante/${i.id}`}>{i.status === "paid" ? "Ver recibo" : "Ver aviso"}</Link>}</div></td>
         </tr>)}</tbody>
-      </table></div><div className="mt-4 grid gap-3 lg:hidden">{invoices.map(i => <article key={i.id} className="space-y-2 rounded-xl border p-3"><div className="flex flex-wrap justify-between gap-2"><strong>KIV-{String(i.id).padStart(6,"0")}</strong><strong>{money(i.amount)}</strong></div><p className="text-xs text-muted-foreground">{date(i.period_start)} – {date(i.period_end)}</p><p className="text-sm">{i.status === "paid" ? "Pagado" : i.status === "overdue" ? "Vencido" : i.status === "cancelled" ? "Cancelado" : "Pendiente"}</p>{process.env.KIVRA_SAAS_TEST_CHECKOUT_ENABLED === "true" && (i.status === "pending" || i.status === "overdue") && <SaaSCheckoutButton invoiceId={Number(i.id)} />}{i.status !== "cancelled" && <Link className="block font-semibold text-primary" href={`/admin/mi-suscripcion/comprobante/${i.id}`}>{i.status === "paid" ? "Ver recibo" : "Ver aviso"}</Link>}</article>)}</div></>}
+      </table></div><div className="mt-4 grid gap-2 lg:hidden">{invoices.map(i => <article key={i.id} className="min-w-0 space-y-1.5 rounded-xl border p-3"><div className="flex flex-wrap justify-between gap-2"><strong>KIV-{String(i.id).padStart(6,"0")}</strong><strong>{money(i.amount)}</strong></div><p className="text-xs text-muted-foreground">{date(i.period_start)} – {date(i.period_end)}</p><p className="text-sm">{i.status === "paid" ? "Pagado" : i.status === "overdue" ? "Vencido" : i.status === "cancelled" ? "Cancelado" : "Pendiente"}</p>{process.env.KIVRA_SAAS_TEST_CHECKOUT_ENABLED === "true" && (i.status === "pending" || i.status === "overdue") && <SaaSCheckoutButton invoiceId={Number(i.id)} />}{i.status !== "cancelled" && <Link className="block font-semibold text-primary" href={`/admin/mi-suscripcion/comprobante/${i.id}`}>{i.status === "paid" ? "Ver recibo" : "Ver aviso"}</Link>}</article>)}</div></>}
     </section>
   </div>;
 }

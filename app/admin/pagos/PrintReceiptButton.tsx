@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
 
 interface PaymentPrintProps {
+  showLabel?: boolean;
   payment: {
     id: number;
     first_name: string;
@@ -16,7 +17,7 @@ interface PaymentPrintProps {
   };
 }
 
-export function PrintReceiptButton({ payment }: PaymentPrintProps) {
+export function PrintReceiptButton({ payment, showLabel = false }: PaymentPrintProps) {
   const handlePrint = () => {
     const printWindow = window.open("", "_blank", "width=600,height=700");
     if (!printWindow) return;
@@ -71,8 +72,9 @@ export function PrintReceiptButton({ payment }: PaymentPrintProps) {
   };
 
   return (
-    <Button variant="ghost" size="icon" onClick={handlePrint} title="Imprimir Recibo">
+    <Button variant="ghost" size={showLabel ? "sm" : "icon"} onClick={handlePrint} aria-label="Imprimir recibo" title="Imprimir Recibo">
       <Printer className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+      {showLabel && <span>Recibo</span>}
     </Button>
   );
 }

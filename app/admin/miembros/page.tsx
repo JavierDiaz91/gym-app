@@ -9,10 +9,10 @@ export default async function MiembrosPage() {
   const members = await getMembers();
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Miembros</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Miembros</h1>
           <p className="text-muted-foreground">Gestiona los miembros del gimnasio</p>
         </div>
         <div className="flex flex-wrap items-center gap-2"><Button asChild variant="outline">
@@ -26,7 +26,7 @@ export default async function MiembrosPage() {
       </div>
 
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="px-3 pt-3 sm:px-6 sm:pt-6">
           <MembersTable members={members} />
         </CardContent>
       </Card>
