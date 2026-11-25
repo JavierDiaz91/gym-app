@@ -63,6 +63,7 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
 
   const getMethodBadge = (method: string) => {
     switch (method?.toLowerCase()) {
+      case "cash":
       case "efectivo":
         return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Efectivo</Badge>;
       case "transferencia":
