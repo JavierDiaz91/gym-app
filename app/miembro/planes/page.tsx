@@ -18,7 +18,7 @@ export default async function MemberPlansPage() {
 
   const plans = await sql`
     SELECT id, name, description, price, access_mode, duration_days, max_entries
-    FROM membership_plans WHERE gym_id = ${session.gymId} AND is_active = true
+    FROM membership_plans WHERE gym_id = ${session.gymId} AND is_active = true AND access_mode = 'monthly'
     ORDER BY price ASC, name ASC
   `;
   const requests = await sql`
