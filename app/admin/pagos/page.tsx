@@ -114,7 +114,7 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
           <CardTitle>Últimos Cobros Registrados</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <div className="hidden lg:block"><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Fecha</TableHead>
@@ -160,7 +160,7 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </Table></div><div className="grid gap-3 lg:hidden">{payments.length ? payments.map((payment: any) => <article key={payment.id} className="space-y-2 rounded-xl border p-3"><div className="flex flex-wrap justify-between gap-2"><strong>{payment.last_name}, {payment.first_name}</strong><strong>${Number(payment.amount).toLocaleString("es-AR")}</strong></div><p className="text-xs text-muted-foreground">{new Date(payment.payment_date).toLocaleString("es-AR")}</p><p className="text-sm">{payment.plan_name || "N/A"}</p><div className="flex flex-wrap items-center justify-between gap-2">{getMethodBadge(payment.payment_method)}<PrintReceiptButton payment={payment} /></div></article>) : <p>No hay pagos registrados aún.</p>}</div>
         </CardContent>
       </Card>
     </div>
