@@ -1,61 +1,21 @@
 import { getSession } from "@/app/actions";
 import { redirect } from "next/navigation";
+import { sql } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings2, ShieldCheck, Globe2 } from "lucide-react";
+import IdentityForm from "./IdentityForm";
+import { Settings2, ShieldCheck, Globe2, CreditCard, Bell } from "lucide-react";
 
 export default async function ConfiguracionKivraPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
-  if (session.role !== "superadmin") redirect("/admin");
-
-  return (
-    <div className="space-y-6">
-      <div className="border-b border-border pb-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Kivra SaaS</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Configuración Kivra</h1>
-        <p className="mt-1 text-muted-foreground">
-          Parámetros globales de la plataforma. Separados de la configuración de cada gimnasio.
-        </p>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <Settings2 className="h-5 w-5 text-primary" />
-            <CardTitle className="pt-3 text-lg">Identidad de plataforma</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Producto</span>
-              <span className="font-medium">Kivra</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Tagline</span>
-              <span className="text-right font-medium">Gestión inteligente para gimnasios.</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            <CardTitle className="pt-3 text-lg">Seguridad</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            El SuperAdmin opera sin gym_id y los administradores de gimnasio quedan aislados por tenant.
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <Globe2 className="h-5 w-5 text-primary" />
-            <CardTitle className="pt-3 text-lg">Entorno</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            La edición persistente de dominio, soporte, emails e integraciones globales todavía no está implementada.
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+ const session=await getSession();
+ if(!session) redirect("/login");
+ if(session.role!=="superadmin" || session.gymId!=null) redirect("/admin");
+ const [user]=await sql`SELECT id FROM public.users WHERE id=${session.id} AND role='superadmin' AND gym_id IS NULL`;
+ if(!user) redirect("/login");
+ const [settings]=await sql`SELECT platform_name,tagline,website_url,support_email,support_phone,business_name,tax_id FROM public.saas_settings WHERE id=1`;
+ const values=Object.fromEntries(Object.entries(settings||{}).map(([k,v])=>[k,String(v??"")]));
+ return <div className="min-w-0 space-y-6">
+ <header className="border-b border-border pb-5"><p className="text-xs font-semibold uppercase tracking-widest text-primary">Kivra SaaS</p><h1 className="mt-2 text-3xl font-bold">Configuración Kivra</h1><p className="mt-1 text-muted-foreground">Administración global de la plataforma.</p></header>
+ <Card><CardHeader><CardTitle className="flex items-center gap-2"><Settings2 className="size-5 text-primary"/> Identidad comercial</CardTitle><p className="text-sm text-muted-foreground">Datos globales guardados en la base de datos.</p></CardHeader><CardContent>{settings?<IdentityForm values={values}/>:<p>No existe la configuración inicial en Neon.</p>}</CardContent></Card>
+ <div className="grid gap-4 sm:grid-cols-2">{[{title:"Seguridad",Icon:ShieldCheck,description:"Acceso exclusivo del superadmin, validado contra la base de datos. Segundo factor y revocación de sesiones pendientes."},{title:"Facturación",Icon:CreditCard,description:"Pendiente de conectar datos bancarios y plazos con la emisión de facturas."},{title:"Integraciones",Icon:Globe2,description:"Las credenciales se administran mediante variables de entorno. No se exponen en esta pantalla."},{title:"Notificaciones",Icon:Bell,description:"Pendiente de conectar las preferencias con los eventos comerciales."}].map(({title,Icon,description})=><Card key={title}><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Icon className="size-5 text-primary"/>{title}</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">{description}</CardContent></Card>)}</div>
+ </div>;
 }
