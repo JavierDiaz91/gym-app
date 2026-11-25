@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { getSession } from "@/app/actions";
 import { sql } from "@/lib/db";
+import { ReportExport } from "./ReportExport";
 import { ReportesCharts } from "./ReportesCharts";
 
 const money = (n: number) => n.toLocaleString("es-AR", {style:"currency",currency:"ARS",maximumFractionDigits:2});
@@ -51,6 +52,7 @@ export default async function ReportesPage({searchParams}: {searchParams: Promis
   return <div className="min-w-0 space-y-6">
     <div><h1 className="text-3xl font-bold">Reportes</h1><p className="text-muted-foreground">Análisis y estadísticas del gimnasio</p></div>
     {filter}
+    <ReportExport from={from} to={to} rows={[["Reporte Kivra",from,to],["Ingresos cobrados",Number(stats.revenue)],["Asistencias",Number(stats.visits)],["Nuevos miembros",Number(stats.new_members)],["Membresías y pases vendidos",Number(stats.sales)],["Método","Importe ARS"],...Object.entries(totals),["Fecha","Asistencias","Ingresos ARS"],...buckets.map(b=>[b,Number(visits.find(v=>v.bucket===b)?.total||0),Number(revenue.find(v=>v.bucket===b)?.total||0)]),["Plan","Cantidad"],...plans.map(p=>[String(p.name),Number(p.count)])]}/>
     <p className="text-sm text-muted-foreground">Período: {from.split("-").reverse().join("/")} al {to.split("-").reverse().join("/")} · Hora argentina</p>
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">{[["Ingresos cobrados",money(Number(stats.revenue))],["Asistencias",stats.visits],["Nuevos miembros",stats.new_members],["Membresías y pases vendidos",stats.sales]].map(([name,value])=><Card key={String(name)} className="min-w-0"><CardContent className="p-5"><p className="text-sm text-muted-foreground">{name}</p><p className="text-2xl font-bold break-words">{String(value)}</p></CardContent></Card>)}</div>
     <Card><CardContent className="p-5 space-y-3"><h2 className="font-semibold">Ingresos por método de pago</h2>{Object.entries(totals).map(([name,total])=><div key={name} className="flex justify-between gap-3 border-b pb-2 text-sm"><span>{name}</span><strong>{money(total)}</strong></div>)}</CardContent></Card>
