@@ -43,7 +43,7 @@ export default async function MiSuscripcionPage() {
       <h2 className="text-xl font-semibold">Comprobantes e historial de cobros</h2>
       <p className="mt-1 text-sm text-muted-foreground">Los recibos solo se muestran cuando el pago está registrado como confirmado. Los documentos son comerciales, no facturas fiscales.</p>
       {invoices.length === 0 ? <p className="mt-6 text-muted-foreground">Todavía no hay comprobantes disponibles.</p> :
-      <div className="mt-5 overflow-x-auto"><table className="min-w-[640px] w-full text-left text-sm">
+      <><div className="mt-5 hidden overflow-x-auto lg:block"><table className="min-w-[640px] w-full text-left text-sm">
         <thead><tr className="border-b border-border text-muted-foreground"><th className="pb-3">Número</th><th className="pb-3">Período</th><th className="pb-3">Importe</th><th className="pb-3">Estado</th><th className="pb-3 text-right">Documento</th></tr></thead>
         <tbody>{invoices.map((i) => <tr key={i.id} className="border-b border-border/60">
           <td className="py-3">KIV-{String(i.id).padStart(6, "0")}</td>
@@ -53,7 +53,7 @@ export default async function MiSuscripcionPage() {
           <td className="py-3 text-right"><div className="flex flex-col items-end gap-2">{process.env.KIVRA_SAAS_TEST_CHECKOUT_ENABLED === "true" && (i.status === "pending" || i.status === "overdue") && <SaaSCheckoutButton invoiceId={Number(i.id)} />}{i.status === "cancelled" ? "—" :
             <Link className="font-semibold text-primary hover:underline" href={`/admin/mi-suscripcion/comprobante/${i.id}`}>{i.status === "paid" ? "Ver recibo" : "Ver aviso"}</Link>}</div></td>
         </tr>)}</tbody>
-      </table></div>}
+      </table></div><div className="mt-4 grid gap-3 lg:hidden">{invoices.map(i => <article key={i.id} className="space-y-2 rounded-xl border p-3"><div className="flex flex-wrap justify-between gap-2"><strong>KIV-{String(i.id).padStart(6,"0")}</strong><strong>{money(i.amount)}</strong></div><p className="text-xs text-muted-foreground">{date(i.period_start)} – {date(i.period_end)}</p><p className="text-sm">{i.status === "paid" ? "Pagado" : i.status === "overdue" ? "Vencido" : i.status === "cancelled" ? "Cancelado" : "Pendiente"}</p>{process.env.KIVRA_SAAS_TEST_CHECKOUT_ENABLED === "true" && (i.status === "pending" || i.status === "overdue") && <SaaSCheckoutButton invoiceId={Number(i.id)} />}{i.status !== "cancelled" && <Link className="block font-semibold text-primary" href={`/admin/mi-suscripcion/comprobante/${i.id}`}>{i.status === "paid" ? "Ver recibo" : "Ver aviso"}</Link>}</article>)}</div></>}
     </section>
   </div>;
 }
