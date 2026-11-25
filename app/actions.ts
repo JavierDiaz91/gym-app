@@ -3370,7 +3370,7 @@ export async function generateSaaSInvoiceAction(subscriptionId: number) {
         ${subscription.current_period_end},
         ${amount},
         'pending',
-        COALESCE(${subscription.next_billing_date}::date, ${subscription.current_period_end}::date),
+        (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date + COALESCE((SELECT billing_due_days FROM public.saas_settings WHERE id=1),10),
         NOW()
       )
       RETURNING *
