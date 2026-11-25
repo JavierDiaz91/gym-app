@@ -262,7 +262,7 @@ export function RegistrarPagoDialog({ members, plans }: Props) {
                 <SelectContent>
                   <SelectItem value="efectivo">Efectivo</SelectItem>
                   <SelectItem value="transferencia">Transferencia</SelectItem>
-                  <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                  <SelectItem value="tarjeta">Tarjeta presencial</SelectItem>
                   <SelectItem value="mercadopago">
                     Mercado Pago (Cobro Online)
                   </SelectItem>
