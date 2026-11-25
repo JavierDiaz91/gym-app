@@ -66,9 +66,12 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
       case "cash":
       case "efectivo":
         return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Efectivo</Badge>;
+      case "transfer":
       case "transferencia":
         return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">Transferencia</Badge>;
+      case "card":
       case "tarjeta":
+        return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">Tarjeta presencial</Badge>;
       case "mercadopago":
         return <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20">Mercado Pago</Badge>;
       default:
