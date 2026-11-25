@@ -38,3 +38,19 @@ export async function saveBank(form: FormData) {
   return {success:true};
  } catch {return {error:"No se pudieron guardar los datos bancarios."};}
 }
+
+export async function saveBilling(form: FormData) {
+ try {
+  const session=await getSession();
+  if(!session || session.role!=="superadmin" || session.gymId!=null) return {error:"Acceso denegado."};
+  const [user]=await sql`SELECT id FROM public.users WHERE id=${session.id} AND role='superadmin' AND gym_id IS NULL`;
+  if(!user) return {error:"Acceso denegado."};
+  const days=Number(form.get("billing_due_days"));
+  if(!Number.isInteger(days)||days<1||days>90) return {error:"Ingresá entre 1 y 90 días."};
+  const [row]=await sql`UPDATE public.saas_settings SET billing_due_days=${days},updated_at=NOW() WHERE id=1 RETURNING id`;
+  if(!row) return {error:"Configuración inicial inexistente."};
+  revalidatePath("/admin/configuracion-kivra");
+  revalidatePath("/admin/facturacion");
+  return {success:true};
+ } catch {return {error:"No se pudo guardar el plazo."};}
+}
