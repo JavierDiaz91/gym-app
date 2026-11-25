@@ -63,6 +63,8 @@ interface SubscriptionData {
   access_mode: string | null;
   max_entries: number | null;
   duration_days: number | null;
+  total_days: number;
+  remaining_days: number;
 }
 
 interface PaymentData {
@@ -107,7 +109,9 @@ const subResult = await sql`
   SELECT
     m.id AS member_id, m.status AS member_status,
     s.id AS subscription_id, s.plan_id, s.start_date, s.end_date, s.status AS subscription_status,
-    s.payment_status, p.name AS plan_name, p.price, p.description, p.access_mode, p.max_entries, p.duration_days
+    s.payment_status, p.name AS plan_name, p.price, p.description, p.access_mode, p.max_entries, p.duration_days,
+    (s.end_date::date - s.start_date::date) AS total_days,
+    GREATEST(0, s.end_date::date - CURRENT_DATE) AS remaining_days
   FROM members m
   JOIN subscriptions s ON s.member_id = m.id
   JOIN membership_plans p ON p.id = s.plan_id AND p.gym_id = m.gym_id
@@ -176,6 +180,9 @@ if (subscription?.access_mode === "entry_pack" && Number.isSafeInteger(Number(su
   const maxEntries = Number(subscription?.max_entries ?? 0);
   const remainingEntries = subscription?.access_mode === "entry_pack" && usedEntries !== null && maxEntries > 0
     ? Math.max(0, maxEntries - usedEntries) : null;
+
+  const totalDays = Math.max(1, Number(subscription?.total_days || 1));
+  const remainingDays = Math.max(0, Math.min(totalDays, Number(subscription?.remaining_days || 0)));
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 p-6">
@@ -282,7 +289,7 @@ if (subscription?.access_mode === "entry_pack" && Number.isSafeInteger(Number(su
               <p className="text-sm text-muted-foreground">No se pudo calcular el saldo de ingresos.</p>
             ) : (
               <>
-                <p className="text-2xl font-bold">{remainingEntries} de {maxEntries} disponibles</p>
+                <p className="text-2xl font-bold text-primary">{remainingEntries} / {maxEntries} ingresos disponibles</p>
                 <p className="text-sm text-muted-foreground">{usedEntries} ingreso(s) utilizado(s)</p>
                 <div className="h-2 rounded-full bg-muted overflow-hidden">
                   <div className="h-full bg-emerald-500" style={{ width: `${remainingEntries / maxEntries * 100}%` }} />
@@ -292,9 +299,13 @@ if (subscription?.access_mode === "entry_pack" && Number.isSafeInteger(Number(su
           </div>
         )}
         {subscription?.access_mode === "fixed_days" && (
-          <p className="rounded-lg border bg-background p-4 text-sm text-muted-foreground">
-            Pase por días: válido hasta el vencimiento indicado. La renovación se gestiona desde el gimnasio.
-          </p>
+          <div className="rounded-xl border bg-background p-5 space-y-3">
+            <h3 className="font-semibold">Vigencia de tu pase</h3>
+            <p className="text-2xl font-bold text-primary">{remainingDays} / {totalDays} {totalDays === 1 ? "día" : "días"}</p>
+            <p className="text-sm text-muted-foreground">{remainingDays === 1 ? "1 día restante" : `${remainingDays} días restantes`}</p>
+            <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-emerald-500" style={{ width: `${remainingDays / totalDays * 100}%` }} /></div>
+            <p className="text-xs text-muted-foreground">La vigencia disminuye por días calendario, independientemente de tus asistencias.</p>
+          </div>
         )}
         {isFlexible && (
           <p className="text-sm text-muted-foreground">
