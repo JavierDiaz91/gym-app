@@ -158,7 +158,7 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
   );
   return <>
     <div className="hidden lg:block shrink-0">{navigation}</div>
-    <header className="sticky top-0 z-40 flex w-full min-w-0 items-center gap-3 border-b border-white/10 bg-[#071827] px-4 py-3 text-white lg:hidden">
+    <header className="relative z-40 flex w-full min-w-0 items-center gap-3 border-b border-white/10 bg-[#071827] px-4 py-3 text-white lg:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild><button type="button" aria-label="Abrir menú" className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-white/15 text-primary"><Menu className="size-6" /></button></SheetTrigger>
         <SheetContent side="left" className="w-[min(85vw,320px)] max-w-full gap-0 overflow-y-auto border-primary/10 bg-[#071827] p-0 text-white">

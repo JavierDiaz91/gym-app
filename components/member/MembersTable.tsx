@@ -28,7 +28,7 @@ export function MembersTable({ members }: { members: Member[] }) {
     <div className="space-y-4">
       <div className="flex flex-wrap justify-between items-center gap-3">
         <h2 className="text-lg font-semibold">Lista de Miembros</h2>
-        <div className="relative w-64">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar miembro..."
@@ -39,7 +39,7 @@ export function MembersTable({ members }: { members: Member[] }) {
         </div>
       </div>
 
-      <Table>
+      <div className="hidden lg:block"><Table>
         <TableHeader>
           <TableRow>
             <TableHead>Miembro</TableHead>
@@ -116,7 +116,8 @@ export function MembersTable({ members }: { members: Member[] }) {
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+      </Table></div>
+<div className="grid gap-3 lg:hidden">{filteredMembers.map(member => <article key={member.id} className="min-w-0 space-y-2 rounded-xl border p-3"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{member.first_name} {member.last_name}</strong><Badge variant="outline">{member.status === "active" ? "Activo" : member.status === "suspended" ? "Suspendido" : "Inactivo"}</Badge></div><p className="break-all text-sm text-muted-foreground">{member.email}</p>{member.phone && <p className="text-sm">{member.phone}</p>}<p className="text-sm">{member.plan_name ?? "Sin membresía"}</p>{member.subscription_payment_status === "pending" && <p className="text-sm text-amber-500">Pago pendiente</p>}<p className="text-sm">Vencimiento: {member.subscription_end ? new Date(member.subscription_end).toLocaleDateString("es-AR", {timeZone:"UTC"}) : "—"}</p><Button variant="outline" className="w-full" asChild><Link href={`/admin/miembros/${member.id}`}>Ver detalle</Link></Button></article>)}</div>
     </div>
   );
 }

@@ -43,7 +43,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
   const [loadingHorarios, setLoadingHorarios] = useState<boolean>(false);
   const [loadingNotif, setLoadingNotif] = useState<boolean>(false);
 
-  // Mensaje de Ã©xito global
+  // Mensaje de éxito global
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   // Formulario General
@@ -89,7 +89,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
   useEffect(() => {
     const fetchDatosGimnasio = async () => {
       try {
-        // Cargar InformaciÃ³n General
+        // Cargar Información General
         const resGeneral = await fetch(`${API_BASE_URL}/gyms/${gymId}`, { cache: "no-store" });
         if (resGeneral.ok) {
           const dataGeneral = await resGeneral.json();
@@ -186,7 +186,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
 
     try {
       const res = await fetch(`${API_BASE_URL}/gyms/${gymId}`, {
-        method: "PUT", // o POST segÃºn el endpoint de tu backend Express
+        method: "PUT", // o POST según el endpoint de tu backend Express
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(generalForm),
       });
@@ -194,16 +194,16 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Error al actualizar la informaciÃ³n general");
+        throw new Error(data.error || "Error al actualizar la información general");
       }
 
-      triggerSuccess("InformaciÃ³n general guardada correctamente.");
+      triggerSuccess("Información general guardada correctamente.");
       setTimeout(() => {
         router.refresh();
         router.push("/admin");
       }, 500);
     } catch (err: unknown) {
-      console.error("Error al guardar informaciÃ³n general:", err);
+      console.error("Error al guardar información general:", err);
       const errorMessage = err instanceof Error ? err.message : "Error desconocido";
       alert("Error al guardar: " + errorMessage);
     } finally {
@@ -250,7 +250,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "Error al guardar la configuraciÃ³n");
+        throw new Error(data.error || "Error al guardar la configuración");
       }
 
       triggerSuccess("Horarios y feriados actualizados correctamente.");
@@ -286,10 +286,10 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
             className="text-3xl font-bold tracking-tight text-white"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            ConfiguraciÃ³n
+            Configuración
           </h1>
           <p className="text-gray-400">
-            AdministrÃ¡ la configuraciÃ³n del sistema y accesos de tu sede
+            Administrá la configuración del sistema y accesos de tu sede
           </p>
         </div>
 
@@ -302,19 +302,19 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="bg-[#14171d] border border-gray-800 p-1 rounded-xl">
+        <TabsList className="bg-[#14171d] border border-gray-800 p-1 rounded-xl !grid !h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="qr">Acceso / QR</TabsTrigger>
           <TabsTrigger value="horarios">Horarios</TabsTrigger>
           <TabsTrigger value="notificaciones">Notificaciones</TabsTrigger>
         </TabsList>
 
-        {/* PestaÃ±a: GENERAL */}
+        {/* Pestaña: GENERAL */}
         <TabsContent value="general">
           <Card className="bg-[#14171d] border-gray-800 text-gray-100">
             <CardHeader>
-              <CardTitle className="text-white">InformaciÃ³n del Gimnasio</CardTitle>
-              <CardDescription className="text-gray-400">Datos bÃ¡sicos de tu negocio</CardDescription>
+              <CardTitle className="text-white">Información del Gimnasio</CardTitle>
+              <CardDescription className="text-gray-400">Datos básicos de tu negocio</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSaveGeneral} className="space-y-4">
@@ -330,7 +330,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-gray-300">TelÃ©fono</Label>
+                    <Label htmlFor="phone" className="text-gray-300">Teléfono</Label>
                     <Input
                       id="phone"
                       value={generalForm.phone}
@@ -341,7 +341,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="address" className="text-gray-300">DirecciÃ³n</Label>
+                  <Label htmlFor="address" className="text-gray-300">Dirección</Label>
                   <Input
                     id="address"
                     value={generalForm.address}
@@ -374,7 +374,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
           </Card>
         </TabsContent>
 
-        {/* PestaÃ±a: ACCESO / QR */}
+        {/* Pestaña: ACCESO / QR */}
         <TabsContent value="qr">
           <Card className="bg-[#14171d] border-gray-800 text-gray-100 shadow-2xl">
             <CardHeader>
@@ -383,9 +383,9 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                   <QrCode className="w-5 h-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl font-bold text-white">CÃ³digo QR de Auto-Registro</CardTitle>
+                  <CardTitle className="text-xl font-bold text-white">Código QR de Auto-Registro</CardTitle>
                   <CardDescription className="text-gray-400">
-                    CÃ³digo QR Ãºnico para que los alumnos escaneen en recepciÃ³n y se registren en tu gimnasio.
+                    Código QR único para que los alumnos escaneen en recepción y se registren en tu gimnasio.
                   </CardDescription>
                 </div>
               </div>
@@ -447,13 +447,13 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
           </Card>
         </TabsContent>
 
-        {/* PestaÃ±a: HORARIOS */}
+        {/* Pestaña: HORARIOS */}
         <TabsContent value="horarios">
           <Card className="bg-[#14171d] border-gray-800 text-gray-100">
             <CardHeader>
-              <CardTitle className="text-white">Horarios de OperaciÃ³n y Feriados</CardTitle>
+              <CardTitle className="text-white">Horarios de Operación y Feriados</CardTitle>
               <CardDescription className="text-gray-400">
-                Define los horarios de apertura y los dÃ­as festivos o cierres especiales para notificar a los socios.
+                Define los horarios de apertura y los días festivos o cierres especiales para notificar a los socios.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
@@ -487,9 +487,9 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                     </div>
                   </div>
 
-                  {/* SÃ¡bado */}
+                  {/* Sábado */}
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-center bg-[#0d0f12] p-3 rounded-xl border border-gray-800">
-                    <Label className="text-gray-200 font-medium">SÃ¡bado</Label>
+                    <Label className="text-gray-200 font-medium">Sábado</Label>
                     <Input
                       type="time"
                       value={horariosForm.sabApertura}
@@ -545,7 +545,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Feriados y Cierres Especiales</h3>
-                      <p className="text-xs text-gray-500">Se mostrarÃ¡n avisos automÃ¡ticos en la app de los alumnos.</p>
+                      <p className="text-xs text-gray-500">Se mostrarán avisos automáticos en la app de los alumnos.</p>
                     </div>
                     <Button
                       type="button"
@@ -573,7 +573,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                           />
                           <Input
                             type="text"
-                            placeholder="Ej: AÃ±o Nuevo / Mantenimiento"
+                            placeholder="Ej: Año Nuevo / Mantenimiento"
                             value={f.motivo}
                             onChange={(e) => handleUpdateFeriado(f.id, "motivo", e.target.value)}
                             className="bg-[#14171d] border-gray-800 text-white flex-1"
@@ -605,19 +605,19 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
           </Card>
         </TabsContent>
 
-        {/* PestaÃ±a: NOTIFICACIONES */}
+        {/* Pestaña: NOTIFICACIONES */}
         <TabsContent value="notificaciones">
           <Card className="bg-[#14171d] border-gray-800 text-gray-100">
             <CardHeader>
               <CardTitle className="text-white">Preferencias de Notificaciones</CardTitle>
-              <CardDescription className="text-gray-400">ConfigurÃ¡ las alertas del sistema</CardDescription>
+              <CardDescription className="text-gray-400">Configurá las alertas del sistema</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSaveNotificaciones} className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <Label className="text-white">Nuevos registros</Label>
-                    <p className="text-sm text-gray-400">Recibir notificaciÃ³n cuando se registre un nuevo miembro</p>
+                    <p className="text-sm text-gray-400">Recibir notificación cuando se registre un nuevo miembro</p>
                   </div>
                   <Switch
                     checked={notifForm.nuevosRegistros}
@@ -626,8 +626,8 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <Label className="text-white">MembresÃ­as por vencer</Label>
-                    <p className="text-sm text-gray-400">Alertas de membresÃ­as prÃ³ximas a expirar</p>
+                    <Label className="text-white">Membresías por vencer</Label>
+                    <p className="text-sm text-gray-400">Alertas de membresías próximas a expirar</p>
                   </div>
                   <Switch
                     checked={notifForm.membresiasVencer}
@@ -637,7 +637,7 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <Label className="text-white">Pagos recibidos</Label>
-                    <p className="text-sm text-gray-400">NotificaciÃ³n de cada pago procesado</p>
+                    <p className="text-sm text-gray-400">Notificación de cada pago procesado</p>
                   </div>
                   <Switch
                     checked={notifForm.pagosRecibidos}
