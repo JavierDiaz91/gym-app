@@ -43,8 +43,8 @@ export default async function AdminLayout({
       <AdminSidebar userRole={session.role} userEmail={session.email} gymName={gymName} />
 
       {/* Contenido Principal */}
-      <main className="relative z-10 w-full min-w-0 flex-1 p-3 sm:p-6 md:p-8">
-        <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6">
+      <main className="kivra-admin-content relative z-10 w-full min-w-0 flex-1 p-3 sm:p-5 lg:p-8">
+        <div className="mx-auto w-full min-w-0 max-w-7xl space-y-4 sm:space-y-6">
           {children}
         </div>
       </main>

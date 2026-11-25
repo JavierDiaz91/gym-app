@@ -149,3 +149,17 @@
   #kivra-print-document .kivra-brand { color: #00d5d0 !important; }
   #kivra-print-document .kivra-print-section { break-inside: avoid; }
 }
+
+/* Kivra premium admin: shared visual rhythm, scoped to admin content. */
+@media screen {
+  .kivra-admin-content h1 { font-size: clamp(1.5rem, 2.5vw, 2rem); line-height: 1.2; letter-spacing: -0.035em; }
+  .kivra-admin-content [data-slot="card"] { box-shadow: 0 4px 18px rgb(0 0 0 / 0.045); }
+  .dark .kivra-admin-content [data-slot="card"] { box-shadow: 0 4px 18px rgb(0 0 0 / 0.12); }
+  .kivra-admin-content [data-slot="card-title"] { letter-spacing: -0.02em; }
+  .kivra-admin-content [data-slot="button"] { transition: background-color 150ms, border-color 150ms, box-shadow 150ms; }
+  @media (max-width: 639px) {
+    .kivra-admin-content [data-slot="card"] { gap: 1rem; padding-block: 1rem; }
+    .kivra-admin-content [data-slot="card-header"], .kivra-admin-content [data-slot="card-content"], .kivra-admin-content [data-slot="card-footer"] { padding-inline: 0.875rem; min-width: 0; }
+    .kivra-admin-content [data-slot="card-title"] { line-height: 1.35; }
+  }
+}
