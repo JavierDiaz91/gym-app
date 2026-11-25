@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -62,6 +63,7 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
   const initials = accountLabel.includes("@")
     ? accountLabel.slice(0, 2).toUpperCase()
     : accountLabel.split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join("").toUpperCase();
+  const { setTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -145,6 +147,7 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
       </div>
 
       <div className="p-3 border-t border-white/10 space-y-2">
+        <div className="lg:hidden space-y-2"><p className="text-xs text-slate-400">Apariencia</p><div className="grid grid-cols-3 gap-1">{[["light","Claro"],["dark","Oscuro"],["system","Sistema"]].map(([value,label]) => <button key={value} type="button" onClick={() => setTheme(value)} className="rounded-lg border border-white/15 px-2 py-2 text-xs hover:bg-white/10">{label}</button>)}</div></div>
         <div className="flex items-center gap-3 rounded-xl bg-[#0d2837]/70 border border-zinc-800/40 p-2 min-w-0">
           <div className="h-8 w-8 shrink-0 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center text-xs font-bold text-white">{initials}</div>
           <div className="min-w-0 flex-1">
