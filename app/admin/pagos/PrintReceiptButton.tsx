@@ -56,7 +56,7 @@ export function PrintReceiptButton({ payment, showLabel = false }: PaymentPrintP
               ? `<div class="row"><span class="label">DNI:</span> <span class="value">${payment.dni}</span></div>`
               : ""}
             <div class="row"><span class="label">Concepto:</span> <span class="value">${payment.plan_name || "Membresía"}</span></div>
-            <div class="row"><span class="label">Método:</span> <span class="value" style="text-transform: capitalize;">${payment.payment_method}</span></div>
+            <div class="row"><span class="label">Método:</span> <span class="value" style="text-transform: capitalize;">${({ cash: "Efectivo", efectivo: "Efectivo", transfer: "Transferencia", transferencia: "Transferencia", card: "Tarjeta presencial", tarjeta: "Tarjeta presencial", mercadopago: "Mercado Pago" } as Record<string, string>)[payment.payment_method?.toLowerCase()] ?? "Otro"}</span></div>
             <div class="row total-row">
               <span>TOTAL:</span> <span>$${amountFormatted}</span>
             </div>
