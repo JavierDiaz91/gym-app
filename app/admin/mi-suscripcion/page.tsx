@@ -27,6 +27,7 @@ export default async function MiSuscripcionPage() {
     ORDER BY created_at DESC LIMIT 100
   `;
 
+  const [bank] = await sql`SELECT bank_name,bank_account_holder,bank_cbu,bank_alias FROM public.saas_settings WHERE id=1`;
   return <div className="space-y-6">
     <div><p className="text-xs font-semibold uppercase tracking-widest text-primary">Kivra SaaS</p>
       <h1 className="mt-2 text-2xl sm:text-3xl font-bold">Mi suscripción Kivra</h1>
@@ -39,6 +40,7 @@ export default async function MiSuscripcionPage() {
         <div className="col-span-2 sm:col-span-3 text-sm text-muted-foreground">Estado: {subscription.status} · Período: {date(subscription.current_period_start)} al {date(subscription.current_period_end)}</div>
       </div> : <p className="text-muted-foreground">Todavía no hay una suscripción SaaS asignada a este gimnasio.</p>}
     </section>
+    {subscription && invoices.some(i=>i.status==="pending" || i.status==="overdue") && bank?.bank_account_holder && (bank.bank_cbu || bank.bank_alias) && <section className="rounded-2xl border border-border bg-card p-4 sm:p-6"><h2 className="text-xl font-semibold">Pago por transferencia</h2><p className="mt-1 text-sm text-muted-foreground">Cuenta receptora de Kivra. Contactá a Kivra para confirmar el pago; la transferencia no se acredita automáticamente.</p><dl className="mt-4 grid gap-3 sm:grid-cols-2">{[["Banco",bank.bank_name],["Titular",bank.bank_account_holder],["CBU / CVU",bank.bank_cbu],["Alias",bank.bank_alias]].filter(([,value])=>value).map(([label,value])=><div key={String(label)}><dt className="text-sm text-muted-foreground">{String(label)}</dt><dd className="break-all font-medium">{String(value)}</dd></div>)}</dl></section>}
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
       <h2 className="text-xl font-semibold">Comprobantes e historial de cobros</h2>
       <p className="mt-1 text-sm text-muted-foreground">Los recibos solo se muestran cuando el pago está registrado como confirmado. Los documentos son comerciales, no facturas fiscales.</p>
