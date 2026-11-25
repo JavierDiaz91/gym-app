@@ -203,6 +203,9 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
     isExpired = endDate <= today;
   }
 
+  const totalDays = memberData?.start_date && memberData?.end_date ? Math.max(1, Math.round((new Date(memberData.end_date).getTime() - new Date(memberData.start_date).getTime()) / 86400000)) : 1;
+  const remainingPercent = Math.max(0, Math.min(100, daysRemaining / totalDays * 100));
+
   // La suscripción está totalmente activa sólo si no está vencida Y su estado no es suspended/inactive
   const isFullyActive = !isExpired && !isSuspended && ["active", "scheduled"].includes(memberData?.sub_status || "") && memberData?.payment_status === "paid";
 
@@ -279,7 +282,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
                 {isSuspended || isExpired ? 0 : daysRemaining}
               </span>
               <span className="text-sm font-medium text-muted-foreground">
-                días restantes
+                {(!isSuspended && !isExpired && daysRemaining === 1) ? "día restante" : "días restantes"}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
@@ -294,11 +297,11 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
               className={`h-full ${
                 isSuspended || isExpired 
                   ? 'bg-red-500' 
-                  : daysRemaining > 5 
+                  : remainingPercent > 20 
                     ? 'bg-emerald-500' 
                     : 'bg-amber-500'
               }`}
-              style={{ width: `${isSuspended || isExpired ? 100 : Math.min(100, (daysRemaining / 30) * 100)}%` }}
+              style={{ width: `${isSuspended || isExpired ? 0 : remainingPercent}%` }}
             />
           </div>
         </div>
