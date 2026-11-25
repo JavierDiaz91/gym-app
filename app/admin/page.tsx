@@ -189,18 +189,6 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1
-          className="text-3xl font-bold"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          Dashboard
-        </h1>
-        <p className="text-muted-foreground">
-          Resumen general del gimnasio en tiempo real
-        </p>
-      </div>
-
       <KpiSection stats={stats} />
 
       <Card>

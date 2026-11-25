@@ -1,5 +1,6 @@
 // app/admin/layout.tsx
 import React from "react";
+import { AdminHeader } from "@/components/admin/admin-header";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { getSession } from "@/app/actions";
 import { redirect } from "next/navigation";
@@ -45,6 +46,7 @@ export default async function AdminLayout({
       {/* Contenido Principal */}
       <main className="kivra-admin-content relative z-10 w-full min-w-0 flex-1 p-3 sm:p-5 lg:p-8">
         <div className="mx-auto w-full min-w-0 max-w-7xl space-y-4 sm:space-y-6">
+          {session.role === "admin" && <AdminHeader gymName={gymName || "Mi gimnasio"} />}
           {children}
         </div>
       </main>

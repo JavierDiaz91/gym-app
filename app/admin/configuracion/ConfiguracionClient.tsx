@@ -74,7 +74,9 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
   const [notifForm, setNotifForm] = useState({
     nuevosRegistros: true,
     membresiasVencer: true,
-    pagosRecibidos: false,
+    pagosRecibidos: true,
+    vencidas: true,
+    dias: 3,
     reservasClases: true,
   });
 
@@ -268,14 +270,27 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
     }
   };
 
+  const [notifReady, setNotifReady] = useState(false);
+  const [notifError, setNotifError] = useState("");
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/notification-preferences", {cache:"no-store"}).then(async r => {
+      if (!r.ok) throw new Error();
+      const p = await r.json();
+      if (active) { setNotifForm({nuevosRegistros:p.new_members,membresiasVencer:p.membership_expiring,vencidas:p.membership_expired,pagosRecibidos:p.payments_received,reservasClases:p.classes_full,dias:p.expiration_days}); setNotifReady(true); }
+    }).catch(() => {if(active) setNotifError("No se pudieron cargar las preferencias.");});
+    return () => {active=false;};
+  }, [gymId]);
   const handleSaveNotificaciones = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingNotif(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setLoadingNotif(false);
-    triggerSuccess("Preferencias de notificaciones guardadas.");
-    router.refresh();
-    router.push("/admin");
+    setNotifError("");
+    try {
+      const r = await fetch("/api/admin/notification-preferences", {method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({new_members:notifForm.nuevosRegistros,membership_expiring:notifForm.membresiasVencer,membership_expired:notifForm.vencidas,payments_received:notifForm.pagosRecibidos,classes_full:notifForm.reservasClases,expiration_days:notifForm.dias})});
+      if (!r.ok) throw new Error();
+      triggerSuccess("Preferencias de notificaciones guardadas.");
+    } catch {setNotifError("No se pudieron guardar las preferencias.");}
+    finally {setLoadingNotif(false);}
   };
 
   return (
@@ -614,6 +629,8 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSaveNotificaciones} className="space-y-6">
+{notifError && <p role="alert" className="text-red-400">{notifError}</p>}
+<fieldset disabled={!notifReady || loadingNotif} className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <Label className="text-white">Nuevos registros</Label>
@@ -654,9 +671,12 @@ export default function ConfiguracionClient({ gymId }: { gymId: number }) {
                     onCheckedChange={(checked) => setNotifForm({ ...notifForm, reservasClases: checked })}
                   />
                 </div>
+                <div className="flex items-center justify-between gap-3"><Label htmlFor="expired-alert">Membresías vencidas</Label><Switch id="expired-alert" checked={notifForm.vencidas} onCheckedChange={v => setNotifForm(p => ({...p,vencidas:v}))}/></div>
+                <div className="space-y-2"><Label htmlFor="expiration-days">Días de anticipación</Label><Input id="expiration-days" type="number" min={1} max={30} required value={notifForm.dias} onChange={e => setNotifForm(p => ({...p,dias:Number(e.target.value)}))}/></div>
+                </fieldset>
                 <Button
                   type="submit"
-                  disabled={loadingNotif}
+                  disabled={loadingNotif || !notifReady}
                   className="bg-primary hover:bg-primary/90 text-black font-bold gap-2"
                 >
                   {loadingNotif && <Loader2 className="w-4 h-4 animate-spin" />}
