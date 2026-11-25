@@ -12,6 +12,7 @@ export async function GET() {
  try {
  const id = await tenant();
  if (id == null) return NextResponse.json({error:"Acceso denegado"},{status:403});
+ await sql`SELECT public.kivra_generate_membership_notifications(${id})`;
  const [items, counts] = await Promise.all([
  sql`SELECT id::text, event_type,title,message,action_url,read_at,created_at FROM gym_notifications WHERE gym_id=${id} ORDER BY created_at DESC,id DESC LIMIT 100`,
  sql`SELECT count(*)::integer AS unread FROM gym_notifications WHERE gym_id=${id} AND read_at IS NULL`
