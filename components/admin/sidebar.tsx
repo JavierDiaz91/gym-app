@@ -85,7 +85,7 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
   const navigation = (
     <aside className="w-full lg:w-64 shrink-0 border-r border-primary/10 bg-[#071827] text-slate-200 flex flex-col justify-between select-none min-h-full">
       <div>
-        <div className="p-6 border-b border-white/10">
+        <div className="px-4 py-4 lg:px-5 lg:py-5 border-b border-white/10">
           <Link href="/admin" className="flex items-center gap-3.5 group">
             <div className="w-10 h-10 bg-primary/10 border border-primary/30 rounded-xl flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-200">
               <Dumbbell className="w-5 h-5 -rotate-45 group-hover:rotate-0 transition-transform duration-300" />
@@ -104,8 +104,8 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
           </Link>
         </div>
 
-        <nav className="p-3">
-          <ul className="space-y-1.5">
+        <nav className="p-2.5 lg:p-3">
+          <ul className="space-y-0.5 lg:space-y-1">
             {filteredNavItems.map((item) => {
               const isActive =
                 pathname === item.href ||
@@ -117,9 +117,10 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    aria-current={isActive ? "page" : undefined}
                     onClick={() => setOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative",
+                      "flex items-center gap-2.5 px-3 py-2.5 min-h-10 rounded-lg text-[13px] lg:text-sm font-medium transition-all duration-200 group relative",
                       isActive
                         ? "bg-primary/10 text-primary font-semibold border border-primary/20 shadow-xs"
                         : "text-slate-400 hover:bg-white/[0.06] hover:text-white"
@@ -131,13 +132,13 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
 
                     <Icon
                       className={cn(
-                        "w-4 h-4 transition-transform duration-200 group-hover:scale-110",
+                        "w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110",
                         isActive
                           ? "text-primary"
                           : "text-slate-400 group-hover:text-white"
                       )}
                     />
-                    <span>{item.label}</span>
+                    <span className="min-w-0 leading-tight">{item.label}</span>
                   </Link>
                 </li>
               );
@@ -161,10 +162,10 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
   );
   return <>
     <div className="hidden lg:block shrink-0">{navigation}</div>
-    <header className="relative z-40 flex w-full min-w-0 items-center gap-3 border-b border-white/10 bg-[#071827] px-4 py-3 text-white lg:hidden">
+    <header className="relative z-40 flex w-full min-w-0 items-center gap-3 border-b border-white/10 bg-[#071827] px-3 py-2 text-white lg:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild><button type="button" aria-label="Abrir menú" className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-white/15 text-primary"><Menu className="size-6" /></button></SheetTrigger>
-        <SheetContent side="left" className="w-[min(85vw,320px)] max-w-full gap-0 overflow-y-auto border-primary/10 bg-[#071827] p-0 text-white">
+        <SheetContent side="left" className="w-[min(75vw,280px)] max-w-full gap-0 overflow-y-auto border-primary/10 bg-[#071827] p-0 text-white">
           <SheetTitle className="sr-only">Menú de Kivra</SheetTitle><SheetDescription className="sr-only">Navegación del panel de administración</SheetDescription>
           {navigation}
         </SheetContent>
