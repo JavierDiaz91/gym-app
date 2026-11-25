@@ -61,6 +61,23 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
     max_entries: p.max_entries == null ? null : Number(p.max_entries)
   }));
 
+  const renderMember = (payment: any) => {
+    const parts = [payment.first_name, payment.last_name].map(v => String(v ?? "").trim()).filter(v => v && !["null", "undefined"].includes(v.toLowerCase()));
+    const name = parts.join(" ") || "Socio";
+    const initials = parts.slice(0, 2).map(v => Array.from(v)[0]).join("").toUpperCase() || "S";
+    const dni = String(payment.dni ?? "").trim();
+    const hasDni = Boolean(dni) && !["sin dni", "null", "undefined", "-"].includes(dni.toLowerCase());
+    return (
+      <div className="flex min-w-0 items-center gap-3">
+        <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{initials}</span>
+        <div className="min-w-0">
+          <span className="block break-words font-medium">{name}</span>
+          {hasDni && <span className="block text-xs text-muted-foreground">DNI: {dni}</span>}
+        </div>
+      </div>
+    );
+  };
+
   const getMethodBadge = (method: string) => {
     switch (method?.toLowerCase()) {
       case "cash":
@@ -143,8 +160,7 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
                       })}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {payment.last_name}, {payment.first_name}
-                      <span className="block text-xs text-muted-foreground">DNI: {payment.dni || "Sin DNI"}</span>
+                      {renderMember(payment)}
                     </TableCell>
                     <TableCell>{payment.plan_name || "N/A"}</TableCell>
                     <TableCell>{getMethodBadge(payment.payment_method)}</TableCell>
@@ -164,7 +180,7 @@ export default async function PagosPage({ searchParams }: PagosPageProps) {
                 </TableRow>
               )}
             </TableBody>
-          </Table></div><div className="grid gap-2 lg:hidden">{payments.length ? payments.map((payment: any) => <article key={payment.id} className="min-w-0 space-y-1.5 rounded-xl border p-3"><div className="flex flex-wrap justify-between gap-2"><strong>{payment.last_name}, {payment.first_name}</strong><strong>${Number(payment.amount).toLocaleString("es-AR")}</strong></div><p className="text-xs text-muted-foreground">{new Date(payment.payment_date).toLocaleString("es-AR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}</p><p className="text-sm">{payment.plan_name || "N/A"}</p><div className="flex flex-wrap items-center justify-between gap-2">{getMethodBadge(payment.payment_method)}<PrintReceiptButton payment={payment} showLabel /></div></article>) : <p>No hay pagos registrados aún.</p>}</div>
+          </Table></div><div className="grid gap-2 lg:hidden">{payments.length ? payments.map((payment: any) => <article key={payment.id} className="min-w-0 space-y-1.5 rounded-xl border p-3"><div className="flex flex-wrap justify-between gap-2">{renderMember(payment)}<strong>${Number(payment.amount).toLocaleString("es-AR")}</strong></div><p className="text-xs text-muted-foreground">{new Date(payment.payment_date).toLocaleString("es-AR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}</p><p className="text-sm">{payment.plan_name || "N/A"}</p><div className="flex flex-wrap items-center justify-between gap-2">{getMethodBadge(payment.payment_method)}<PrintReceiptButton payment={payment} showLabel /></div></article>) : <p>No hay pagos registrados aún.</p>}</div>
         </CardContent>
       </Card>
     </div>
