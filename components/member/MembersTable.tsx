@@ -18,20 +18,22 @@ import type { Member } from "@/app/types/member";
 
 export function MembersTable({ members }: { members: Member[] }) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState("all");
 
   const filteredMembers = members.filter((m) => {
-    const fullText = `${m.first_name} ${m.last_name ?? ""} ${m.email}`.toLowerCase();
-    return fullText.includes(searchTerm.toLowerCase());
+    const fullText = `${m.first_name} ${m.last_name ?? ""} ${m.email ?? ""} ${m.phone ?? ""} ${m.id}`.toLowerCase();
+    return fullText.includes(searchTerm.trim().toLowerCase()) && (filter === "all" || (filter === "pending" ? m.subscription_payment_status === "pending" : filter === "no-plan" ? !m.plan_name : m.status === filter));
   });
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[["Total",members.length],["Activos",members.filter(m=>m.status==="active").length],["Pago pendiente",members.filter(m=>m.subscription_payment_status==="pending").length],["Sin membresía",members.filter(m=>!m.plan_name).length]].map(([label,count])=><div key={label} className="rounded-xl border bg-background/50 p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold tabular-nums">{count}</p></div>)}</div>
       <div className="flex flex-wrap justify-between items-center gap-3">
-        <h2 className="text-lg font-semibold">Lista de Miembros</h2>
+        <div><h2 className="text-lg font-semibold">Directorio de miembros</h2><p className="text-xs text-muted-foreground">{filteredMembers.length} de {members.length} miembros</p></div><select aria-label="Filtrar miembros" className="rounded-lg border bg-background p-2 text-sm" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">Todos los estados</option><option value="active">Activos</option><option value="suspended">Suspendidos</option><option value="pending">Pago pendiente</option><option value="no-plan">Sin membresía</option></select>
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar miembro..."
+            placeholder="Nombre, correo, teléfono o ID"
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -45,17 +47,18 @@ export function MembersTable({ members }: { members: Member[] }) {
             <TableHead>Miembro</TableHead>
             <TableHead>Contacto</TableHead>
             <TableHead>Membresía</TableHead>
-            <TableHead>Estado del miembro</TableHead>
+            <TableHead>Estado administrativo</TableHead>
             <TableHead>Vencimiento</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
+          {filteredMembers.length === 0 && <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">No se encontraron miembros.</TableCell></TableRow>}
           {filteredMembers.map((member) => (
             <TableRow key={member.id}>
               <TableCell>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <div className="shrink-0 w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                     <span className="text-sm font-medium text-primary">
                       {member.first_name[0]}
                       {member.last_name?.[0] ?? ""}
@@ -101,7 +104,7 @@ export function MembersTable({ members }: { members: Member[] }) {
                     ? "Suspendido"
                     : "Inactivo"}
                 </Badge>
-                <p className="mt-1 text-xs text-muted-foreground">Estado administrativo</p>
+                
               </TableCell>
               <TableCell>
                 {member.subscription_end
