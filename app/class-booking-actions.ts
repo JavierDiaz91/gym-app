@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 async function requireStaff() {
  const session=await getSession();
  if(!session||session.gymId==null||!["admin","trainer"].includes(session.role)) throw new Error("Sin permisos");
+ const [moduleAccess] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'classes', ${session.role}::text) AS enabled`;
+ if (moduleAccess?.enabled !== true) throw new Error("El módulo de clases no está habilitado");
  return session;
 }
 export async function getClassBookings(scheduleId:number, date:string) {
