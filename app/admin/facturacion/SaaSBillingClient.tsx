@@ -71,9 +71,11 @@ function StatusBadge({ status }: { status: string }) {
 export default function SaaSBillingClient({
   initialSubscriptions,
   initialInvoices,
+  transferSection,
 }: {
   initialSubscriptions: SubscriptionRow[];
   initialInvoices: InvoiceRow[];
+  transferSection?: React.ReactNode;
 }) {
   const router = useRouter();
   const subscriptions = initialSubscriptions;
@@ -203,6 +205,8 @@ export default function SaaSBillingClient({
           </CardContent>
         </Card>
       </div>
+
+      {transferSection}
 
       <Card className="border-primary/30">
         <CardHeader><CardTitle>Generar factura manual</CardTitle></CardHeader>
