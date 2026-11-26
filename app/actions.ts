@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { revalidateTag, revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
+import { auditSecurity } from "@/lib/security-audit";
 import { Member } from "./types/member";
 import { AttendanceStat } from "./types/attendance";
 import { TrainerMember } from "./types/trainer";
@@ -161,6 +162,7 @@ export async function loginUser(formData: FormData) {
 
     const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) {
+      if(user.role==="superadmin" && user.gym_id==null) await auditSecurity(Number(user.id),"login","failure");
       return { error: "Credenciales inválidas" };
     }
 
@@ -176,6 +178,7 @@ export async function loginUser(formData: FormData) {
     const token = await createSessionToken({...sessionData, ...(version ? {sessionVersion:Number(version.session_version)} : {})});
     const cookieStore = await cookies();
     cookieStore.set("session", token, sessionCookieOptions);
+    if(user.role==="superadmin" && user.gym_id==null) await auditSecurity(Number(user.id),"login","success");
 
     return {
       success: true,
