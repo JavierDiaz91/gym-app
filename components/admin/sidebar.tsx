@@ -33,6 +33,7 @@ interface AdminSidebarProps {
   userRole?: string;
   userEmail?: string;
   gymName?: string;
+  showClasses?: boolean;
 }
 
 const navItems = [
@@ -60,7 +61,7 @@ const navItems = [
   { href: "/admin/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
 ];
 
-export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: AdminSidebarProps) {
+export function AdminSidebar({ userRole = "admin", userEmail = "", gymName, showClasses = true }: AdminSidebarProps) {
   const accountLabel = (userRole === "admin" ? gymName?.trim() : undefined) || userEmail.trim() || "Usuario";
   const initials = accountLabel.includes("@")
     ? accountLabel.slice(0, 2).toUpperCase()
@@ -84,7 +85,7 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
     router.push("/");
   }
 
-  const filteredNavItems = navItems.filter((item) => item.roles.includes(userRole));
+  const filteredNavItems = navItems.filter((item) => item.roles.includes(userRole) && (item.href !== '/admin/clases' || showClasses));
 
   const groups = userRole === "admin" ? [
     { title: "General", paths: ["/admin"] },
