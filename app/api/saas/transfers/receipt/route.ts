@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const extension = extensions[mime];
     if (!receipt || !extension || !receipt.receipt_hex) return NextResponse.json({error:"Comprobante no disponible"},{status:404,headers});
     const bytes = Uint8Array.from(Buffer.from(String(receipt.receipt_hex),"hex"));
-    return new NextResponse(bytes, {headers:{...headers,"Content-Type":mime,"Content-Disposition":`attachment; filename="transferencia-${id}.${extension}"`,"Content-Security-Policy":"default-src 'none'; sandbox"}});
+    return new NextResponse(bytes, {headers:{...headers,"Content-Type":mime,"Content-Disposition":`inline; filename="transferencia-${id}.${extension}"`,"Content-Security-Policy":"default-src 'none'; sandbox"}});
   } catch {
     return NextResponse.json({error:"No se pudo recuperar el comprobante"},{status:500,headers});
   }
