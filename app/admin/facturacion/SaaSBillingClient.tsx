@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Receipt } from "lucide-react";
 import { toast } from "sonner";
@@ -76,12 +76,11 @@ export default function SaaSBillingClient({
   initialInvoices: InvoiceRow[];
 }) {
   const router = useRouter();
-  const [subscriptions] = useState<SubscriptionRow[]>(
-    Array.isArray(initialSubscriptions) ? initialSubscriptions : []
-  );
+  const subscriptions = initialSubscriptions;
   const [invoices, setInvoices] = useState<InvoiceRow[]>(
     Array.isArray(initialInvoices) ? initialInvoices : []
   );
+  useEffect(() => { setInvoices(initialInvoices); }, [initialInvoices]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [testSubscriptionId, setTestSubscriptionId] = useState(String(initialSubscriptions[0]?.id ?? ""));
   const [testAmount, setTestAmount] = useState("1750");
