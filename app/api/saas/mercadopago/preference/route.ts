@@ -13,6 +13,10 @@ export async function POST(request: NextRequest) {
     if (!session || session.role !== "admin" || session.gymId == null) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
+    const [settings] = await sql`SELECT mp_payments_enabled FROM public.saas_settings WHERE id = 1`;
+    if (settings?.mp_payments_enabled !== true || process.env.KIVRA_SAAS_TEST_CHECKOUT_ENABLED !== "true") {
+      return NextResponse.json({ error: "Mercado Pago no está habilitado para el pago de Kivra" }, { status: 403 });
+    }
     const token = process.env.KIVRA_MP_TEST_ACCESS_TOKEN;
     const publicUrl = process.env.KIVRA_PUBLIC_URL;
     if (!token || !publicUrl || !/^https:\/\//.test(publicUrl)) {
