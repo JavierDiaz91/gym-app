@@ -116,7 +116,7 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
 
         <nav className="p-2.5 lg:p-3">
           {groups.map(group => <div key={group.title} className="mb-4 last:mb-0">
-          {group.title && <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{group.title}</p>}
+          {group.title && <p className="mb-1.5 rounded-r-md border-l-2 border-primary/70 bg-primary/[0.07] px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-primary/90">{group.title}</p>}
           <ul className="space-y-0.5">
             {group.paths.map(path => filteredNavItems.find(i => i.href === path)).filter((i): i is (typeof navItems)[number] => Boolean(i)).map((item) => {
               const isActive =
