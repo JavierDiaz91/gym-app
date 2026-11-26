@@ -17,6 +17,7 @@ const features = [
 ];
 
 export default function LoginPage() {
+  const [requiresTotp, setRequiresTotp] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -32,6 +33,7 @@ export default function LoginPage() {
       const result = await loginUser(formData);
 
       if (result.error) {
+        setRequiresTotp("requiresTotp" in result && result.requiresTotp === true);
         setError(result.error);
         setLoading(false);
         return;
@@ -137,6 +139,11 @@ export default function LoginPage() {
                 <Input id="password" name="password" type="password" placeholder="Ingresá tu contraseña" required className="h-12 rounded-xl border-white/[0.08] bg-white/[0.035] text-white placeholder:text-zinc-400 focus-visible:border-[#00d5d0]/50 focus-visible:ring-[#00d5d0]/20" />
               </div>
 
+              {requiresTotp && <div className="space-y-2">
+                <Label htmlFor="totp">Código de seguridad</Label>
+                <Input id="totp" name="totp" autoComplete="one-time-code" autoFocus required maxLength={32} className="h-12 rounded-xl border-white/10 bg-white/5 text-white" />
+                <p className="text-xs text-zinc-400">Ingresá el código de tu autenticador o un código de recuperación.</p>
+              </div>}
               <div className="flex justify-end">
                 <Link href="/recuperar-contrasena" className="text-sm font-medium text-[#67e8e3] hover:text-white">
                   ¿Olvidaste tu contraseña?
