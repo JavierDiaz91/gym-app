@@ -24,6 +24,7 @@ import {
   Receipt,
   Activity,
   Settings2,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logoutUser } from "@/app/actions";
@@ -67,6 +68,8 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [subscriptionOpen, setSubscriptionOpen] = useState(pathname.startsWith("/admin/mi-suscripcion"));
+  useEffect(() => { if (pathname.startsWith("/admin/mi-suscripcion")) setSubscriptionOpen(true); }, [pathname]);
   useEffect(() => { setOpen(false); }, [pathname]);
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1024px)');
@@ -82,6 +85,13 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
 
   const filteredNavItems = navItems.filter((item) => item.roles.includes(userRole));
 
+  const groups = userRole === "admin" ? [
+    { title: "General", paths: ["/admin"] },
+    { title: "Gestión del gimnasio", paths: ["/admin/miembros", "/admin/membresias", "/admin/pagos", "/admin/asistencias"] },
+    { title: "Gestión deportiva", paths: ["/admin/clases", "/admin/entrenadores", "/admin/categorias"] },
+    { title: "Administración", paths: ["/admin/reportes", "/admin/configuracion"] },
+    { title: "Mi cuenta Kivra", paths: ["/admin/mi-suscripcion"] },
+  ] : [{ title: "", paths: filteredNavItems.map(i => i.href) }];
   const navigation = (
     <aside className="w-full lg:w-64 shrink-0 border-r border-primary/10 bg-[#071827] text-slate-200 flex flex-col justify-between select-none min-h-full">
       <div>
@@ -105,14 +115,20 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
         </div>
 
         <nav className="p-2.5 lg:p-3">
-          <ul className="space-y-0.5 lg:space-y-1">
-            {filteredNavItems.map((item) => {
+          {groups.map(group => <div key={group.title} className="mb-4 last:mb-0">
+          {group.title && <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{group.title}</p>}
+          <ul className="space-y-0.5">
+            {group.paths.map(path => filteredNavItems.find(i => i.href === path)).filter((i): i is (typeof navItems)[number] => Boolean(i)).map((item) => {
               const isActive =
                 pathname === item.href ||
                 (item.href !== "/admin" && pathname.startsWith(item.href));
 
               const Icon = item.icon;
 
+              if (userRole === "admin" && item.href === "/admin/mi-suscripcion") return <li key={item.href}>
+                <button type="button" aria-expanded={subscriptionOpen} onClick={() => setSubscriptionOpen(v => !v)} className={cn("flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium", isActive ? "bg-primary/10 text-primary" : "text-slate-400 hover:bg-white/5")}><Receipt className="size-4 shrink-0"/><span className="flex-1">Mi suscripción Kivra</span><ChevronDown className={cn("size-4 transition-transform", subscriptionOpen && "rotate-180")}/></button>
+                {subscriptionOpen && <ul className="ml-5 mt-1 space-y-1 border-l border-white/10 pl-3">{[["Resumen general",""],["Facturas pendientes","/pendientes"],["Datos bancarios","/datos-bancarios"],["Historial y recibos","/historial"]].map(([label,suffix]) => { const href = item.href + suffix; return <li key={href}><Link href={href} onClick={() => setOpen(false)} aria-current={pathname === href ? "page" : undefined} className={cn("block rounded-md px-2 py-2 text-xs", pathname === href ? "bg-primary/10 font-semibold text-primary" : "text-slate-400 hover:text-white")}>{label}</Link></li>; })}</ul>}
+              </li>;
               return (
                 <li key={item.href}>
                   <Link
@@ -143,7 +159,7 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName }: Ad
                 </li>
               );
             })}
-          </ul>
+          </ul></div>)}
         </nav>
       </div>
 
