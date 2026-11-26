@@ -42,6 +42,7 @@ const navItems = [
   { href: "/admin/gimnasios", label: "Gimnasios", icon: Building2, roles: ["superadmin"] },
   { href: "/admin/clientes", label: "Clientes / Administradores", icon: UsersRound, roles: ["superadmin"] },
   { href: "/admin/planes-saas", label: "Planes SaaS", icon: Boxes, roles: ["superadmin"] },
+  { href: "/admin/modulos", label: "Módulos", icon: Settings2, roles: ["superadmin"] },
   { href: "/admin/facturacion", label: "Facturación", icon: Receipt, roles: ["superadmin"] },
   { href: "/admin/actividad", label: "Actividad", icon: Activity, roles: ["superadmin"] },
   { href: "/admin/configuracion-kivra", label: "Configuración Kivra", icon: Settings2, roles: ["superadmin"] },
