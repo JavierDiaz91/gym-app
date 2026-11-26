@@ -1,5 +1,7 @@
 "use server";
 import { getSession } from "@/app/actions";
+import bcrypt from "bcryptjs";
+import { cookies } from "next/headers";
 import { sql } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
@@ -53,4 +55,21 @@ export async function saveBilling(form: FormData) {
   revalidatePath("/admin/facturacion");
   return {success:true};
  } catch {return {error:"No se pudo guardar el plazo."};}
+}
+
+export async function updateSecurity(form: FormData) {
+ try {
+  const session=await getSession();
+  if(!session || session.role!=="superadmin" || session.gymId!==null) return {error:"Acceso denegado."};
+  const current=form.get("current"), next=form.get("next"), confirm=form.get("confirm"), mode=form.get("mode");
+  if(typeof current!=="string" || !current || current.length>256 || (mode!=="password" && mode!=="revoke")) return {error:"Datos inválidos."};
+  if(mode==="password" && (typeof next!=="string" || next.length<12 || new TextEncoder().encode(next).length>72 || next!==confirm || next===current)) return {error:"Usá una contraseña nueva de al menos 12 caracteres y hasta 72 bytes, y confirmala."};
+  const [user]=await sql`SELECT password_hash FROM public.users WHERE id=${session.id} AND role='superadmin' AND gym_id IS NULL AND session_version=${session.sessionVersion}`;
+  if(!user || !await bcrypt.compare(current,user.password_hash)) return {error:"Contraseña actual incorrecta o sesión vencida."};
+  const hash=mode==="password"?await bcrypt.hash(next as string,12):user.password_hash;
+  const [updated]=await sql`UPDATE public.users SET password_hash=${hash},session_version=session_version+1,updated_at=NOW() WHERE id=${session.id} AND role='superadmin' AND gym_id IS NULL AND session_version=${session.sessionVersion} AND password_hash=${user.password_hash} RETURNING id`;
+  if(!updated) return {error:"La sesión cambió. Iniciá sesión nuevamente."};
+  (await cookies()).delete("session");
+  return {success:true};
+ } catch {return {error:"No se pudo completar la operación de seguridad."};}
 }

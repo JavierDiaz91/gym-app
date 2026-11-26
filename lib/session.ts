@@ -6,6 +6,7 @@ export interface SessionPayload {
   role: UserRole;
   gymId: number | null;
   exp: number;
+  sessionVersion?: number;
 }
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
