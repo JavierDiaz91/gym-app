@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import IdentityForm from "./IdentityForm";
 import BankForm from "./BankForm";
 import BillingForm from "./BillingForm";
+import SecurityForm from "./SecurityForm";
 import { Settings2, ShieldCheck, Globe2, CreditCard, Bell } from "lucide-react";
 
 export default async function ConfiguracionKivraPage() {
@@ -20,6 +21,7 @@ export default async function ConfiguracionKivraPage() {
  <Card><CardHeader><CardTitle className="flex items-center gap-2"><Settings2 className="size-5 text-primary"/> Identidad comercial</CardTitle><p className="text-sm text-muted-foreground">Datos globales guardados en la base de datos.</p></CardHeader><CardContent>{settings?<IdentityForm values={values}/>:<p>No existe la configuración inicial en Neon.</p>}</CardContent></Card>
  <Card><CardHeader><CardTitle className="flex items-center gap-2"><CreditCard className="size-5 text-primary"/> Datos bancarios de Kivra</CardTitle><p className="text-sm text-muted-foreground">Cuenta receptora de transferencias de los gimnasios.</p></CardHeader><CardContent>{settings?<BankForm values={values}/>:<p>Configuración inicial inexistente.</p>}</CardContent></Card>
  <Card><CardHeader><CardTitle>Condiciones de facturación</CardTitle></CardHeader><CardContent>{settings?<BillingForm days={values.billing_due_days}/>:<p>Configuración inicial inexistente.</p>}</CardContent></Card>
- <div className="grid gap-4 sm:grid-cols-2">{[{title:"Seguridad",Icon:ShieldCheck,description:"Acceso exclusivo del superadmin, validado contra la base de datos. Segundo factor y revocación de sesiones pendientes."},{title:"Integraciones",Icon:Globe2,description:"Las credenciales se administran mediante variables de entorno. No se exponen en esta pantalla."},{title:"Notificaciones",Icon:Bell,description:"Pendiente de conectar las preferencias con los eventos comerciales."}].map(({title,Icon,description})=><Card key={title}><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Icon className="size-5 text-primary"/>{title}</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">{description}</CardContent></Card>)}</div>
+ <Card><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary"/> Seguridad</CardTitle><p className="text-sm text-muted-foreground">Protegé el acceso del superadmin.</p></CardHeader><CardContent><SecurityForm/></CardContent></Card>
+ <div className="grid gap-4 sm:grid-cols-2">{[{title:"Integraciones",Icon:Globe2,description:"Las credenciales se administran mediante variables de entorno. No se exponen en esta pantalla."},{title:"Notificaciones",Icon:Bell,description:"Pendiente de conectar las preferencias con los eventos comerciales."}].map(({title,Icon,description})=><Card key={title}><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Icon className="size-5 text-primary"/>{title}</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">{description}</CardContent></Card>)}</div>
  </div>;
 }
