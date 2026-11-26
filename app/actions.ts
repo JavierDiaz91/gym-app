@@ -5,6 +5,7 @@ import { revalidateTag, revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { auditSecurity } from "@/lib/security-audit";
+import { verifySecondFactor } from "@/lib/superadmin-totp-store";
 import { Member } from "./types/member";
 import { AttendanceStat } from "./types/attendance";
 import { TrainerMember } from "./types/trainer";
@@ -175,6 +176,20 @@ export async function loginUser(formData: FormData) {
 
     const [version] = user.role === "superadmin" ? await sql`SELECT session_version FROM public.users WHERE id=${user.id} AND role='superadmin' AND gym_id IS NULL AND password_hash=${user.password_hash}` : [];
     if (user.role === "superadmin" && !version) return {error:"Credenciales inválidas"};
+    if (version) {
+      const [factor] = await sql`SELECT user_id FROM public.superadmin_totp WHERE user_id=${user.id} AND enabled_at IS NOT NULL`;
+      if (factor) {
+        const code = formData.get("totp");
+        if (typeof code !== "string" || !code.trim()) return {error:"Ingresá el segundo factor.", requiresTotp:true};
+        if (code.length > 64 || !await verifySecondFactor(Number(user.id),code.trim())) {
+          await auditSecurity(Number(user.id),"totp_login","failure");
+          return {error:"Código inválido o acceso temporalmente bloqueado.",requiresTotp:true};
+        }
+        await auditSecurity(Number(user.id),"totp_login","success");
+      }
+      const [current] = await sql`SELECT id FROM public.users WHERE id=${user.id} AND session_version=${version.session_version} AND password_hash=${user.password_hash} AND role='superadmin' AND gym_id IS NULL`;
+      if (!current) return {error:"Volvé a iniciar sesión."};
+    }
     const token = await createSessionToken({...sessionData, ...(version ? {sessionVersion:Number(version.session_version)} : {})});
     const cookieStore = await cookies();
     cookieStore.set("session", token, sessionCookieOptions);
