@@ -171,7 +171,9 @@ export async function loginUser(formData: FormData) {
       gymId: user.gym_id == null ? null : Number(user.gym_id),
     };
 
-    const token = await createSessionToken(sessionData);
+    const [version] = user.role === "superadmin" ? await sql`SELECT session_version FROM public.users WHERE id=${user.id} AND role='superadmin' AND gym_id IS NULL AND password_hash=${user.password_hash}` : [];
+    if (user.role === "superadmin" && !version) return {error:"Credenciales inválidas"};
+    const token = await createSessionToken({...sessionData, ...(version ? {sessionVersion:Number(version.session_version)} : {})});
     const cookieStore = await cookies();
     cookieStore.set("session", token, sessionCookieOptions);
 
@@ -197,7 +199,13 @@ export async function getSession() {
 
   if (!session) return null;
 
-  return verifySessionToken(session.value);
+  const payload = await verifySessionToken(session.value);
+  if (payload?.role === "superadmin") {
+    if (payload.gymId !== null || !Number.isSafeInteger(payload.sessionVersion)) return null;
+    const [user] = await sql`SELECT id FROM public.users WHERE id=${payload.id} AND role='superadmin' AND gym_id IS NULL AND session_version=${payload.sessionVersion}`;
+    if (!user) return null;
+  }
+  return payload;
 }
 
 async function requireTenantSession() {
