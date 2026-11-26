@@ -54,11 +54,10 @@ export default async function FacturacionSaaSPage() {
         </div>
       )}
 
-      {transfers === null ? <p className="text-destructive">No se pudieron cargar las transferencias.</p> : <TransferQueue rows={transfers.map(t=>({id:String(t.id),invoice_id:String(t.invoice_id),operation_number:String(t.operation_number),status:String(t.status),submitted_at:new Date(t.submitted_at).toISOString(),gym_name:String(t.gym_name),amount:Number(t.amount),invoice_status:String(t.invoice_status),review_notes:t.review_notes==null?null:String(t.review_notes)}))}/>}
-
       <SaaSBillingClient
         initialSubscriptions={subscriptions as any[]}
         initialInvoices={invoices as any[]}
+        transferSection={transfers === null ? <p className="text-destructive">No se pudieron cargar las transferencias.</p> : <TransferQueue rows={transfers.map(t=>({id:String(t.id),invoice_id:String(t.invoice_id),operation_number:String(t.operation_number),status:String(t.status),submitted_at:new Date(t.submitted_at).toISOString(),gym_name:String(t.gym_name),amount:Number(t.amount),invoice_status:String(t.invoice_status),review_notes:t.review_notes==null?null:String(t.review_notes)}))}/>}
       />
     </div>
   );
