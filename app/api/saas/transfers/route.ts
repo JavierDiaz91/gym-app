@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const session = await getSession();
     if (!session || session.role !== "admin" || !session.gymId) return NextResponse.json({error:"No autorizado"},{status:401});
     if (request.headers.get("origin") !== request.nextUrl.origin) return NextResponse.json({error:"Origen inválido"},{status:403});
-    const [user] = await sql`SELECT id FROM public.users WHERE id=${session.id} AND gym_id=${session.gymId} AND role='admin' AND session_version=${session.sessionVersion}`;
+    const [user] = await sql`SELECT id FROM public.users WHERE id=${session.id} AND gym_id=${session.gymId} AND role='admin'`;
     if (!user) return NextResponse.json({error:"Sesión inválida"},{status:401});
     const length = Number(request.headers.get("content-length"));
     if (length > 2300000) return NextResponse.json({error:"El comprobante supera 2 MiB"},{status:413});
