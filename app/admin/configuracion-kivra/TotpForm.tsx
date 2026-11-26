@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { startTotp, enableTotp, disableTotp } from "./totp-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ export default function TotpForm({enabled}:{enabled:boolean}){
  const [expanded,setExpanded]=useState(false);
  const [password,setPassword]=useState("");
  const [code,setCode]=useState("");
+ const [email,setEmail]=useState("");
  const [secret,setSecret]=useState("");
  const [codes,setCodes]=useState<string[]>([]);
  const [error,setError]=useState("");
@@ -21,7 +23,7 @@ export default function TotpForm({enabled}:{enabled:boolean}){
  if(r.error)setError(r.error);else window.location.replace("/login");
  }else if(!secret){
  const r=await startTotp(password);
- if(r.error)setError(r.error);else if(r.secret)setSecret(r.secret);
+ if(r.error)setError(r.error);else if(r.secret){setSecret(r.secret);setEmail(r.email??"Superadmin");}
  }else{
  const r=await enableTotp(password,code);
  if(r.error)setError(r.error);else if(r.codes){setCodes(r.codes);setSecret("");setPassword("");setCode("");}
@@ -34,7 +36,7 @@ export default function TotpForm({enabled}:{enabled:boolean}){
  <p className="text-sm text-muted-foreground">Protegé el acceso del superadmin con Google Authenticator o una aplicación compatible.</p>
  {!expanded?<Button variant={enabled?"outline":"default"} onClick={()=>setExpanded(true)}>{enabled?"Administrar 2FA":"Configurar 2FA"}</Button>:<form onSubmit={submit} className="space-y-3">
  <label className="block text-sm">Contraseña actual<Input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required maxLength={256}/></label>
- {secret&&<div className="space-y-2 rounded-lg bg-muted p-3 text-sm"><p>En tu autenticador, agregá una cuenta mediante clave de configuración. Elegí Kivra y el tipo basado en tiempo.</p><code className="block break-all font-mono">{secret}</code><Button type="button" variant="outline" onClick={async()=>{try{await navigator.clipboard.writeText(secret);}catch{setError("No se pudo copiar. Seleccioná la clave manualmente.");}}}>Copiar clave</Button></div>}
+ {secret&&<div className="space-y-2 rounded-lg bg-muted p-3 text-sm"><p className="font-medium">Escaneá el QR con Google Authenticator.</p><div className="flex justify-center"><div className="rounded-lg bg-white p-3"><QRCodeSVG value={"otpauth://totp/"+encodeURIComponent("Kivra:"+email)+"?secret="+secret+"&issuer=Kivra&algorithm=SHA1&digits=6&period=30"} size={192} level="M" marginSize={4}/></div></div><p>Si no podés escanearlo, ingresá la siguiente clave manualmente. Elegí el tipo basado en tiempo.</p><code className="block break-all font-mono">{secret}</code><Button type="button" variant="outline" onClick={async()=>{try{await navigator.clipboard.writeText(secret);}catch{setError("No se pudo copiar. Seleccioná la clave manualmente.");}}}>Copiar clave</Button></div>}
  {(enabled||secret)&&<label className="block text-sm">{enabled?"Código TOTP o de recuperación":"Código de seis dígitos"}<Input value={code} onChange={e=>setCode(e.target.value)} autoComplete="one-time-code" required maxLength={enabled?32:6} inputMode={enabled?"text":"numeric"}/></label>}
  {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
  <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy} variant={enabled?"destructive":"default"}>{busy?"Procesando...":enabled?"Desactivar 2FA":secret?"Confirmar activación":"Configurar 2FA"}</Button>{<Button type="button" variant="outline" disabled={busy} onClick={()=>{setExpanded(false);setSecret("");setCode("");setPassword("");setError("");}}>Cancelar</Button>}</div>
