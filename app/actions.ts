@@ -3522,6 +3522,23 @@ export async function createSaaSManualInvoiceAction(subscriptionId: number, amou
   }
 }
 
+export async function reviewSaaSTransferAction(id: string, decision: "approved" | "rejected", notes: string) {
+  try {
+    const session = await requireSuperAdminSession();
+    if (!/^[1-9][0-9]{0,18}$/.test(id) || !["approved", "rejected"].includes(decision) || typeof notes !== "string" || notes.length > 1000 || (decision === "rejected" && !notes.trim())) {
+      return { success: false, error: "Datos de revisión inválidos." };
+    }
+    const [result] = await sql`SELECT public.review_kivra_saas_transfer(${id}::bigint, ${session.id}::integer, ${decision}::text, ${notes.trim()}::text) AS reviewed`;
+    if (!result?.reviewed) return { success: false, error: "La transferencia ya fue revisada o la factura no admite esta operación." };
+    revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/actividad");
+    return { success: true };
+  } catch (error) {
+    console.error("Error al revisar transferencia SaaS:", error);
+    return { success: false, error: "No se pudo revisar la transferencia." };
+  }
+}
+
 export async function markSaaSInvoicePaidAction(invoiceId: number) {
   try {
     const session = await requireSuperAdminSession();
