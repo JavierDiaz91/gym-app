@@ -19,12 +19,15 @@ export default async function AdminLayout({
   }
 
   let gymName: string | undefined;
+  let showClasses = false;
 
   // 2. Si es un Admin del Gimnasio, verificamos el estado real en la Base de Datos
   if (session.role === "admin") {
     if (session.gymId == null) redirect("/login");
     const [gym] = await sql`SELECT name, status FROM gyms WHERE id = ${session.gymId} LIMIT 1`;
     if (!gym) redirect("/login");
+    const [access] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'classes', 'admin') AS enabled`;
+    showClasses = access?.enabled === true;
     gymName = typeof gym.name === "string" ? gym.name.trim() : undefined;
 
     if (gym.status === "suspended") {
@@ -41,7 +44,7 @@ export default async function AdminLayout({
       />
 
       {/* Sidebar Navigation */}
-      <AdminSidebar userRole={session.role} userEmail={session.email} gymName={gymName} />
+      <AdminSidebar userRole={session.role} userEmail={session.email} gymName={gymName} showClasses={showClasses} />
 
       {/* Contenido Principal */}
       <main className="kivra-admin-content relative z-10 w-full min-w-0 flex-1 p-3 sm:p-5 lg:p-8">
