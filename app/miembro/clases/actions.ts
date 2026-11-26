@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 async function currentMember() {
  const session=await getSession();
  if(!session||session.role!=="member"||session.gymId==null) throw new Error("Sin permisos");
+ const [moduleAccess] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'classes', ${session.role}::text) AS enabled`;
+ if (moduleAccess?.enabled !== true) throw new Error("El módulo de clases no está habilitado");
  const [member]=await sql`SELECT id FROM members WHERE user_id=${session.id} AND gym_id=${session.gymId} LIMIT 1`;
  if(!member) throw new Error("No se encontró tu perfil de alumno");
  return {memberId:Number(member.id),gymId:session.gymId};
