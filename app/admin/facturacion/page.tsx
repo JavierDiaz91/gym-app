@@ -2,6 +2,7 @@ import { getSaaSBillingOverviewAction, getSession } from "@/app/actions";
 import { sql } from "@/lib/db";
 import { redirect } from "next/navigation";
 import SaaSBillingClient from "./SaaSBillingClient";
+import TransferReviewButtons from "./TransferReviewButtons";
 
 export default async function FacturacionSaaSPage() {
   const session = await getSession();
@@ -28,7 +29,7 @@ export default async function FacturacionSaaSPage() {
 
   const transfers = await sql`
     SELECT t.id, t.invoice_id, t.operation_number, t.status, t.submitted_at,
-           g.name AS gym_name, i.amount
+           g.name AS gym_name, i.amount, i.status AS invoice_status, t.review_notes
     FROM saas_transfer_submissions t
     JOIN saas_invoices i ON i.id = t.invoice_id AND i.gym_id = t.gym_id
     JOIN gyms g ON g.id = t.gym_id
@@ -78,6 +79,8 @@ export default async function FacturacionSaaSPage() {
               <a target="_blank" rel="noopener noreferrer" href={`/api/saas/transfers/receipt?id=${encodeURIComponent(String(t.id))}`} className="inline-flex rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10">
                 Ver comprobante
               </a>
+              {t.status === "under_review" && <TransferReviewButtons id={String(t.id)} canApprove={["pending", "overdue"].includes(String(t.invoice_status))} />}
+              {t.review_notes && <p className="text-sm text-muted-foreground">Observaciones: {String(t.review_notes)}</p>}
             </div>
           ))}
         </>}
