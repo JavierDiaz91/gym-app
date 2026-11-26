@@ -75,6 +75,9 @@ export default async function FacturacionSaaSPage() {
               <p className="text-sm">Operación: {String(t.operation_number)}</p>
               <p className="text-sm text-muted-foreground">{new Date(t.submitted_at).toLocaleString("es-AR", {timeZone:"America/Argentina/Buenos_Aires"})}</p>
               <p className="text-sm font-medium">{t.status === "under_review" ? "En revisión" : t.status === "approved" ? "Aprobada" : t.status === "rejected" ? "Rechazada" : String(t.status)}</p>
+              <a href={`/api/saas/transfers/receipt?id=${encodeURIComponent(String(t.id))}`} className="inline-flex rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10">
+                Ver comprobante
+              </a>
             </div>
           ))}
         </>}
