@@ -1,4 +1,5 @@
 import { getSaaSBillingOverviewAction, getSession } from "@/app/actions";
+import { sql } from "@/lib/db";
 import { redirect } from "next/navigation";
 import SaaSBillingClient from "./SaaSBillingClient";
 
@@ -25,6 +26,15 @@ export default async function FacturacionSaaSPage() {
       ? result.invoices
       : [];
 
+  const transfers = await sql`
+    SELECT t.id, t.invoice_id, t.operation_number, t.status, t.submitted_at,
+           g.name AS gym_name, i.amount
+    FROM saas_transfer_submissions t
+    JOIN saas_invoices i ON i.id = t.invoice_id AND i.gym_id = t.gym_id
+    JOIN gyms g ON g.id = t.gym_id
+    ORDER BY (t.status = 'under_review') DESC, t.submitted_at DESC
+  `.catch(() => null);
+
   return (
     <div className="space-y-6">
       <div className="border-b border-border pb-5">
@@ -42,6 +52,33 @@ export default async function FacturacionSaaSPage() {
           No se pudo cargar la facturación SaaS.
         </div>
       )}
+
+      <section className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <h2 className="text-xl font-semibold">Transferencias bancarias</h2>
+        <p className="text-sm text-muted-foreground">Comprobantes informados por los gimnasios.</p>
+        {transfers === null ? <p className="text-destructive">No se pudieron cargar las transferencias.</p> : <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {([["under_review", "En revisión"], ["approved", "Aprobadas"], ["rejected", "Rechazadas"]] as const).map(([status, label]) => (
+              <div key={status} className="rounded-lg border border-border p-4">
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="text-2xl font-bold">{transfers.filter(t => t.status === status).length}</p>
+              </div>
+            ))}
+          </div>
+          {transfers.length === 0 && <p className="text-muted-foreground">Todavía no hay transferencias informadas.</p>}
+          {transfers.map(t => (
+            <div key={String(t.id)} className="rounded-lg border border-border p-4 space-y-2">
+              <div className="flex flex-wrap justify-between gap-2">
+                <div><p className="font-semibold">{String(t.gym_name)}</p><p className="text-sm text-muted-foreground">Factura #{String(t.invoice_id)}</p></div>
+                <p className="font-semibold">{Number(t.amount).toLocaleString("es-AR", {style:"currency", currency:"ARS"})}</p>
+              </div>
+              <p className="text-sm">Operación: {String(t.operation_number)}</p>
+              <p className="text-sm text-muted-foreground">{new Date(t.submitted_at).toLocaleString("es-AR", {timeZone:"America/Argentina/Buenos_Aires"})}</p>
+              <p className="text-sm font-medium">{t.status === "under_review" ? "En revisión" : t.status === "approved" ? "Aprobada" : t.status === "rejected" ? "Rechazada" : String(t.status)}</p>
+            </div>
+          ))}
+        </>}
+      </section>
 
       <SaaSBillingClient
         initialSubscriptions={subscriptions as any[]}
