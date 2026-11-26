@@ -27,7 +27,7 @@ const navigation = [
   { name: "Asignación Masiva", href: "/trainer/asignar-masivo", icon: UserCheck },
 ];
 
-export default function TrainerSidebar({ displayName }: { displayName: string }) {
+export default function TrainerSidebar({ displayName, showClasses = true }: { displayName: string; showClasses?: boolean }) {
   const initials = displayName.includes("@")
     ? displayName.slice(0, 2).toUpperCase()
     : displayName.trim().split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join("").toUpperCase();
@@ -114,7 +114,7 @@ export default function TrainerSidebar({ displayName }: { displayName: string })
               Menú Principal
             </p>
 
-            {navigation.map((item) => {
+            {navigation.filter(item => item.href !== '/trainer/clases' || showClasses).map((item) => {
               const Icon = item.icon;
               const isActive =
                 item.href === "/trainer"
