@@ -2515,9 +2515,9 @@ export async function registerAttendanceAction(
 
     // 1. Buscar al socio dentro del gimnasio.
     // No registrar asistencia directamente en esta función.
-    const members = isNumber
     if (!session || session.gymId == null) throw new Error("No autorizado");
     await requireModuleAccess(session, "attendance");
+    const members = isNumber
       ? await sql`
           SELECT
             m.id,
