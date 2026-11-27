@@ -2212,6 +2212,9 @@ export async function createPlanAction(formData: FormData) {
     }
   } catch (error) {
     console.error("Error al crear plan:", error);
+    if (error instanceof Error && error.message === "El módulo no está habilitado") {
+      return { success: false, error: "El módulo Membresías no está habilitado para este gimnasio." };
+    }
     return { success: false, error: "Error de conexión" };
   }
 }
@@ -2236,6 +2239,9 @@ export async function updatePlanAction(id: number, formData: FormData) {
     return await res.json();
   } catch (error) {
     console.error("Error al actualizar plan:", error);
+    if (error instanceof Error && error.message === "El módulo no está habilitado") {
+      return { success: false, error: "El módulo Membresías no está habilitado para este gimnasio." };
+    }
     return { success: false, error: "Error de conexión" };
   }
 }
@@ -2250,6 +2256,9 @@ export async function deletePlanAction(id: number) {
     return await res.json();
   } catch (error) {
     console.error("Error al desactivar plan:", error);
+    if (error instanceof Error && error.message === "El módulo no está habilitado") {
+      return { success: false, error: "El módulo Membresías no está habilitado para este gimnasio." };
+    }
     return { success: false, error: "Error de conexión" };
   }
 }
