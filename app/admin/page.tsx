@@ -1,3 +1,4 @@
+import { sql } from "@/lib/db";
 import { getDashboardStats, getGymsAction, getSession } from "@/app/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -185,29 +186,35 @@ export default async function AdminDashboardPage() {
     redirect("/login");
   }
 
+  const permissions = await sql`SELECT module_code FROM public.saas_module_roles WHERE role = 'admin' AND public.kivra_gym_module_enabled(${session.gymId}::integer, module_code, 'admin')`;
+  const enabledModules = permissions.map(row => String(row.module_code));
   const stats = await getDashboardStats();
+  const showAttendance = enabledModules.includes("attendance");
+  const showMembers = enabledModules.includes("members");
 
   return (
     <div className="space-y-8">
-      <KpiSection stats={stats} />
+      <KpiSection stats={stats} enabledModules={enabledModules} />
+      { (showAttendance || showMembers) && (
 
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Acciones Frecuentes</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-4">
-          <Button asChild>
+          {showAttendance && <Button asChild>
             <Link href="/admin/asistencias">
               <UserCheck className="mr-2 h-4 w-4" /> Control de Asistencias
             </Link>
-          </Button>
-          <Button asChild variant="outline">
+          </Button>}
+          {showMembers && <Button asChild variant="outline">
             <Link href="/admin/miembros">
               <Users className="mr-2 h-4 w-4" /> Ver Miembros
             </Link>
-          </Button>
+          </Button>}
         </CardContent>
-      </Card>
+      </Card>)}
+      {!enabledModules.some(code => ["members", "memberships", "attendance", "payments"].includes(code)) && <p className="text-muted-foreground">No hay indicadores operativos habilitados.</p>}
     </div>
   );
 }
