@@ -34,7 +34,10 @@ interface AdminSidebarProps {
   userEmail?: string;
   gymName?: string;
   showClasses?: boolean;
+  enabledModules?: string[];
 }
+
+const moduleByPath: Record<string, string> = {"/admin/miembros":"members","/admin/membresias":"memberships","/admin/pagos":"payments","/admin/asistencias":"attendance","/admin/entrenadores":"trainers","/admin/categorias":"categories","/admin/reportes":"reports"};
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, roles: ["superadmin", "admin"] },
@@ -61,7 +64,7 @@ const navItems = [
   { href: "/admin/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
 ];
 
-export function AdminSidebar({ userRole = "admin", userEmail = "", gymName, showClasses = true }: AdminSidebarProps) {
+export function AdminSidebar({ userRole = "admin", userEmail = "", gymName, showClasses = true, enabledModules = [] }: AdminSidebarProps) {
   const accountLabel = (userRole === "admin" ? gymName?.trim() : undefined) || userEmail.trim() || "Usuario";
   const initials = accountLabel.includes("@")
     ? accountLabel.slice(0, 2).toUpperCase()
@@ -85,7 +88,7 @@ export function AdminSidebar({ userRole = "admin", userEmail = "", gymName, show
     router.push("/");
   }
 
-  const filteredNavItems = navItems.filter((item) => item.roles.includes(userRole) && (item.href !== '/admin/clases' || showClasses));
+  const filteredNavItems = navItems.filter((item) => item.roles.includes(userRole) && (item.href !== '/admin/clases' || showClasses) && (userRole === "superadmin" || (!moduleByPath[item.href] || enabledModules.includes(moduleByPath[item.href]))));
 
   const groups = userRole === "admin" ? [
     { title: "General", paths: ["/admin"] },
