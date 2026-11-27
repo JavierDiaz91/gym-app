@@ -236,6 +236,11 @@ async function requireTenantSession() {
   return { ...session, gymId: session.gymId };
 }
 
+async function requireModuleAccess(session: { gymId: number | string; role: string }, moduleCode: string) {
+  const [access] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, ${moduleCode}::text, ${session.role}::text) AS enabled`;
+  if (access?.enabled !== true) throw new Error("El módulo no está habilitado");
+}
+
 async function requireGymAdminSession() {
   const session = await requireTenantSession();
   if (session.role !== "admin") {
@@ -520,6 +525,7 @@ export async function createSubscription(memberId: number, planId: number) {
 export async function getClasses() {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "classes");
 
     const classes = await sql`
       SELECT
@@ -543,6 +549,7 @@ export async function getClasses() {
 export async function getClassSchedule() {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "classes");
 
     const schedule = await sql`
       SELECT
@@ -577,6 +584,7 @@ export async function getClassSchedule() {
 export async function bookClass(memberId: number, scheduleId: number) {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "classes");
 
     const [member] = await sql`
       SELECT id
