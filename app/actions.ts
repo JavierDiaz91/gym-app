@@ -499,7 +499,8 @@ export async function getMembershipPlans() {
 
 export async function createSubscription(memberId: number, planId: number) {
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "memberships");
 
     const [member] = await sql`
       SELECT id
@@ -587,75 +588,17 @@ export async function getClassSchedule() {
   }
 }
 
-export async function bookClass(memberId: number, scheduleId: number) {
-  try {
-    const session = await requireTenantSession();
-    await requireModuleAccess(session, "classes");
-
-    const [member] = await sql`
-      SELECT id
-      FROM members
-      WHERE id = ${memberId}
-        AND gym_id = ${session.gymId}
-      LIMIT 1
-    `;
-
-    if (!member) return { error: "Miembro no encontrado" };
-
-    const schedule = await sql`
-      SELECT
-        cs.id,
-        cs.max_capacity,
-        (
-          SELECT COUNT(*)
-          FROM class_bookings cb
-          WHERE cb.schedule_id = cs.id
-            AND cb.status = 'booked'
-        ) AS booked
-      FROM class_schedule cs
-      JOIN classes c ON cs.class_id = c.id
-      JOIN trainers t ON COALESCE(cs.trainer_id, c.trainer_id) = t.id
-      WHERE cs.id = ${scheduleId}
-        AND t.gym_id = ${session.gymId}
-      LIMIT 1
-    `;
-
-    if (schedule.length === 0) return { error: "Clase no encontrada" };
-
-    const existing = await sql`
-      SELECT id
-      FROM class_bookings
-      WHERE member_id = ${memberId}
-        AND schedule_id = ${scheduleId}
-        AND status = 'booked'
-    `;
-
-    if (existing.length > 0) {
-      return { error: "Ya tienes reserva para esta clase" };
-    }
-
-    if (Number(schedule[0].booked) >= Number(schedule[0].max_capacity)) {
-      return { error: "Clase llena" };
-    }
-
-    await sql`
-      INSERT INTO class_bookings (member_id, schedule_id, status)
-      VALUES (${memberId}, ${scheduleId}, 'booked')
-    `;
-
-    revalidateTag("schedule", "max");
-    return { success: true };
-  } catch (error) {
-    console.error("Error booking class:", error);
-    return { error: "Error al reservar clase" };
-  }
+export async function bookClass(_memberId: number, _scheduleId: number) {
+  // Legacy undated booking is disabled; use the authenticated dated booking flow.
+  return { error: "Usá el calendario de clases para reservar con fecha." };
 }
 
 // ==================== TRAINERS ====================
 
 export async function getTrainers() {
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "trainers");
 
     const trainers = await sql`
       SELECT
@@ -692,13 +635,16 @@ export async function getTrainers() {
 
 // ==================== TRAINER ↔ MEMBERS ====================
 
-export async function assignMemberToTrainer(email: string, sessionUserId: number | string) {
+export async function assignMemberToTrainer(email: string, _sessionUserId: number | string) {
   try {
+    const session = await requireTenantSession();
+    if (session.role !== "trainer") return { error: "Sin permisos" };
+    await requireModuleAccess(session, "members");
     const cleanEmail = email.trim().toLowerCase();
 
     // 1. Buscamos el ID y el gym_id del entrenador
     const trainerResult = await sql`
-      SELECT id, gym_id FROM trainers WHERE user_id = ${sessionUserId} LIMIT 1
+      SELECT id, gym_id FROM trainers WHERE user_id = ${session.id} AND gym_id = ${session.gymId} AND is_active = true LIMIT 1
     `;
 
     if (trainerResult.length === 0) {
@@ -711,7 +657,7 @@ export async function assignMemberToTrainer(email: string, sessionUserId: number
     const userResult = await sql`
       SELECT id FROM users 
       WHERE LOWER(email) = ${cleanEmail} 
-        AND gym_id = ${trainerGymId}
+        AND gym_id = ${trainerGymId} AND role = 'member'
       LIMIT 1
     `;
 
@@ -723,14 +669,14 @@ export async function assignMemberToTrainer(email: string, sessionUserId: number
 
     // 3. Verificamos si el alumno ya existe en la tabla members
     const memberResult = await sql`
-      SELECT id FROM members WHERE user_id = ${userId} LIMIT 1
+      SELECT id FROM members WHERE user_id = ${userId} AND gym_id = ${session.gymId} LIMIT 1
     `;
 
     if (memberResult.length === 0) {
       // Si el usuario existe pero no tiene fila en 'members', la creamos
       await sql`
-        INSERT INTO members (user_id, trainer_id, first_name, last_name)
-        VALUES (${userId}, ${trainerId}, 'Alumno', 'Registrado')
+        INSERT INTO members (user_id, gym_id, trainer_id, first_name, last_name)
+        VALUES (${userId}, ${session.gymId}, ${trainerId}, 'Alumno', 'Registrado')
       `;
     } else {
       // Si ya existe en 'members', actualizamos el trainer_id
@@ -739,7 +685,7 @@ export async function assignMemberToTrainer(email: string, sessionUserId: number
         SET 
           trainer_id = ${trainerId},
           routine_id = NULL
-        WHERE user_id = ${userId}
+        WHERE user_id = ${userId} AND gym_id = ${session.gymId}
       `;
     }
 
@@ -828,7 +774,8 @@ export async function recordAttendance(memberId: number) {
 
 export async function getAttendanceStats(): Promise<AttendanceStat[]> {
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "attendance");
 
     const stats = await sql`
       SELECT
@@ -854,7 +801,8 @@ export async function getAttendanceStats(): Promise<AttendanceStat[]> {
 
 export async function getDashboardStats() {
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "dashboard");
 
     const [members, activeSubscriptions, todayAttendance, revenue] =
       await Promise.all([
@@ -2770,12 +2718,14 @@ export async function createMercadoPagoPreferenceAction(
   try {
     const session = await requireTenantSession();
 
-    if (!["admin", "member", "superadmin"].includes(session.role)) {
+    if (!["admin", "member"].includes(session.role)) {
       return {
         success: false,
         error: "No tenés permisos para generar este cobro.",
       };
     }
+
+    if (session.role === "admin") await requireModuleAccess(session, "payments");
 
     if (!Number.isFinite(planId) || planId <= 0) {
       return { success: false, error: "Plan inválido." };
