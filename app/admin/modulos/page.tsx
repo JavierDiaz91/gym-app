@@ -28,7 +28,7 @@ export default async function ModulesPage({ searchParams }: { searchParams: Prom
     if (!actor || actor.role !== "superadmin") throw new Error("Sin permisos");
     const gymId = Number(formData.get("gym"));
     if (!Number.isSafeInteger(gymId) || gymId <= 0) throw new Error("Gimnasio inválido");
-    const values = roles.map(role => formData.get(role));
+    const values = roles.map(role => formData.get(role) ?? "false");
     if (values.some(value => value !== "true" && value !== "false")) throw new Error("Configuración inválida");
     await sql`SELECT public.kivra_set_gym_module(${gymId}::integer, 'classes', 'admin', ${values[0] === "true"}::boolean, ${actor.id}::integer),
       public.kivra_set_gym_module(${gymId}::integer, 'classes', 'trainer', ${values[1] === "true"}::boolean, ${actor.id}::integer),
@@ -40,7 +40,7 @@ export default async function ModulesPage({ searchParams }: { searchParams: Prom
   }
   const modules = rows.filter((r, i) => rows.findIndex(x => x.code === r.code) === i);
   return (
-    <section className="space-y-6">
+    <section className="space-y-4 pb-24">
       <header className="border-b border-border pb-5">
         <h1 className="text-2xl font-black tracking-tight">Módulos y funcionalidades</h1>
         <p className="text-sm text-muted-foreground">Configuración de accesos por gimnasio y rol.</p>
@@ -60,21 +60,25 @@ export default async function ModulesPage({ searchParams }: { searchParams: Prom
         {params.saved === "1" && <p role="status" className="text-sm text-primary">Configuración guardada correctamente.</p>}
         <form action={saveClasses} className="space-y-4">
         <input type="hidden" name="gym" value={String(gym.id)} />
-        <div className="grid grid-cols-3 gap-2 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
           <div className="rounded-lg border border-border p-3">Módulos <strong className="block text-xl">{modules.length}</strong></div>
           <div className="rounded-lg border border-border p-3">Accesos activos <strong className="block text-xl">{rows.filter(r => r.enabled).length}</strong></div>
           <div className="rounded-lg border border-border p-3">Esenciales <strong className="block text-xl">{modules.filter(r => r.is_essential).length}</strong></div>
         </div>
         <div className="rounded-xl border border-border bg-card overflow-x-auto">
           <table className="w-full min-w-[520px] text-sm">
-            <thead className="bg-muted/40"><tr><th scope="col" className="p-3 text-left">Módulo</th>{["Gimnasio","Entrenador","Alumno"].map(label => <th key={label} scope="col" className="p-3 text-center">{label}</th>)}</tr></thead>
+            <thead className="bg-muted/40"><tr><th scope="col" className="p-3 text-left">Módulo</th>{["Gimnasio","Entrenador","Alumno"].map(label => <th key={label} scope="col" className="px-3 py-2 text-center">{label}</th>)}</tr></thead>
             <tbody>{modules.map(m => <tr key={String(m.code)} className="border-t border-border">
-              <th scope="row" className="p-3 text-left font-medium">{String(m.name)}<span className="block text-xs text-muted-foreground">{String(m.category)}{m.is_essential ? " · Esencial" : ""}</span></th>
-              {roles.map(role => { const cell = rows.find(r => r.code === m.code && r.role === role); return <td key={role} className="p-3 text-center">{cell ? m.is_essential ? <span className="inline-flex items-center gap-1 text-muted-foreground"><LockKeyhole className="size-3" /> Esencial</span> : m.code === "classes" ? <select key={String(gym.id)+role+String(cell.enabled)} name={role} aria-label={`Clases: ${role}`} defaultValue={String(cell.enabled)} className="rounded-md border border-primary/40 bg-background px-2 py-2 text-sm"><option value="true">Habilitado</option><option value="false">Deshabilitado</option></select> : <span className="text-muted-foreground">{cell.enabled ? "Habilitado" : "Deshabilitado"}</span> : "—"}</td>; })}
+              <th scope="row" className="px-3 py-2 text-left font-medium">{String(m.name)}<span className="block text-xs text-muted-foreground">{String(m.category)}{m.is_essential ? " · Esencial" : ""}</span></th>
+              {roles.map(role => { const cell = rows.find(r => r.code === m.code && r.role === role); return <td key={role} className="px-3 py-2 text-center">{cell ? m.is_essential ? <span className="inline-flex items-center gap-1 text-muted-foreground"><LockKeyhole className="size-3" /> Esencial</span> : m.code === "classes" ? <label className="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap">
+                <input key={String(gym.id)+role+String(cell.enabled)} type="checkbox" role="switch" name={role} value="true" defaultChecked={cell.enabled === true} aria-label={`Clases: ${role}`} className="peer sr-only" />
+                <span aria-hidden="true" className="relative h-6 w-11 shrink-0 rounded-full border border-border bg-muted transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-muted-foreground after:transition-transform peer-checked:border-primary peer-checked:bg-primary peer-checked:after:translate-x-5 peer-checked:after:bg-primary-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2" />
+                <span className="text-xs text-muted-foreground peer-checked:hidden">Deshabilitado</span><span className="hidden text-xs font-medium text-primary peer-checked:inline">Habilitado</span>
+              </label> : <span className={cell.enabled ? "text-primary/80" : "text-muted-foreground"}>{cell.enabled ? "Habilitado" : "Deshabilitado"}</span> : "—"}</td>; })}
             </tr>)}</tbody>
           </table>
         </div>
-        <div className="flex justify-end gap-2"><button type="reset" className="rounded-lg border border-border px-4 py-2 text-sm">Restablecer</button><button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Guardar cambios</button></div>
+        <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-border bg-card p-3 pr-16 shadow-lg"><span className="mr-auto text-xs text-muted-foreground">Solo Clases y reservas es editable.</span><button type="reset" className="rounded-lg border border-border px-4 py-2 text-sm">Restablecer</button><button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Guardar cambios</button></div>
         </form>
       </>}
     </section>
