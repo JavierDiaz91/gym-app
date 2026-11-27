@@ -68,6 +68,9 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
   }
 
 
+  const [trainingAccess] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'training', 'member') AS enabled`;
+  const trainingEnabled = trainingAccess?.enabled === true;
+
   // El estado de pagos se sincroniza exclusivamente por webhook de Mercado Pago.
   await searchParams;
 
@@ -112,7 +115,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
     memberData = (rows[0] as MemberDashboardData) || null;
 
     // 2. Si se encontró el miembro, obtenemos las rutinas y entrenamientos completados HOY
-    if (memberData) {
+    if (memberData && trainingEnabled) {
       const planRows = await sql`
         SELECT mtp.id, COALESCE(tp.title, 'Plan de entrenamiento') AS title,
                COALESCE(tp.duration_weeks, jsonb_array_length(mtp.snapshot_jsonb->'days')) AS weeks
@@ -335,6 +338,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
       </div>
 
       {/* Tarjeta de Rutinas Asignadas */}
+      {trainingEnabled && (
       <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 font-semibold text-sm">
@@ -439,6 +443,8 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
           </div>
         )}
       </div>
+
+      )}
 
       {/* Banner promocional / Aviso del Gimnasio */}
       <div className="bg-muted/40 border border-border rounded-xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
