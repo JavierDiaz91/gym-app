@@ -2,6 +2,7 @@ import { getSession } from "@/app/actions";
 import { sql } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { ModuleForm } from "./module-form";
 import { LockKeyhole } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export default async function ModulesPage({ searchParams }: { searchParams: Prom
   ` : [];
   async function saveModules(formData: FormData) {
     "use server";
+    try {
     const actor = await getSession();
     if (!actor || actor.role !== "superadmin") throw new Error("Sin permisos");
     const gymId = Number(formData.get("gym"));
@@ -39,7 +41,11 @@ export default async function ModulesPage({ searchParams }: { searchParams: Prom
     revalidatePath("/admin", "layout");
     revalidatePath("/trainer", "layout");
     revalidatePath("/miembro", "layout");
-    redirect(`/admin/modulos?gym=${gymId}&saved=1`);
+    return { ok: true, message: "Cambios guardados correctamente." };
+    } catch (error) {
+      console.error("Module save failed", error);
+      return { ok: false, message: "No se pudo confirmar el guardado. Volvé a intentar." };
+    }
   }
   const modules = rows.filter((r, i) => rows.findIndex(x => x.code === r.code) === i);
   return (
@@ -61,7 +67,7 @@ export default async function ModulesPage({ searchParams }: { searchParams: Prom
       {gym && <>
         <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">Configuración de módulos por rol. Los módulos esenciales permanecen protegidos.</div>
         {params.saved === "1" && <p role="status" className="text-sm text-primary">Configuración guardada correctamente.</p>}
-        <form action={saveModules} className="space-y-4">
+        <ModuleForm key={String(gym.id)} save={saveModules}>
         <input type="hidden" name="gym" value={String(gym.id)} />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
           <div className="rounded-lg border border-border p-3">Módulos <strong className="block text-xl">{modules.length}</strong></div>
@@ -81,8 +87,7 @@ export default async function ModulesPage({ searchParams }: { searchParams: Prom
             </tr>)}</tbody>
           </table>
         </div>
-        <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-border bg-card p-3 pr-16 shadow-lg"><span className="mr-auto text-xs text-muted-foreground">Los cambios se aplican al gimnasio seleccionado.</span><button type="reset" className="rounded-lg border border-border px-4 py-2 text-sm">Restablecer</button><button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Guardar cambios</button></div>
-        </form>
+        </ModuleForm>
       </>}
     </section>
   );
