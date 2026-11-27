@@ -333,6 +333,7 @@ export async function getMemberById(id: number): Promise<Member | null> {
 
 export async function createMember(formData: FormData) {
   const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "members");
   const gymId = session.gymId;
   const firstName = String(formData.get("firstName") ?? "").trim();
   const lastName = String(formData.get("lastName") ?? "").trim();
@@ -398,6 +399,7 @@ export async function updateMember(id: number, formData: FormData) {
 
   try {
     const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "members");
 
     // 2. Actualizar únicamente dentro del gimnasio autenticado
     const [updatedMember] = await sql`
@@ -438,6 +440,7 @@ export async function updateMember(id: number, formData: FormData) {
 export async function deleteMember(id: number) {
   try {
     const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "members");
 
     const [member] = await sql`
       SELECT user_id
@@ -759,6 +762,7 @@ export async function createTrainer(formData: FormData) {
 
   try {
     const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "trainers");
     const gymId = session.gymId;
     const capacityError = await checkSaaSCapacity(gymId, "trainers");
     if (capacityError) return { error: capacityError };
@@ -2208,6 +2212,7 @@ export async function createPlanAction(formData: FormData) {
   const weeklyClassLimit = includesClasses ? Number(formData.get("weeklyClassLimit") || 0) : 0;
 
   try {
+    await requireModuleAccess(await requireGymAdminSession(), "memberships");
     const res = await fetch(apiUrl("/memberships/plans"), {
       method: "POST",
       headers: await getApiAuthHeaders(),
@@ -2240,6 +2245,7 @@ export async function updatePlanAction(id: number, formData: FormData) {
   const weeklyClassLimit = includesClasses ? Number(formData.get("weeklyClassLimit") || 0) : 0;
 
   try {
+    await requireModuleAccess(await requireGymAdminSession(), "memberships");
     const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "PUT",
       headers: await getApiAuthHeaders(),
@@ -2254,6 +2260,7 @@ export async function updatePlanAction(id: number, formData: FormData) {
 
 export async function deletePlanAction(id: number) {
   try {
+    await requireModuleAccess(await requireGymAdminSession(), "memberships");
     const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "DELETE",
       headers: await getApiAuthHeaders(),
@@ -2269,6 +2276,7 @@ export async function deletePlanAction(id: number) {
 export async function updateMemberStatusAction(memberId: number, status: string) {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "members");
 
     const result = await sql`
       UPDATE members 
@@ -2293,6 +2301,7 @@ export async function updateMemberStatusAction(memberId: number, status: string)
 export async function deleteMemberAction(memberId: number) {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "members");
 
     const [member] = await sql`
       SELECT id
@@ -2336,6 +2345,7 @@ export async function updateMemberAction(
 ) {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "members");
 
     const updated = await sql`
       UPDATE members
@@ -2581,6 +2591,7 @@ export async function createPayment(formData: FormData) {
 
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "payments");
 
     if (session.role !== "admin") {
       return { success: false, error: "No tenés permisos para registrar pagos." };
@@ -2642,6 +2653,7 @@ export async function createPayment(formData: FormData) {
 export async function createFlexibleInPersonPayment(formData: FormData) {
   try {
     const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "payments");
     if (process.env.ENABLE_FLEXIBLE_PASS_SALES !== "true") {
       return { success: false, error: "La venta de pases flexibles está deshabilitada." };
     }
