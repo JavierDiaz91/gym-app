@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as service from "../services/trainers.service";
 import * as trainersController from "../controllers/trainers.controller";
 import { authenticate, requireRole } from "../middlewares/auth";
-import { checkTenantStatus } from "../middlewares/checkTenantStatus";
+import { checkTenantStatus, requireModule } from "../middlewares/checkTenantStatus";
 
 const router = Router();
 
@@ -12,13 +12,13 @@ router.use(checkTenantStatus);
 router.get(
   "/",
   requireRole("admin", "trainer", "member", "superadmin"),
-  trainersController.getTrainers
+  requireModule("trainers"), trainersController.getTrainers
 );
 
 router.get(
   "/:id",
   requireRole("admin", "trainer", "member", "superadmin"),
-  trainersController.getTrainerById
+  requireModule("trainers"), trainersController.getTrainerById
 );
 
 router.get(
