@@ -22,17 +22,20 @@ export default async function ModulesPage({ searchParams }: { searchParams: Prom
     JOIN public.saas_module_roles r ON r.module_code = m.code
     ORDER BY m.sort_order, r.role
   ` : [];
-  async function saveClasses(formData: FormData) {
+  async function saveModules(formData: FormData) {
     "use server";
     const actor = await getSession();
     if (!actor || actor.role !== "superadmin") throw new Error("Sin permisos");
     const gymId = Number(formData.get("gym"));
     if (!Number.isSafeInteger(gymId) || gymId <= 0) throw new Error("Gimnasio inválido");
-    const values = roles.map(role => formData.get(role) ?? "false");
-    if (values.some(value => value !== "true" && value !== "false")) throw new Error("Configuración inválida");
-    await sql`SELECT public.kivra_set_gym_module(${gymId}::integer, 'classes', 'admin', ${values[0] === "true"}::boolean, ${actor.id}::integer),
-      public.kivra_set_gym_module(${gymId}::integer, 'classes', 'trainer', ${values[1] === "true"}::boolean, ${actor.id}::integer),
-      public.kivra_set_gym_module(${gymId}::integer, 'classes', 'member', ${values[2] === "true"}::boolean, ${actor.id}::integer)`;
+    const editable = await sql`SELECT r.module_code, r.role FROM public.saas_module_roles r JOIN public.saas_modules m ON m.code = r.module_code WHERE NOT m.is_essential AND r.module_code = 'classes'`;
+    const changes = editable.map(row => ({ module_code: String(row.module_code), role: String(row.role), enabled: formData.get(`${row.module_code}:${row.role}`) === "true" }));
+    for (const row of editable) {
+      const values = formData.getAll(`${row.module_code}:${row.role}`);
+      if (values.length > 1 || values.some(value => value !== "true")) throw new Error("Configuración inválida");
+    }
+    await sql`SELECT public.kivra_set_gym_module(${gymId}::integer, x.module_code, x.role, x.enabled, ${actor.id}::integer)
+      FROM jsonb_to_recordset(${JSON.stringify(changes)}::jsonb) AS x(module_code text, role text, enabled boolean)`;
     revalidatePath("/admin", "layout");
     revalidatePath("/trainer", "layout");
     revalidatePath("/miembro", "layout");
@@ -58,7 +61,7 @@ export default async function ModulesPage({ searchParams }: { searchParams: Prom
       {gym && <>
         <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">Vista completa de permisos. Los interruptores atenuados están pendientes de integración; Clases y reservas ya es editable.</div>
         {params.saved === "1" && <p role="status" className="text-sm text-primary">Configuración guardada correctamente.</p>}
-        <form action={saveClasses} className="space-y-4">
+        <form action={saveModules} className="space-y-4">
         <input type="hidden" name="gym" value={String(gym.id)} />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
           <div className="rounded-lg border border-border p-3">Módulos <strong className="block text-xl">{modules.length}</strong></div>
@@ -71,7 +74,7 @@ export default async function ModulesPage({ searchParams }: { searchParams: Prom
             <tbody>{modules.map(m => <tr key={String(m.code)} className="border-t border-border">
               <th scope="row" className="px-3 py-2 text-left font-medium">{String(m.name)}<span className="block text-xs text-muted-foreground">{String(m.category)}{m.is_essential ? " · Esencial" : ""}</span></th>
               {roles.map(role => { const cell = rows.find(r => r.code === m.code && r.role === role); return <td key={role} className="px-3 py-2 text-center">{cell ? m.is_essential ? <span className="inline-flex items-center gap-1 text-muted-foreground"><LockKeyhole className="size-3" /> Esencial</span> : <label className={`inline-flex items-center gap-2 whitespace-nowrap ${m.code === "classes" ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`} title={m.code === "classes" ? undefined : "Integración de permisos pendiente"}>
-                <input key={String(gym.id)+role+String(cell.enabled)} type="checkbox" role="switch" name={m.code === "classes" ? role : undefined} disabled={m.code !== "classes"} value="true" defaultChecked={cell.enabled === true} aria-label={`Clases: ${role}`} className="peer sr-only" />
+                <input key={String(gym.id)+role+String(cell.enabled)} type="checkbox" role="switch" name={m.code === "classes" ? `${m.code}:${role}` : undefined} disabled={m.code !== "classes"} value="true" defaultChecked={cell.enabled === true} aria-label={`${m.name}: ${role}`} className="peer sr-only" />
                 <span aria-hidden="true" className="relative h-6 w-11 shrink-0 rounded-full border border-border bg-muted transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-muted-foreground after:transition-transform peer-checked:border-primary peer-checked:bg-primary peer-checked:after:translate-x-5 peer-checked:after:bg-primary-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2" />
                 <span className="text-xs text-muted-foreground peer-checked:hidden">Deshabilitado</span><span className="hidden text-xs font-medium text-primary peer-checked:inline">Habilitado</span>
               </label> : "—"}</td>; })}
