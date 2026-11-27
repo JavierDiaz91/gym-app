@@ -51,6 +51,7 @@ interface AlumnosClientProps {
   routines: Routine[];
   trainingPlans: { id: number; title: string; durationWeeks: number }[];
   sessionUserId: number | string;
+  showTraining?: boolean;
 }
 
 export default function AlumnosClient({
@@ -58,6 +59,7 @@ export default function AlumnosClient({
   routines,
   trainingPlans,
   sessionUserId,
+  showTraining = true,
 }: AlumnosClientProps) {
   const router = useRouter();
   const [membersList, setMembersList] = useState<Member[]>(initialMembers);
@@ -89,7 +91,7 @@ export default function AlumnosClient({
   const filteredMembers = membersList.filter((m) => {
     const matchesName = `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase());
     const hasPlan = (m.training_plans || []).some(p => p.lifecycle === 'current' || p.lifecycle === 'scheduled');
-    return matchesName && (planFilter === "all" || (planFilter === "with" ? hasPlan : !hasPlan));
+    return matchesName && (!showTraining || planFilter === "all" || (planFilter === "with" ? hasPlan : !hasPlan));
   });
   const withPlanCount = membersList.filter((m) => (m.training_plans || []).some(p => p.lifecycle === 'current' || p.lifecycle === 'scheduled')).length;
 
@@ -200,7 +202,7 @@ export default function AlumnosClient({
             </span>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Administrá tus atletas asignados y vinculales sus rutinas de entrenamiento.
+            {showTraining ? "Administrá tus atletas asignados y vinculales sus rutinas de entrenamiento." : "Administrá tus alumnos vinculados."}
           </p>
         </div>
 
@@ -213,10 +215,10 @@ export default function AlumnosClient({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className={`grid grid-cols-1 gap-3 ${showTraining ? "sm:grid-cols-3" : ""}`}>
         <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Alumnos vinculados</p><p className="mt-1 text-2xl font-bold">{membersList.length}</p></div>
-        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Con plan asignado</p><p className="mt-1 text-2xl font-bold text-primary">{withPlanCount}</p></div>
-        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Sin plan asignado</p><p className="mt-1 text-2xl font-bold">{membersList.length - withPlanCount}</p></div>
+        {showTraining && <><div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Con plan asignado</p><p className="mt-1 text-2xl font-bold text-primary">{withPlanCount}</p></div>
+        <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Sin plan asignado</p><p className="mt-1 text-2xl font-bold">{membersList.length - withPlanCount}</p></div></>}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -225,19 +227,19 @@ export default function AlumnosClient({
           <input aria-label="Buscar alumnos" type="search" placeholder="Buscar alumnos por nombre..." value={search} onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-3 text-sm bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-foreground" />
         </div>
-        <select aria-label="Filtrar por plan" value={planFilter} onChange={(e) => setPlanFilter(e.target.value as "all" | "with" | "without")}
+        {showTraining && <select aria-label="Filtrar por plan" value={planFilter} onChange={(e) => setPlanFilter(e.target.value as "all" | "with" | "without")}
           className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground">
           <option value="all">Todos los alumnos</option>
           <option value="with">Con plan asignado</option>
           <option value="without">Sin plan asignado</option>
-        </select>
+        </select>}
       </div>
 
       {filteredMembers.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card p-10 text-center">
           <Users className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
           <h3 className="font-semibold">{membersList.length ? "No hay alumnos con esos filtros" : "Todavía no tenés alumnos vinculados"}</h3>
-          <p className="mt-2 text-sm text-muted-foreground">{membersList.length ? "Probá con otro nombre o filtro." : "Vinculá un alumno para empezar a gestionar sus planes."}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{membersList.length ? "Probá con otro nombre o filtro." : "Vinculá un alumno para empezar."}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -265,7 +267,7 @@ export default function AlumnosClient({
                     )}
                   </div>
                 </div>
-                <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.65fr)]">
+                {showTraining && <><div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.65fr)]">
                   <div className="rounded-xl border border-border bg-secondary/30 p-4">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan de entrenamiento</p>
                     {currentPlan ? (
@@ -296,14 +298,14 @@ export default function AlumnosClient({
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-black hover:bg-primary/90"><Dumbbell className="h-4 w-4" />Asignar plan o rutina</button>
                   <Link href={`/trainer/alumnos/${member.id}/progreso`} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary"><Dumbbell className="h-4 w-4" />Ver progreso</Link>
                   <Link href={`/trainer/alumnos/${member.id}/progreso/historial`} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary"><History className="h-4 w-4" />Historial</Link>
-                </div>
+                </div></>}
               </article>
             );
           })}
         </div>
       )}
 
-      {dateEdit && (
+      {showTraining && dateEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <form onSubmit={saveStartDate} className="w-full max-w-md space-y-4 rounded-2xl border border-border bg-card p-6 shadow-2xl">
             <div className="flex items-center justify-between gap-3">
@@ -332,7 +334,7 @@ export default function AlumnosClient({
       {/* MODAL HISTORIAL DE ENTRENAMIENTOS */}
 
       {/* MODAL ASIGNAR RUTINA */}
-      {selectedMember && (
+      {showTraining && selectedMember && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-card rounded-2xl max-w-md w-full p-6 shadow-2xl border border-border space-y-4 text-card-foreground">
             <div className="flex items-center justify-between">

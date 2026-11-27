@@ -90,9 +90,16 @@ export default function MembresiasAdminPage() {
     if (!confirm("¿Querés desactivar este plan?")) return;
 
     startTransition(async () => {
-      const res = await deletePlanAction(id);
-      if (res?.success) {
-        loadData();
+      try {
+        const res = await deletePlanAction(id);
+        if (!res?.success) {
+          alert(res?.error || "No se pudo desactivar el plan.");
+          return;
+        }
+        await loadData();
+      } catch (error) {
+        console.error("Error inesperado al desactivar el plan:", error);
+        alert("Error inesperado al desactivar el plan.");
       }
     });
   };

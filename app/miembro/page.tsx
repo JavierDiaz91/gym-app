@@ -52,6 +52,8 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
   if (!session || session.role !== "member" || session.gymId == null) redirect("/login");
 
   const userId = session.id;
+  const [trainingAccess] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'training', 'member') AS enabled`;
+  const trainingEnabled = trainingAccess?.enabled === true;
 
   // Only members with no subscription or payment history qualify for onboarding.
   const firstMembership = await sql`
@@ -64,8 +66,10 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
     LIMIT 1
   `.catch((error) => { console.error("First membership lookup failed", error); return []; });
   if (firstMembership[0]) {
-    return <FirstMembership name={String(firstMembership[0].first_name)} gymName={String(firstMembership[0].gym_name)} dashboard directCheckout={process.env.KIVRA_MEMBER_DIRECT_CHECKOUT_ENABLED === "true"} />;
+    return <FirstMembership name={String(firstMembership[0].first_name)} gymName={String(firstMembership[0].gym_name)} dashboard trainingEnabled={trainingEnabled} directCheckout={process.env.KIVRA_MEMBER_DIRECT_CHECKOUT_ENABLED === "true"} />;
   }
+
+
 
 
   // El estado de pagos se sincroniza exclusivamente por webhook de Mercado Pago.
@@ -112,7 +116,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
     memberData = (rows[0] as MemberDashboardData) || null;
 
     // 2. Si se encontró el miembro, obtenemos las rutinas y entrenamientos completados HOY
-    if (memberData) {
+    if (memberData && trainingEnabled) {
       const planRows = await sql`
         SELECT mtp.id, COALESCE(tp.title, 'Plan de entrenamiento') AS title,
                COALESCE(tp.duration_weeks, jsonb_array_length(mtp.snapshot_jsonb->'days')) AS weeks
@@ -255,7 +259,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
             <p className="text-xs text-muted-foreground leading-relaxed">
               {isFullyActive
                 ? "Tenés acceso completo a las instalaciones"
-                : memberData?.payment_status === "pending" ? "Tenés una cuota pendiente. Pagala para habilitar tus entrenamientos." : "Regularizá tu cuota para volver a entrenar"}
+                : memberData?.payment_status === "pending" ? "Tenés una cuota pendiente. Pagala para activar tu membresía." : "Regularizá tu cuota para recuperar los beneficios de tu membresía"}
             </p>
           </div>
 
@@ -335,6 +339,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
       </div>
 
       {/* Tarjeta de Rutinas Asignadas */}
+      {trainingEnabled && (
       <div className="bg-card text-card-foreground border rounded-xl p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 font-semibold text-sm">
@@ -439,6 +444,8 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
           </div>
         )}
       </div>
+
+      )}
 
       {/* Banner promocional / Aviso del Gimnasio */}
       <div className="bg-muted/40 border border-border rounded-xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

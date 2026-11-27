@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache";
 async function context() {
   const session = await getSession();
   if (!session || session.gymId == null || !["admin", "trainer"].includes(session.role)) throw new Error("Sin permisos");
+ const [moduleAccess] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'classes', ${session.role}::text) AS enabled`;
+ if (moduleAccess?.enabled !== true) throw new Error("El módulo de clases no está habilitado");
   const trainer = session.role === "trainer" ? (await sql`SELECT id FROM trainers WHERE user_id = ${session.id} AND gym_id = ${session.gymId} AND is_active = true LIMIT 1`)[0] : null;
   if (session.role === "trainer" && !trainer) throw new Error("Entrenador no asociado al gimnasio");
   return { gymId: session.gymId, role: session.role, trainerId: trainer ? Number(trainer.id) : null };

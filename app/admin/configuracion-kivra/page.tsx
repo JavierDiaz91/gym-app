@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import IdentityForm from "./IdentityForm";
 import BankForm from "./BankForm";
+import PaymentMethodsForm from "./PaymentMethodsForm";
 import BillingForm from "./BillingForm";
 import SecurityForm from "./SecurityForm";
 import TotpForm from "./TotpForm";
@@ -16,7 +17,7 @@ export default async function ConfiguracionKivraPage() {
  if(session.role!=="superadmin" || session.gymId!=null) redirect("/admin");
  const [user]=await sql`SELECT id FROM public.users WHERE id=${session.id} AND role='superadmin' AND gym_id IS NULL`;
  if(!user) redirect("/login");
- const [settings]=await sql`SELECT platform_name,tagline,website_url,support_email,support_phone,business_name,tax_id,bank_name,bank_account_holder,bank_cbu,bank_alias,billing_due_days FROM public.saas_settings WHERE id=1`;
+ const [settings]=await sql`SELECT platform_name,tagline,website_url,support_email,support_phone,business_name,tax_id,bank_name,bank_account_holder,bank_cbu,bank_alias,billing_due_days,mp_payments_enabled,bank_transfers_enabled FROM public.saas_settings WHERE id=1`;
  const [factor]=await sql`SELECT user_id FROM public.superadmin_totp WHERE user_id=${session.id} AND enabled_at IS NOT NULL`;
  const auditRows=await sql`SELECT a.id::text AS id,a.created_at,a.action,a.details->>'result' AS result,a.details->>'ip' AS ip,COALESCE(u.email,'Usuario eliminado') AS actor FROM public.saas_audit_log a LEFT JOIN public.users u ON u.id=a.actor_user_id WHERE a.entity_type='superadmin_security' ORDER BY a.created_at DESC,a.id DESC LIMIT 200`;
  const events=auditRows.map(a=>({id:String(a.id),date:new Date(a.created_at).toISOString(),action:String(a.action),result:String(a.result??""),ip:String(a.ip??""),actor:String(a.actor)}));
@@ -25,6 +26,7 @@ export default async function ConfiguracionKivraPage() {
  <header className="border-b border-border pb-5"><p className="text-xs font-semibold uppercase tracking-widest text-primary">Kivra SaaS</p><h1 className="mt-2 text-3xl font-bold">Configuración Kivra</h1><p className="mt-1 text-muted-foreground">Administración global de la plataforma.</p></header>
  <Card><CardHeader><CardTitle className="flex items-center gap-2"><Settings2 className="size-5 text-primary"/> Identidad comercial</CardTitle><p className="text-sm text-muted-foreground">Datos globales guardados en la base de datos.</p></CardHeader><CardContent>{settings?<IdentityForm values={values}/>:<p>No existe la configuración inicial en Neon.</p>}</CardContent></Card>
  <Card><CardHeader><CardTitle className="flex items-center gap-2"><CreditCard className="size-5 text-primary"/> Datos bancarios de Kivra</CardTitle><p className="text-sm text-muted-foreground">Cuenta receptora de transferencias de los gimnasios.</p></CardHeader><CardContent>{settings?<BankForm values={values}/>:<p>Configuración inicial inexistente.</p>}</CardContent></Card>
+ <Card><CardHeader><CardTitle>Medios de cobro</CardTitle><p className="text-sm text-muted-foreground">Administración de los pagos comerciales de Kivra.</p></CardHeader><CardContent>{settings?<PaymentMethodsForm mpEnabled={settings.mp_payments_enabled===true} bankEnabled={settings.bank_transfers_enabled===true}/>:<p>Configuración inicial inexistente.</p>}</CardContent></Card>
  <Card><CardHeader><CardTitle>Condiciones de facturación</CardTitle></CardHeader><CardContent>{settings?<BillingForm days={values.billing_due_days}/>:<p>Configuración inicial inexistente.</p>}</CardContent></Card>
  <Card><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary"/> Seguridad</CardTitle><p className="text-sm text-muted-foreground">Protegé el acceso del superadmin.</p></CardHeader><CardContent className="space-y-6"><SecurityForm/><TotpForm enabled={Boolean(factor)}/></CardContent></Card>
  <Card><CardHeader><CardTitle>Actividad de seguridad</CardTitle><p className="text-sm text-muted-foreground">Últimos 200 eventos registrados del superadmin.</p></CardHeader><CardContent><SecurityHistory events={events}/></CardContent></Card>

@@ -236,6 +236,12 @@ async function requireTenantSession() {
   return { ...session, gymId: session.gymId };
 }
 
+async function requireModuleAccess(session: { gymId: number | string | null; role: string }, moduleCode: string) {
+  if (session.gymId == null) throw new Error("No autorizado: gimnasio requerido");
+  const [access] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, ${moduleCode}::text, ${session.role}::text) AS enabled`;
+  if (access?.enabled !== true) throw new Error("El módulo no está habilitado");
+}
+
 async function requireGymAdminSession() {
   const session = await requireTenantSession();
   if (session.role !== "admin") {
@@ -249,6 +255,7 @@ async function requireGymAdminSession() {
 export async function getMembers(query: string = ""): Promise<Member[]> {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "members");
     const searchTerm = `%${query.trim()}%`;
 
     const members = await sql`
@@ -292,6 +299,7 @@ export async function getMembers(query: string = ""): Promise<Member[]> {
 export async function getMemberById(id: number): Promise<Member | null> {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "members");
 
     const members = await sql`
       SELECT 
@@ -328,6 +336,7 @@ export async function getMemberById(id: number): Promise<Member | null> {
 
 export async function createMember(formData: FormData) {
   const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "members");
   const gymId = session.gymId;
   const firstName = String(formData.get("firstName") ?? "").trim();
   const lastName = String(formData.get("lastName") ?? "").trim();
@@ -393,6 +402,7 @@ export async function updateMember(id: number, formData: FormData) {
 
   try {
     const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "members");
 
     // 2. Actualizar únicamente dentro del gimnasio autenticado
     const [updatedMember] = await sql`
@@ -433,6 +443,7 @@ export async function updateMember(id: number, formData: FormData) {
 export async function deleteMember(id: number) {
   try {
     const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "members");
 
     const [member] = await sql`
       SELECT user_id
@@ -488,7 +499,8 @@ export async function getMembershipPlans() {
 
 export async function createSubscription(memberId: number, planId: number) {
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "memberships");
 
     const [member] = await sql`
       SELECT id
@@ -520,6 +532,7 @@ export async function createSubscription(memberId: number, planId: number) {
 export async function getClasses() {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "classes");
 
     const classes = await sql`
       SELECT
@@ -543,6 +556,7 @@ export async function getClasses() {
 export async function getClassSchedule() {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "classes");
 
     const schedule = await sql`
       SELECT
@@ -574,74 +588,17 @@ export async function getClassSchedule() {
   }
 }
 
-export async function bookClass(memberId: number, scheduleId: number) {
-  try {
-    const session = await requireTenantSession();
-
-    const [member] = await sql`
-      SELECT id
-      FROM members
-      WHERE id = ${memberId}
-        AND gym_id = ${session.gymId}
-      LIMIT 1
-    `;
-
-    if (!member) return { error: "Miembro no encontrado" };
-
-    const schedule = await sql`
-      SELECT
-        cs.id,
-        cs.max_capacity,
-        (
-          SELECT COUNT(*)
-          FROM class_bookings cb
-          WHERE cb.schedule_id = cs.id
-            AND cb.status = 'booked'
-        ) AS booked
-      FROM class_schedule cs
-      JOIN classes c ON cs.class_id = c.id
-      JOIN trainers t ON COALESCE(cs.trainer_id, c.trainer_id) = t.id
-      WHERE cs.id = ${scheduleId}
-        AND t.gym_id = ${session.gymId}
-      LIMIT 1
-    `;
-
-    if (schedule.length === 0) return { error: "Clase no encontrada" };
-
-    const existing = await sql`
-      SELECT id
-      FROM class_bookings
-      WHERE member_id = ${memberId}
-        AND schedule_id = ${scheduleId}
-        AND status = 'booked'
-    `;
-
-    if (existing.length > 0) {
-      return { error: "Ya tienes reserva para esta clase" };
-    }
-
-    if (Number(schedule[0].booked) >= Number(schedule[0].max_capacity)) {
-      return { error: "Clase llena" };
-    }
-
-    await sql`
-      INSERT INTO class_bookings (member_id, schedule_id, status)
-      VALUES (${memberId}, ${scheduleId}, 'booked')
-    `;
-
-    revalidateTag("schedule", "max");
-    return { success: true };
-  } catch (error) {
-    console.error("Error booking class:", error);
-    return { error: "Error al reservar clase" };
-  }
+export async function bookClass(_memberId: number, _scheduleId: number) {
+  // Legacy undated booking is disabled; use the authenticated dated booking flow.
+  return { error: "Usá el calendario de clases para reservar con fecha." };
 }
 
 // ==================== TRAINERS ====================
 
 export async function getTrainers() {
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "trainers");
 
     const trainers = await sql`
       SELECT
@@ -678,13 +635,16 @@ export async function getTrainers() {
 
 // ==================== TRAINER ↔ MEMBERS ====================
 
-export async function assignMemberToTrainer(email: string, sessionUserId: number | string) {
+export async function assignMemberToTrainer(email: string, _sessionUserId: number | string) {
   try {
+    const session = await requireTenantSession();
+    if (session.role !== "trainer") return { error: "Sin permisos" };
+    await requireModuleAccess(session, "members");
     const cleanEmail = email.trim().toLowerCase();
 
     // 1. Buscamos el ID y el gym_id del entrenador
     const trainerResult = await sql`
-      SELECT id, gym_id FROM trainers WHERE user_id = ${sessionUserId} LIMIT 1
+      SELECT id, gym_id FROM trainers WHERE user_id = ${session.id} AND gym_id = ${session.gymId} AND is_active = true LIMIT 1
     `;
 
     if (trainerResult.length === 0) {
@@ -697,7 +657,7 @@ export async function assignMemberToTrainer(email: string, sessionUserId: number
     const userResult = await sql`
       SELECT id FROM users 
       WHERE LOWER(email) = ${cleanEmail} 
-        AND gym_id = ${trainerGymId}
+        AND gym_id = ${trainerGymId} AND role = 'member'
       LIMIT 1
     `;
 
@@ -709,14 +669,14 @@ export async function assignMemberToTrainer(email: string, sessionUserId: number
 
     // 3. Verificamos si el alumno ya existe en la tabla members
     const memberResult = await sql`
-      SELECT id FROM members WHERE user_id = ${userId} LIMIT 1
+      SELECT id FROM members WHERE user_id = ${userId} AND gym_id = ${session.gymId} LIMIT 1
     `;
 
     if (memberResult.length === 0) {
       // Si el usuario existe pero no tiene fila en 'members', la creamos
       await sql`
-        INSERT INTO members (user_id, trainer_id, first_name, last_name)
-        VALUES (${userId}, ${trainerId}, 'Alumno', 'Registrado')
+        INSERT INTO members (user_id, gym_id, trainer_id, first_name, last_name)
+        VALUES (${userId}, ${session.gymId}, ${trainerId}, 'Alumno', 'Registrado')
       `;
     } else {
       // Si ya existe en 'members', actualizamos el trainer_id
@@ -725,7 +685,7 @@ export async function assignMemberToTrainer(email: string, sessionUserId: number
         SET 
           trainer_id = ${trainerId},
           routine_id = NULL
-        WHERE user_id = ${userId}
+        WHERE user_id = ${userId} AND gym_id = ${session.gymId}
       `;
     }
 
@@ -751,6 +711,7 @@ export async function createTrainer(formData: FormData) {
 
   try {
     const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "trainers");
     const gymId = session.gymId;
     const capacityError = await checkSaaSCapacity(gymId, "trainers");
     if (capacityError) return { error: capacityError };
@@ -793,6 +754,7 @@ export async function createTrainer(formData: FormData) {
 export async function recordAttendance(memberId: number) {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "attendance");
     const [member] = await sql`
       SELECT id FROM members WHERE id = ${memberId} AND gym_id = ${session.gymId}
     `;
@@ -812,7 +774,8 @@ export async function recordAttendance(memberId: number) {
 
 export async function getAttendanceStats(): Promise<AttendanceStat[]> {
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "attendance");
 
     const stats = await sql`
       SELECT
@@ -838,7 +801,8 @@ export async function getAttendanceStats(): Promise<AttendanceStat[]> {
 
 export async function getDashboardStats() {
   try {
-    const session = await requireTenantSession();
+    const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "dashboard");
 
     const [members, activeSubscriptions, todayAttendance, revenue] =
       await Promise.all([
@@ -902,6 +866,8 @@ export async function saveOrUpdateRoutine(
   }
 
   try {
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const trainerResult = await sql`
       SELECT id FROM trainers WHERE user_id = ${session.id}
     `;
@@ -946,6 +912,8 @@ export async function getTrainerRoutines(_userId: number) {
     const session = await getSession();
     if (!session || session.role !== "trainer" || session.gymId == null) return [];
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const trainerResult = await sql`
       SELECT id
       FROM trainers
@@ -978,6 +946,8 @@ export async function getTrainerMembers(_userId: number) {
     const session = await getSession();
     if (!session || session.role !== "trainer" || session.gymId == null) return [];
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "members");
     const trainerRes = await sql`
       SELECT id
       FROM trainers
@@ -1043,6 +1013,8 @@ export async function assignRoutineToMember(
       return { success: false, error: "No autorizado." };
     }
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const [trainer] = await sql`
       SELECT id
       FROM trainers
@@ -1135,6 +1107,8 @@ export async function getMemberRoutines(_memberUserId: number) {
       return [];
     }
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const memberResult = await sql`
       SELECT id
       FROM members
@@ -1242,6 +1216,8 @@ export async function logWorkout(routineId: number, details: any) {
   }
 
   try {
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const memberRes = await sql`
       SELECT id
       FROM members
@@ -1320,6 +1296,8 @@ export async function getMemberRoutinesWithStatus(_userId: number) {
       return [];
     }
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const memberRes = await sql`
       SELECT id, routine_id, trainer_id
       FROM members
@@ -1399,6 +1377,8 @@ export async function getMemberRoutineData(routineId: number) {
     let routineRes: any[] = [];
 
     if (session.role === "member") {
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
       routineRes = await sql`
         SELECT r.id, r.title, r.notes
         FROM routines r
@@ -1506,6 +1486,8 @@ export async function deleteRoutine(routineId: number) {
 
     const id = Number(routineId);
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const [trainer] = await sql`
       SELECT id
       FROM trainers
@@ -1575,6 +1557,8 @@ export async function resetTodayWorkout(memberId: number, routineId: number) {
       return { success: false, error: "No autorizado" };
     }
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const [trainer] = await sql`
       SELECT id
       FROM trainers
@@ -1651,6 +1635,8 @@ export async function removeMemberFromTrainer(memberId: number) {
       return { error: "No autorizado" };
     }
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "members");
     const [trainer] = await sql`
       SELECT id
       FROM trainers
@@ -1692,6 +1678,8 @@ export async function getMemberWorkoutHistory(memberId: number) {
       return [];
     }
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const [trainer] = await sql`
       SELECT id
       FROM trainers
@@ -1849,6 +1837,8 @@ export async function getTrainerMembersAndRoutines(_userId: number) {
       return { members: [], routines: [] };
     }
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const trainerRes = await sql`
       SELECT id
       FROM trainers
@@ -1928,6 +1918,8 @@ export async function assignRoutineToMultipleMembersBulk(
       return { success: false, count: 0, error: "No autorizado" };
     }
 
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "training");
     const [trainer] = await sql`
       SELECT id
       FROM trainers
@@ -2154,6 +2146,8 @@ export async function processCheckInAction(identifier: string) {
   }
 
   try {
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "attendance");
     const res = await fetch(apiUrl("/attendance/check-in"), {
       method: "POST",
       headers: await getApiAuthHeaders(),
@@ -2200,6 +2194,7 @@ export async function createPlanAction(formData: FormData) {
   const weeklyClassLimit = includesClasses ? Number(formData.get("weeklyClassLimit") || 0) : 0;
 
   try {
+    await requireModuleAccess(await requireGymAdminSession(), "memberships");
     const res = await fetch(apiUrl("/memberships/plans"), {
       method: "POST",
       headers: await getApiAuthHeaders(),
@@ -2217,6 +2212,9 @@ export async function createPlanAction(formData: FormData) {
     }
   } catch (error) {
     console.error("Error al crear plan:", error);
+    if (error instanceof Error && error.message === "El módulo no está habilitado") {
+      return { success: false, error: "El módulo Membresías no está habilitado para este gimnasio." };
+    }
     return { success: false, error: "Error de conexión" };
   }
 }
@@ -2232,6 +2230,7 @@ export async function updatePlanAction(id: number, formData: FormData) {
   const weeklyClassLimit = includesClasses ? Number(formData.get("weeklyClassLimit") || 0) : 0;
 
   try {
+    await requireModuleAccess(await requireGymAdminSession(), "memberships");
     const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "PUT",
       headers: await getApiAuthHeaders(),
@@ -2240,12 +2239,16 @@ export async function updatePlanAction(id: number, formData: FormData) {
     return await res.json();
   } catch (error) {
     console.error("Error al actualizar plan:", error);
+    if (error instanceof Error && error.message === "El módulo no está habilitado") {
+      return { success: false, error: "El módulo Membresías no está habilitado para este gimnasio." };
+    }
     return { success: false, error: "Error de conexión" };
   }
 }
 
 export async function deletePlanAction(id: number) {
   try {
+    await requireModuleAccess(await requireGymAdminSession(), "memberships");
     const res = await fetch(apiUrl(`/memberships/plans/${id}`), {
       method: "DELETE",
       headers: await getApiAuthHeaders(),
@@ -2253,6 +2256,9 @@ export async function deletePlanAction(id: number) {
     return await res.json();
   } catch (error) {
     console.error("Error al desactivar plan:", error);
+    if (error instanceof Error && error.message === "El módulo no está habilitado") {
+      return { success: false, error: "El módulo Membresías no está habilitado para este gimnasio." };
+    }
     return { success: false, error: "Error de conexión" };
   }
 }
@@ -2261,6 +2267,7 @@ export async function deletePlanAction(id: number) {
 export async function updateMemberStatusAction(memberId: number, status: string) {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "members");
 
     const result = await sql`
       UPDATE members 
@@ -2285,6 +2292,7 @@ export async function updateMemberStatusAction(memberId: number, status: string)
 export async function deleteMemberAction(memberId: number) {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "members");
 
     const [member] = await sql`
       SELECT id
@@ -2328,6 +2336,7 @@ export async function updateMemberAction(
 ) {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "members");
 
     const updated = await sql`
       UPDATE members
@@ -2464,6 +2473,8 @@ export async function registerAttendanceAction(
 
     // 1. Buscar al socio dentro del gimnasio.
     // No registrar asistencia directamente en esta función.
+    if (!session || session.gymId == null) throw new Error("No autorizado");
+    await requireModuleAccess(session, "attendance");
     const members = isNumber
       ? await sql`
           SELECT
@@ -2558,7 +2569,9 @@ export async function registerAttendanceAction(
 
     return {
       success: false,
-      error: "Error interno al procesar el ingreso",
+      error: error instanceof Error && error.message === "El módulo no está habilitado"
+        ? "El módulo Asistencias no está habilitado para este gimnasio."
+        : "Error interno al procesar el ingreso",
     };
   }
 }
@@ -2573,6 +2586,7 @@ export async function createPayment(formData: FormData) {
 
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "payments");
 
     if (session.role !== "admin") {
       return { success: false, error: "No tenés permisos para registrar pagos." };
@@ -2634,6 +2648,7 @@ export async function createPayment(formData: FormData) {
 export async function createFlexibleInPersonPayment(formData: FormData) {
   try {
     const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "payments");
     if (process.env.ENABLE_FLEXIBLE_PASS_SALES !== "true") {
       return { success: false, error: "La venta de pases flexibles está deshabilitada." };
     }
@@ -2714,12 +2729,14 @@ export async function createMercadoPagoPreferenceAction(
   try {
     const session = await requireTenantSession();
 
-    if (!["admin", "member", "superadmin"].includes(session.role)) {
+    if (!["admin", "member"].includes(session.role)) {
       return {
         success: false,
         error: "No tenés permisos para generar este cobro.",
       };
     }
+
+    if (session.role === "admin") await requireModuleAccess(session, "payments");
 
     if (!Number.isFinite(planId) || planId <= 0) {
       return { success: false, error: "Plan inválido." };
@@ -2784,6 +2801,7 @@ export async function createMercadoPagoPreferenceAction(
 export async function getPaymentsHistory() {
   try {
     const session = await requireTenantSession();
+    await requireModuleAccess(session, "payments");
 
     const payments = await sql`
       SELECT 
@@ -3522,6 +3540,23 @@ export async function createSaaSManualInvoiceAction(subscriptionId: number, amou
   }
 }
 
+export async function reviewSaaSTransferAction(id: string, decision: "approved" | "rejected", notes: string) {
+  try {
+    const session = await requireSuperAdminSession();
+    if (!/^[1-9][0-9]{0,18}$/.test(id) || !["approved", "rejected"].includes(decision) || typeof notes !== "string" || notes.length > 1000 || (decision === "rejected" && !notes.trim())) {
+      return { success: false, error: "Datos de revisión inválidos." };
+    }
+    const [result] = await sql`SELECT public.review_kivra_saas_transfer(${id}::bigint, ${session.id}::integer, ${decision}::text, ${notes.trim()}::text) AS reviewed`;
+    if (!result?.reviewed) return { success: false, error: "La transferencia ya fue revisada o la factura no admite esta operación." };
+    revalidatePath("/admin/facturacion");
+    revalidatePath("/admin/actividad");
+    return { success: true };
+  } catch (error) {
+    console.error("Error al revisar transferencia SaaS:", error);
+    return { success: false, error: "No se pudo revisar la transferencia." };
+  }
+}
+
 export async function markSaaSInvoicePaidAction(invoiceId: number) {
   try {
     const session = await requireSuperAdminSession();
@@ -3617,6 +3652,7 @@ export async function getSaaSAuditLogAction(limit: number = 100) {
 export async function setMemberTrainerFromAdmin(memberId: number, trainerId: number | null) {
   try {
     const session = await requireGymAdminSession();
+    await requireModuleAccess(session, "members");
     if (!Number.isSafeInteger(memberId) || memberId <= 0 ||
       (trainerId !== null && (!Number.isSafeInteger(trainerId) || trainerId <= 0))) {
       return { success: false, error: "Datos de asignación inválidos" };
@@ -3659,6 +3695,7 @@ export async function setMemberTrainerFromAdmin(memberId: number, trainerId: num
 
 export async function getMemberAssignedTrainer(memberId: number) {
   const session = await requireTenantSession();
+    await requireModuleAccess(session, "members");
   const rows = await sql`
     SELECT t.id, t.first_name, t.last_name, t.specialization, t.is_active
     FROM members m

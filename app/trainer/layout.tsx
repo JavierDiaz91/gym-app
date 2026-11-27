@@ -10,7 +10,13 @@ export default async function TrainerLayout({
 }) {
   const session = await getSession();
   let trainerName = "";
+  let showClasses = false;
+  let enabledModules: string[] = [];
   if (session?.role === "trainer" && session.gymId != null) {
+    const [access] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'classes', 'trainer') AS enabled`;
+    showClasses = access?.enabled === true;
+    const moduleRows = await sql`SELECT module_code FROM public.saas_module_roles WHERE role = 'trainer' AND public.kivra_gym_module_enabled(${session.gymId}::integer, module_code, role)`;
+    enabledModules = moduleRows.map(row => String(row.module_code));
     const rows = await sql`
       SELECT t.first_name, t.last_name
       FROM trainers t
@@ -24,7 +30,7 @@ export default async function TrainerLayout({
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-background text-foreground relative">
       {/* Sidebar preparado para ocultarse en celular y ser fijo en PC */}
-      <TrainerSidebar displayName={displayName} />
+      <TrainerSidebar displayName={displayName} showClasses={showClasses} enabledModules={enabledModules} />
 
       {/* Contenido principal con límites de ancho responsivos */}
       <main className="flex-1 w-full min-w-0 p-4 md:p-8 overflow-y-auto">

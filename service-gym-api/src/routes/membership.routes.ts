@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { MembershipController } from "../controllers/membership.controller";
 import { authenticate, requireRole } from "../middlewares/auth";
-import { checkTenantStatus } from "../middlewares/checkTenantStatus";
+import { checkTenantStatus, requireModule } from "../middlewares/checkTenantStatus";
 
 const router = Router();
 
@@ -16,37 +16,37 @@ router.get(
 router.post(
   "/plans",
   requireRole("admin", "superadmin"),
-  MembershipController.createPlan
+  requireModule("memberships"), MembershipController.createPlan
 );
 router.post(
   "/plans/flexible-drafts",
   requireRole("admin", "superadmin"),
-  MembershipController.createFlexibleDraft
+  requireModule("memberships"), MembershipController.createFlexibleDraft
 );
 router.post(
   "/payments/flexible-in-person",
   requireRole("admin", "superadmin"),
-  MembershipController.recordFlexibleInPersonPayment
+  requireModule("payments"), MembershipController.recordFlexibleInPersonPayment
 );
 router.post(
   "/plans/:id/activate-flexible",
   requireRole("admin", "superadmin"),
-  MembershipController.activateFlexiblePlan
+  requireModule("memberships"), MembershipController.activateFlexiblePlan
 );
 router.post(
   "/subscribe",
   requireRole("admin", "superadmin"),
-  MembershipController.subscribeMember
+  requireModule("memberships"), MembershipController.subscribeMember
 );
 router.put(
   "/plans/:id",
   requireRole("admin", "superadmin"),
-  MembershipController.updatePlan
+  requireModule("memberships"), MembershipController.updatePlan
 );
 router.delete(
   "/plans/:id",
   requireRole("admin", "superadmin"),
-  MembershipController.deletePlan
+  requireModule("memberships"), MembershipController.deletePlan
 );
 
 export default router;

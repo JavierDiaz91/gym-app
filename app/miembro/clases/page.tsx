@@ -5,6 +5,8 @@ import MemberClasses from "@/components/member/MemberClasses";
 export const dynamic="force-dynamic";
 export default async function Page(){
  const session=await getSession();if(!session||session.role!=="member"||session.gymId==null)redirect("/login");
+ const [moduleAccess] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'classes', ${session.role}::text) AS enabled`;
+ if (moduleAccess?.enabled !== true) redirect("/miembro");
  const [m]=await sql`SELECT id FROM members WHERE user_id=${session.id} AND gym_id=${session.gymId} LIMIT 1`;
  if(!m)return <p>No encontramos tu perfil de alumno.</p>;
  const [entitlement] = await sql`SELECT 1 FROM subscriptions sub JOIN membership_plans p ON p.id=sub.plan_id AND p.gym_id=${session.gymId} WHERE sub.member_id=${m.id} AND sub.status IN ('active','scheduled') AND sub.payment_status='paid' AND sub.end_date>CURRENT_DATE AND p.includes_classes=true LIMIT 1`;

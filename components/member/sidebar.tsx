@@ -16,11 +16,14 @@ import { logoutUser } from "@/app/actions";
 
 interface MemberSidebarProps {
   showClasses?: boolean;
+  enabledModules?: string[];
   user?: {
     name?: string;
     email?: string;
   };
 }
+
+const moduleByPath: Record<string, string> = {"/miembro":"training","/miembro/historial":"history"};
 
 const navigation = [
   { name: "Mi Rutina", href: "/miembro", icon: Dumbbell },
@@ -29,7 +32,7 @@ const navigation = [
   { name: "Mi Perfil", href: "/miembro/perfil", icon: User },
 ];
 
-export default function MemberSidebar({ user, showClasses = false }: MemberSidebarProps) {
+export default function MemberSidebar({ user, showClasses = false, enabledModules = [] }: MemberSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -121,7 +124,7 @@ export default function MemberSidebar({ user, showClasses = false }: MemberSideb
               Menú Alumno
             </p>
 
-            {navigation.filter(item => showClasses || item.href !== "/miembro/clases").map((item) => {
+            {navigation.filter(item => (showClasses || item.href !== "/miembro/clases") && (!moduleByPath[item.href] || enabledModules.includes(moduleByPath[item.href]))).map((item) => {
               const Icon = item.icon;
               const isActive =
                 item.href === "/miembro"

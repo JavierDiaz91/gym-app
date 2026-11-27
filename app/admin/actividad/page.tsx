@@ -13,6 +13,11 @@ import {
 
 function eventMeta(action: string) {
   switch (action) {
+    case "login": return { label: "Inicio de sesión", icon: UserRoundCog };
+    case "payment_methods_updated": return { label: "Medios de cobro actualizados", icon: BadgeDollarSign };
+    case "saas_transfer_submitted": return { label: "Transferencia informada", icon: FilePlus2 };
+    case "saas_transfer_approved": return { label: "Transferencia aprobada", icon: FileCheck2 };
+    case "saas_transfer_rejected": return { label: "Transferencia rechazada", icon: Activity };
     case "saas_plan_created":
       return {
         label: "Plan SaaS creado",
@@ -112,7 +117,7 @@ export default async function ActividadSaaSPage() {
   ).length;
 
   const billingEvents = events.filter((event: any) =>
-    ["saas_invoice_generated", "saas_invoice_paid"].includes(event.action)
+    ["saas_invoice_generated", "saas_invoice_paid", "saas_transfer_submitted", "saas_transfer_approved", "saas_transfer_rejected", "payment_methods_updated"].includes(event.action)
   ).length;
 
   return (
