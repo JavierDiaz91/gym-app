@@ -7,9 +7,10 @@ interface KpiStats {
   monthlyRevenue: number;
 }
 
-export function KpiSection({ stats }: { stats: KpiStats }) {
+export function KpiSection({ stats, enabledModules }: { stats: KpiStats; enabledModules?: string[] }) {
   const kpis = [
     {
+      module: "members",
       title: "Miembros Activos",
       value: stats.totalMembers,
       subtitle: "Clientes registrados activos",
@@ -19,6 +20,7 @@ export function KpiSection({ stats }: { stats: KpiStats }) {
       hoverBorder: "hover:border-info/40",
     },
     {
+      module: "memberships",
       title: "Suscripciones Vigentes",
       value: stats.activeSubscriptions,
       subtitle: "Pases/Planes al día",
@@ -28,6 +30,7 @@ export function KpiSection({ stats }: { stats: KpiStats }) {
       hoverBorder: "hover:border-purple/40",
     },
     {
+      module: "attendance",
       title: "Asistencias Hoy",
       value: stats.todayAttendance,
       subtitle: "Ingresos de la jornada",
@@ -37,6 +40,7 @@ export function KpiSection({ stats }: { stats: KpiStats }) {
       hoverBorder: "hover:border-warning/40",
     },
     {
+      module: "payments",
       title: "Ingresos del Mes",
       value: `$${stats.monthlyRevenue.toLocaleString("es-AR")}`,
       subtitle: "Recaudación acumulada",
@@ -45,10 +49,12 @@ export function KpiSection({ stats }: { stats: KpiStats }) {
       topBar: "bg-success",
       hoverBorder: "hover:border-success/40",
     },
-  ];
+  ].filter(kpi => !enabledModules || enabledModules.includes(kpi.module));
+  if (!kpis.length) return null;
+  const columns = ["", "grid-cols-1", "grid-cols-1 sm:grid-cols-2", "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3", "grid-cols-2 xl:grid-cols-4"][kpis.length];
 
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-4">
+    <div className={`grid ${columns} gap-2 sm:gap-4`}>
       {kpis.map((kpi, index) => {
         const Icon = kpi.icon;
         return (
