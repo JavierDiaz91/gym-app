@@ -236,7 +236,8 @@ async function requireTenantSession() {
   return { ...session, gymId: session.gymId };
 }
 
-async function requireModuleAccess(session: { gymId: number | string; role: string }, moduleCode: string) {
+async function requireModuleAccess(session: { gymId: number | string | null; role: string }, moduleCode: string) {
+  if (session.gymId == null) throw new Error("No autorizado: gimnasio requerido");
   const [access] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, ${moduleCode}::text, ${session.role}::text) AS enabled`;
   if (access?.enabled !== true) throw new Error("El módulo no está habilitado");
 }
