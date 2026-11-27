@@ -17,9 +17,11 @@ export type PlanInput = {
 const dimensions = ["discipline", "objective", "level", "audience"] as const;
 
 
-async function trainerContext() {
+async function trainerContext(moduleCode: 'training' | 'categories' = 'training') {
   const session = await getSession();
   if (!session || session.role !== "trainer" || session.gymId == null) throw new Error("No autorizado");
+  const [access] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, ${moduleCode}::text, 'trainer') AS enabled`;
+  if (access?.enabled !== true) throw new Error("Módulo deshabilitado");
   const trainers = await sql`
     SELECT id FROM trainers
     WHERE user_id = ${session.id} AND gym_id = ${session.gymId} AND is_active IS DISTINCT FROM FALSE
@@ -281,7 +283,7 @@ export async function listEnabledTrainingCategories() {
 
 export async function createTrainerCategory(dimension: string, labelInput: string) {
   try {
-    const { gymId, trainerId } = await trainerContext();
+    const { gymId, trainerId } = await trainerContext('categories');
     const label = labelInput.trim().replace(/\\s+/g, " ");
     if (!dimensions.includes(dimension as typeof dimensions[number]) || label.length < 2 || label.length > 80)
       return { success: false, error: "Ingresá un nombre de 2 a 80 caracteres." };
@@ -303,7 +305,7 @@ export async function createTrainerCategory(dimension: string, labelInput: strin
 
 export async function setTrainerCategoryActive(slug: string, active: boolean) {
   try {
-    const { gymId, trainerId } = await trainerContext();
+    const { gymId, trainerId } = await trainerContext('categories');
     const rows = await sql`UPDATE training_categories SET is_active=${active}
       WHERE gym_id=${gymId} AND trainer_id=${trainerId} AND slug=${slug}
       RETURNING id`;
@@ -315,7 +317,7 @@ export async function setTrainerCategoryActive(slug: string, active: boolean) {
 }
 
 export async function listTrainerCategoriesForManagement() {
-  const { gymId, trainerId } = await trainerContext();
+  const { gymId, trainerId } = await trainerContext('categories');
   const rows = await sql`SELECT dimension, slug, label, is_active FROM training_categories
     WHERE gym_id=${gymId} AND trainer_id=${trainerId}
     ORDER BY dimension, label`;
