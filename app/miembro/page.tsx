@@ -52,6 +52,8 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
   if (!session || session.role !== "member" || session.gymId == null) redirect("/login");
 
   const userId = session.id;
+  const [trainingAccess] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'training', 'member') AS enabled`;
+  const trainingEnabled = trainingAccess?.enabled === true;
 
   // Only members with no subscription or payment history qualify for onboarding.
   const firstMembership = await sql`
@@ -64,12 +66,11 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
     LIMIT 1
   `.catch((error) => { console.error("First membership lookup failed", error); return []; });
   if (firstMembership[0]) {
-    return <FirstMembership name={String(firstMembership[0].first_name)} gymName={String(firstMembership[0].gym_name)} dashboard directCheckout={process.env.KIVRA_MEMBER_DIRECT_CHECKOUT_ENABLED === "true"} />;
+    return <FirstMembership name={String(firstMembership[0].first_name)} gymName={String(firstMembership[0].gym_name)} dashboard trainingEnabled={trainingEnabled} directCheckout={process.env.KIVRA_MEMBER_DIRECT_CHECKOUT_ENABLED === "true"} />;
   }
 
 
-  const [trainingAccess] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'training', 'member') AS enabled`;
-  const trainingEnabled = trainingAccess?.enabled === true;
+
 
   // El estado de pagos se sincroniza exclusivamente por webhook de Mercado Pago.
   await searchParams;
@@ -258,7 +259,7 @@ export default async function MiembroDashboardPage({ searchParams }: PageProps) 
             <p className="text-xs text-muted-foreground leading-relaxed">
               {isFullyActive
                 ? "Tenés acceso completo a las instalaciones"
-                : memberData?.payment_status === "pending" ? "Tenés una cuota pendiente. Pagala para habilitar tus entrenamientos." : "Regularizá tu cuota para volver a entrenar"}
+                : memberData?.payment_status === "pending" ? "Tenés una cuota pendiente. Pagala para activar tu membresía." : "Regularizá tu cuota para recuperar los beneficios de tu membresía"}
             </p>
           </div>
 
