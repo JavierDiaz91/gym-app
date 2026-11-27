@@ -2569,7 +2569,9 @@ export async function registerAttendanceAction(
 
     return {
       success: false,
-      error: "Error interno al procesar el ingreso",
+      error: error instanceof Error && error.message === "El módulo no está habilitado"
+        ? "El módulo Asistencias no está habilitado para este gimnasio."
+        : "Error interno al procesar el ingreso",
     };
   }
 }
