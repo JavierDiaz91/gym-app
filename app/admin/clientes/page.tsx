@@ -42,10 +42,10 @@ export default async function ClientesAdministradoresPage({ searchParams }: { se
   `;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       <div className="border-b border-border pb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Kivra SaaS</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Clientes / Administradores</h1>
+        <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">Clientes / Administradores</h1>
         <p className="mt-1 text-muted-foreground">
           {gymFilter ? `Cuentas administradoras del gimnasio #${gymFilter}.` : "Cuentas administradoras asociadas a cada gimnasio de la plataforma."}
         </p>
@@ -91,7 +91,7 @@ export default async function ClientesAdministradoresPage({ searchParams }: { se
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="pb-3">Administrador</th>

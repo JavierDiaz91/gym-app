@@ -191,26 +191,26 @@ export default function SaaSBillingClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
-          <CardContent className="p-5">
+          <CardContent className="p-4 sm:p-5">
             <p className="text-sm text-muted-foreground">Suscripciones SaaS</p>
-            <p className="mt-3 text-3xl font-bold">{subscriptions.length}</p>
+            <p className="mt-3 break-words text-2xl sm:text-3xl font-bold">{subscriptions.length}</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-5">
+          <CardContent className="p-4 sm:p-5">
             <p className="text-sm text-muted-foreground">Pendiente de cobro</p>
-            <p className="mt-3 text-3xl font-bold">{formatMoney(totalPending)}</p>
+            <p className="mt-3 break-words text-2xl sm:text-3xl font-bold">{formatMoney(totalPending)}</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-5">
+          <CardContent className="p-4 sm:p-5">
             <p className="text-sm text-muted-foreground">Cobrado</p>
-            <p className="mt-3 text-3xl font-bold">{formatMoney(totalPaid)}</p>
+            <p className="mt-3 break-words text-2xl sm:text-3xl font-bold">{formatMoney(totalPaid)}</p>
           </CardContent>
         </Card>
       </div>

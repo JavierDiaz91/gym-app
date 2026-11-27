@@ -121,12 +121,12 @@ export default async function ActividadSaaSPage() {
   ).length;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       <div className="border-b border-border pb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           Kivra SaaS
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Actividad</h1>
+        <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">Actividad</h1>
         <p className="mt-1 text-muted-foreground">
           Historial de acciones administrativas realizadas sobre la plataforma.
         </p>
@@ -186,7 +186,7 @@ export default async function ActividadSaaSPage() {
                     key={event.id}
                     className="flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                         <Icon className="h-4 w-4" />
                       </div>
