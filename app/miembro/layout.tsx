@@ -12,6 +12,8 @@ export default async function MemberLayout({
   const session = await getSession();
   if (!session || session.role !== "member") redirect("/login");
 
+  const moduleRows = session.gymId == null ? [] : await sql`SELECT module_code FROM public.saas_module_roles WHERE role = 'member' AND public.kivra_gym_module_enabled(${session.gymId}::integer, module_code, role)`;
+  const enabledModules = moduleRows.map(row => String(row.module_code));
   const [classBenefit] = session.gymId == null ? [] : await sql`
     SELECT 1 FROM members m
     JOIN subscriptions sub ON sub.member_id = m.id
@@ -30,7 +32,7 @@ export default async function MemberLayout({
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-background">
-      <MemberSidebar user={userData} showClasses={Boolean(classBenefit)} />
+      <MemberSidebar user={userData} showClasses={Boolean(classBenefit)} enabledModules={enabledModules} />
       <main className="flex-1 w-full min-w-0 p-4 md:p-8 overflow-y-auto">
         {children}
       </main>
