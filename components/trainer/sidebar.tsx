@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { logoutUser } from "@/app/actions"; 
 
+const moduleByPath: Record<string, string> = {"/trainer/alumnos":"members","/trainer/rutinas/planes":"training","/trainer/ejercicios":"training","/trainer/mis-categorias":"categories","/trainer/asignar-masivo":"training"};
+
 const navigation = [
   { name: "Dashboard", href: "/trainer", icon: LayoutDashboard },
   { name: "Mis Alumnos", href: "/trainer/alumnos", icon: Users },
@@ -27,7 +29,7 @@ const navigation = [
   { name: "Asignación Masiva", href: "/trainer/asignar-masivo", icon: UserCheck },
 ];
 
-export default function TrainerSidebar({ displayName, showClasses = true }: { displayName: string; showClasses?: boolean }) {
+export default function TrainerSidebar({ displayName, showClasses = true, enabledModules = [] }: { displayName: string; showClasses?: boolean; enabledModules?: string[] }) {
   const initials = displayName.includes("@")
     ? displayName.slice(0, 2).toUpperCase()
     : displayName.trim().split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join("").toUpperCase();
@@ -114,7 +116,7 @@ export default function TrainerSidebar({ displayName, showClasses = true }: { di
               Menú Principal
             </p>
 
-            {navigation.filter(item => item.href !== '/trainer/clases' || showClasses).map((item) => {
+            {navigation.filter(item => (item.href !== '/trainer/clases' || showClasses) && (!moduleByPath[item.href] || enabledModules.includes(moduleByPath[item.href]))).map((item) => {
               const Icon = item.icon;
               const isActive =
                 item.href === "/trainer"
