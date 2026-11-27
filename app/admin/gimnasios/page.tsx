@@ -48,7 +48,7 @@ export default async function AdminGymsPage() {
   const subscriptions = (subscriptionsResult.success ? subscriptionsResult.data : []).filter(isSaaSSubscription);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-0 sm:p-4 lg:p-6 min-w-0 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
           <h1 className="text-2xl font-black text-foreground tracking-tight">
