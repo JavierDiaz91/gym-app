@@ -13,16 +13,21 @@ export default async function TrainerAlumnosPage() {
     redirect("/login");
   }
 
+  if (session.gymId == null) redirect("/login");
+  const [permissions] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'members', 'trainer') AS members, public.kivra_gym_module_enabled(${session.gymId}::integer, 'training', 'trainer') AS training`;
+  if (!permissions?.members) redirect("/trainer");
+  const showTraining = permissions.training === true;
+
   // Cargar alumnos y catálogo de rutinas en paralelo
   const [rawMembers, serverRoutines, allPlans] = await Promise.all([
     getTrainerMembers(session.id),
-    getTrainerRoutines(session.id),
-    listTrainingPlans(),
+    showTraining ? getTrainerRoutines(session.id) : Promise.resolve([]),
+    showTraining ? listTrainingPlans() : Promise.resolve([]),
   ]);
 
   const publishedPlans = allPlans.filter((p) => p.status === "published");
   const memberIds = (rawMembers || []).map((m: any) => Number(m.id));
-  const planAssignments = memberIds.length ? await sql`
+  const planAssignments = showTraining && memberIds.length ? await sql`
     SELECT mtp.member_id, mtp.id AS assignment_id, tp.title, mtp.source_plan_id,
       mtp.start_date::text AS start_date, tp.duration_weeks,
       CASE WHEN CURRENT_DATE < mtp.start_date THEN 'scheduled'
@@ -36,7 +41,7 @@ export default async function TrainerAlumnosPage() {
       AND mtp.status = 'active'
     ORDER BY mtp.member_id, mtp.id DESC
   ` : [];
-  const lastSessions = memberIds.length ? await sql`
+  const lastSessions = showTraining && memberIds.length ? await sql`
     SELECT ws.member_id, MAX(ws.finished_at) AS last_finished_at
     FROM workout_sessions ws
     JOIN member_training_plans mtp ON mtp.id = ws.member_training_plan_id
@@ -58,12 +63,12 @@ export default async function TrainerAlumnosPage() {
     last_name: row.last_name || "",
     phone: row.phone || "",
     status: row.status || "active",
-    routines: Array.isArray(row.routines) 
+    routines: !showTraining ? [] : Array.isArray(row.routines) 
       ? row.routines 
       : row.routine_name 
         ? [{ id: Number(row.routine_id), title: row.routine_name }] 
         : [],
-    last_workout_at: row.last_workout_at ? String(row.last_workout_at) : undefined,
+    last_workout_at: showTraining && row.last_workout_at ? String(row.last_workout_at) : undefined,
     last_workout: lastWorkoutByMember.get(Number(row.id)) ? formatArgentinaDate(lastWorkoutByMember.get(Number(row.id))) + " (Argentina)" : undefined,
     training_plans: planAssignments.filter((p) => Number(p.member_id) === Number(row.id)).map((p) => ({
       assignmentId: Number(p.assignment_id), title: String(p.title), sourcePlanId: Number(p.source_plan_id),
@@ -85,6 +90,7 @@ export default async function TrainerAlumnosPage() {
         routines={routines} 
         trainingPlans={publishedPlans} 
         sessionUserId={session.id}
+        showTraining={showTraining}
       />
     </div>
   );
