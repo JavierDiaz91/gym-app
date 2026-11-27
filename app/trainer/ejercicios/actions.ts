@@ -14,6 +14,8 @@ export type ExerciseInput = Omit<TrainerExercise, "id">;
 async function owner() {
   const session = await getSession();
   if (!session || session.role !== "trainer" || session.gymId == null) throw new Error("No autorizado");
+  const [access] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'training', 'trainer') AS enabled`;
+  if (access?.enabled !== true) throw new Error("Módulo de entrenamiento deshabilitado");
   const rows = await sql`SELECT id FROM trainers WHERE user_id = ${session.id} AND gym_id = ${session.gymId} AND is_active IS DISTINCT FROM FALSE LIMIT 1`;
   if (!rows.length) throw new Error("Entrenador no habilitado");
   return { gymId: Number(session.gymId), trainerId: Number(rows[0].id) };
