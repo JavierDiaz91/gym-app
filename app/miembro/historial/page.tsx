@@ -15,6 +15,8 @@ const dateLabel=(value:string)=>new Intl.DateTimeFormat("es-AR",{timeZone:"Ameri
 export default async function MemberHistoryPage() {
  const session=await getSession();
  if(!session||session.role!=="member"||session.gymId==null)redirect("/login");
+ const [access]=await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'history', 'member') AS enabled`;
+ if(access?.enabled!==true)redirect("/miembro/perfil");
  const members=await sql`SELECT id FROM members WHERE user_id=${session.id} AND gym_id=${session.gymId} LIMIT 1`;
  const memberId=members[0]?.id;
  const entries:Entry[]=[];
