@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache";
 async function memberContext(assignmentId: number, week: number, day: number) {
   const session = await getSession();
   if (!session || session.role !== "member" || session.gymId == null) throw new Error("No autorizado");
+  const [access] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'training', 'member') AS enabled`;
+  if (access?.enabled !== true) throw new Error("Módulo de entrenamiento deshabilitado");
   if (![assignmentId, week, day].every(Number.isSafeInteger) || assignmentId < 1 || week < 1 || day < 1) throw new Error("Parámetros inválidos");
   const rows = await sql`
     SELECT mtp.id, mtp.snapshot_jsonb, tp.duration_weeks
