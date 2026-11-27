@@ -93,7 +93,8 @@ export default async function MembershipPage() {
     LIMIT 1
   `.catch((error) => { console.error("First membership lookup failed", error); return []; });
   if (firstMembership[0]) {
-    return <FirstMembership name={String(firstMembership[0].first_name)} gymName={String(firstMembership[0].gym_name)} directCheckout={process.env.KIVRA_MEMBER_DIRECT_CHECKOUT_ENABLED === "true"} />;
+    const [trainingAccess] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'training', 'member') AS enabled`;
+    return <FirstMembership trainingEnabled={trainingAccess?.enabled === true} name={String(firstMembership[0].first_name)} gymName={String(firstMembership[0].gym_name)} directCheckout={process.env.KIVRA_MEMBER_DIRECT_CHECKOUT_ENABLED === "true"} />;
   }
 
 
