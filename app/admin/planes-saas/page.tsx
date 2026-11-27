@@ -22,7 +22,7 @@ export default async function PlanesSaaSPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           Kivra SaaS
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Planes SaaS</h1>
+        <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">Planes SaaS</h1>
         <p className="mt-1 text-muted-foreground">
           Administrá los planes comerciales que Kivra ofrece a los gimnasios.
         </p>
