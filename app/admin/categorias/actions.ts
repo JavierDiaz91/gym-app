@@ -7,6 +7,8 @@ const dimensions = ["discipline","objective","level","audience"] as const;
 async function gym() {
  const s = await getSession();
  if (!s || s.role !== "admin" || !Number.isSafeInteger(Number(s.gymId)) || Number(s.gymId) <= 0) throw new Error("No autorizado");
+ const [access]=await sql`SELECT public.kivra_gym_module_enabled(${s.gymId}::integer, 'categories', 'admin') AS enabled`;
+ if(access?.enabled!==true)throw new Error("Módulo deshabilitado");
  return Number(s.gymId);
 }
 export async function listGymCategories() {
