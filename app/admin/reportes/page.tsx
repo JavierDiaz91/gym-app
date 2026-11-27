@@ -10,6 +10,8 @@ const valid = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2
 export default async function ReportesPage({searchParams}: {searchParams: Promise<{period?:string;from?:string;to?:string}>}) {
   const session = await getSession();
   if (!session || session.role !== "admin" || !session.gymId) return <p>No autorizado.</p>;
+  const [access] = await sql`SELECT public.kivra_gym_module_enabled(${session.gymId}::integer, 'reports', 'admin') AS enabled`;
+  if (access?.enabled !== true) return <p>Módulo deshabilitado.</p>;
   const gym = session.gymId;
   const params = await searchParams;
   const today = new Intl.DateTimeFormat("sv-SE",{timeZone:"America/Argentina/Buenos_Aires",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
